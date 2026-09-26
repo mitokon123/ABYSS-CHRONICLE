@@ -36,6 +36,8 @@
     this.panel = new NS.Panel(game.ctx, this.theme);
     this.hpBar = new NS.HpBar(game.ctx, this.theme);
     this.renderer = new NS.Renderer(game.ctx);
+    // 使う相手の状態異常の印（仲間画面・戦闘と同じ絵）を描くのに使う
+    this.sprites = new NS.SpriteRenderer(game.ctx, game.assets);
     this.list = new NS.ScrollList(this.panel, this.layout.list);
     this.backButton = new NS.BackButton(this.panel, game.data);
     this.usage = new NS.ItemUsage(game.data);
@@ -213,6 +215,9 @@
     } else if (result.reason === "noEffect") {
       this._showNotice(this.texts.noEffect || "");
       this.game.playError();
+    } else if (result.reason === "fainted") {
+      this._showNotice((this.texts.targetFainted || "").replace("{name}", target.getName()));
+      this.game.playError();
     } else {
       this._showNotice(this.texts.cannotUse || "");
       this.game.playError();
@@ -336,8 +341,15 @@
       var selected = (i === this.targetIndex);
 
       if (selected) this.panel.drawText("▶", origin.x, y, { color: t.cursorColor });
-      this.panel.drawText(monster.getName() + " Lv" + monster.level, origin.x + 18, y,
+      var heading = monster.getName() + " Lv" + monster.level;
+      this.panel.drawText(heading, origin.x + 18, y,
         { color: selected ? t.cursorColor : t.textColor, font: t.smallFont });
+
+      // 掛かっている状態異常の印（毒など）。解毒草を誰に使うか選べるように
+      this.panel.ctx.font = t.smallFont || "12px monospace";
+      NS.StatusMarks.draw(this.panel, NS.StatusMarks.defsOf(monster),
+        origin.x + 18 + this.panel.ctx.measureText(heading).width + 8, y,
+        { maxX: rect.x + rect.w - (t.padding || 8), sprites: this.sprites, data: this.game.data });
 
       this.hpBar.draw(origin.x + 18, y + 8, 160, 8, monster.currentHp, monster.getMaxHp());
       this.panel.drawText(monster.currentHp + "/" + monster.getMaxHp(),

@@ -518,6 +518,9 @@
   BattleScene.prototype._playEvent = function (event, quick) {
     this.messageLog.stream(this.formatter.formatOne(event));
 
+    // 強化・弱体・特性・加護が発動したら、画面上部に札を出す
+    this._pushEffectPopup(event);
+
     var wait = quick
       ? (this.animation.quickDelay || 90)
       : (this.animation.eventDelay || 400);
@@ -526,6 +529,10 @@
     if (event.revealTarget) {
       this.animator.revealTo(event.revealTarget, event.revealHp);
     }
+    // 状態異常の印も、この瞬間に増やす・消す（_shownStatusesFor）
+    if (event.type === "status" || event.type === "statusEnd" || event.statusIds) {
+      this._revealStatusMark(event);
+    }
 
     this._playActionMotion(event);
     this._playSkillEffect(event);
@@ -533,10 +540,10 @@
     switch (event.type) {
       case "damage":
         this.animator.revealTo(event.target, event.currentHp);
-        // 会心のときは会心用の見た目にする
+        // クリティカルのときはクリティカル用の見た目にする
         this._applyStyle(event.critical ? "critical" : "damage",
           event.target, String(event.amount));
-        // 打撃か斬撃かは演出の型で決まる。会心も同じ音（専用の音は付けない、と決めてある）。
+        // 打撃か斬撃かは演出の型で決まる。クリティカルも同じ音（専用の音は付けない、と決めてある）。
         // 出した瞬間の音を持つ技は null が返り、当たった音は鳴らさない
         var hitSe = this._hitSeFor();
         if (hitSe) this.game.audio.playSe(hitSe);
@@ -636,6 +643,122 @@
     this.playbackTimer = wait;
   };
 
+  // --- 発動の札（画面上部のポップアップ） ---
+
+  /**
+   * 出来事から、画面上部に出す札を作る。札にならない出来事なら何もしない。
+   *
+   *   強化／弱体（modifier）… 「防御力上昇」「攻撃力低下」（緑／赤）
+   *   特性・加護・装備が働いた … その名前（「毒のとげ」「疾き初手」）。出どころで色を変える
+   *     ability（先手・放電・毒のとげ）／regen・drain（再生・吸精・命の灯・吸う牙）／
+   *     undying（亡者の魂）／partyFirstStrike（加護の先手をまとめたもの）
+   *
+   * 札の左端には、誰に起きたかを小さく出す（敵なら「敵の」付き）。
+   * 同じ相手・同じ札がまだ出ていれば、並べずに出し直す。
+   * 文言は data/messages.js の battle.popup…、見た目は data/ui.js の battle.effectPopup。
+   */
+  BattleScene.prototype._pushEffectPopup = function (event) {
+    var P = this.layout.effectPopup;
+    if (!P || !event) return;
+    var t = this.texts;
+
+    var text = null;
+    var kind = null;
+    if (event.type === "modifier") {
+      var mark = NS.StatusMarks.summarizeModifier({ effects: event.effects || [] });
+      var labels = t.popupStats || {};
+      var stat = labels[mark.stat] || labels.other || "";
+      text = fill(event.raised ? t.popupStatUp : t.popupStatDown, { stat: stat });
+      kind = event.raised ? "buff" : "debuff";
+    } else if (event.type === "ability" || event.type === "undying" || event.type === "partyFirstStrike" ||
+               ((event.type === "regen" || event.type === "drain") && event.abilityName)) {
+      text = event.abilityName;
+      kind = event.sourceKind || "ability";
+    }
+    if (!text) return;
+
+    var owner = (event.type === "partyFirstStrike")
+      ? (event.side === "enemy" ? t.popupEnemyAll : t.popupPartyAll)
+      : this._popupOwnerName(event);
+
+    if (!this.effectPopups) this.effectPopups = [];
+    // 同じ札がまだ出ていれば、出し直すだけ（並べない）
+    for (var i = 0; i < this.effectPopups.length; i++) {
+      var p = this.effectPopups[i];
+      if (p.text === text && p.owner === owner) {
+        this.effectPopups.splice(i, 1);
+        break;
+      }
+    }
+    this.effectPopups.unshift({ text: text, owner: owner || "", kind: kind, start: this.game.clock });
+    if (this.effectPopups.length > (P.max || 3)) this.effectPopups.length = P.max || 3;
+  };
+
+  /** 札に出す持ち主の名前。敵なら「敵の」を付ける（文と同じ見分け方） */
+  BattleScene.prototype._popupOwnerName = function (event) {
+    var name = event.targetName || (event.target && event.target.getName && event.target.getName()) || "";
+    if (!name) return "";
+    var enemy = event.targetSide ? (event.targetSide === "enemy") : (event.side === "ally");
+    return enemy ? (this.texts.popupEnemyPrefix || "") + name : name;
+  };
+
+  /**
+   * 札を描く。新しいものが上、古いものが下へ押し出される。
+   * 出てすぐ少し下からせり上がり、duration を過ぎたら薄れて消える。
+   */
+  BattleScene.prototype._renderEffectPopups = function (ctx, canvasWidth) {
+    var P = this.layout.effectPopup;
+    var list = this.effectPopups;
+    if (!P || !list || list.length === 0) return;
+
+    var now = this.game.clock;
+    var duration = P.duration || 1500;
+    var fadeIn = P.fadeIn || 120;
+    var fadeOut = P.fadeOut || 300;
+    var colors = P.colors || {};
+    var t = this.theme;
+
+    // 時間の過ぎた札を外す
+    var alive = [];
+    for (var i = 0; i < list.length; i++) {
+      if (now - list[i].start < duration) alive.push(list[i]);
+    }
+    this.effectPopups = alive;
+
+    var x = (canvasWidth - P.w) / 2;
+    for (var k = 0; k < alive.length; k++) {
+      var p = alive[k];
+      var age = now - p.start;
+      var alpha = Math.min(1, age / fadeIn);
+      if (age > duration - fadeOut) alpha = Math.max(0, (duration - age) / fadeOut);
+      var rise = (age < fadeIn) ? (1 - age / fadeIn) * (P.rise || 6) : 0;
+      var y = P.y + k * (P.h + (P.gap || 4)) + rise;
+      var color = colors[p.kind] || t.cursorColor || "#ffd75e";
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = P.background || "rgba(10,15,28,0.88)";
+      ctx.fillRect(x, y, P.w, P.h);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, P.w - 1, P.h - 1);
+      // 左端の色帯で種類（強化・弱体・特性・加護）を見分ける
+      ctx.fillRect(x, y, P.barWidth || 5, P.h);
+      ctx.restore();
+
+      var baseY = y + P.h / 2 + 5;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      if (p.owner) {
+        this.panel.drawText(p.owner, x + (P.barWidth || 5) + 8, baseY,
+          { font: t.smallFont, color: t.subTextColor });
+      }
+      this.panel.drawText(p.text, x + P.w / 2 + (P.textOffsetX || 30), baseY,
+        { align: "center", font: P.font || t.font, color: color });
+      ctx.restore();
+    }
+  };
+
   /**
    * 当たったときの音のid。無ければ null（鳴らさない）。
    *
@@ -707,7 +830,8 @@
    */
   BattleScene.prototype._renderMemberSprite = function (monster, x, y, size, action) {
     var sprite = monster.getSpriteId();
-    var clock = this.game.clock;
+    // ふだんの動きの時計。麻痺で鈍く、眠りで止まる（_motionClockFor）
+    var clock = this._motionClockFor(monster);
 
     var transform = NS.Motion.forSprite(this.game.data, sprite,
       monster.getMotionId(), clock, monster.getMotionPhase());
@@ -723,6 +847,38 @@
 
     this.spriteRenderer.drawMotion(sprite, x, y, size, size,
       NS.Motion.combine(transform, action));
+  };
+
+  /**
+   * その個体の「ふだんの動き」に使う時計。
+   *
+   * 状態異常の motionSpeed（data/statuses.js）で進み方を変える。
+   *   麻痺 0.3 … 動きが鈍くなる　／　眠り 0 … その瞬間の形で止まる
+   * 時計を個体ごとに持って「前回からの経過 × 速さ」ずつ進めるので、
+   * 速さが切り替わった瞬間に動きが飛ばない（眠りから覚めると、止まった形から動き出す）。
+   * 状態異常は見えている印（_shownStatusesFor）で見るので、「眠ってしまった」の文と同時に止まる。
+   * 1回だけの動き（踏み込み・のけぞり・倒れる）には掛けない。
+   */
+  BattleScene.prototype._motionClockFor = function (monster) {
+    var now = this.game.clock;
+    if (!this._motionClocks) this._motionClocks = new Map();
+
+    var entry = this._motionClocks.get(monster);
+    if (!entry) {
+      entry = { time: now, last: now };
+      this._motionClocks.set(monster, entry);
+      return entry.time;
+    }
+
+    var speed = 1;
+    var defs = this._shownStatusesFor(monster);
+    for (var i = 0; i < defs.length; i++) {
+      if (typeof defs[i].motionSpeed === "number") speed = Math.min(speed, defs[i].motionSpeed);
+    }
+
+    entry.time += (now - entry.last) * Math.max(0, speed);
+    entry.last = now;
+    return entry.time;
   };
 
   /**
@@ -804,10 +960,18 @@
       // 名前に注意：_currentActor は「いま行動を決めている味方」を返すメソッド。
       // 同じ名前で値を入れるとメソッドを潰してしまう（実際に一度やって戦闘が壊れた）
       this._currentSkillActor = event.actor || null;
+      this._centerEffectDone = false;
       return;
     }
 
     if (!this._currentSkill) return;
+
+    // 範囲の中心に1回だけ出す技（data/skills.js の effectAt: "center"。どくのいき）
+    if (this._currentSkill.effectAt === "center") {
+      this._playCenterEffect(event);
+      return;
+    }
+
     if (!isHitEvent(event.type) || !event.target) return;
 
     var effectId = this._effectIdFor(this._currentSkill, this._currentSkillActor);
@@ -817,9 +981,43 @@
     if (!pos) return;
 
     this.skillEffects.play(effectId, this.game.clock, pos.x, pos.y,
-      this._skillEffectColor(this._currentSkill),
+      this._skillEffectColor(this._currentSkill, effectId),
       // 強化は下から上へ、弱体は上から下へ流す
       this._effectDirection(this._currentSkill, event));
+  };
+
+  /**
+   * 並び全体の中心に、演出を1回だけ出す（effectAt: "center"）。
+   *
+   * 1体ずつ出すと、同じ息が3回吐かれたように見えるため。
+   * 最初に誰かへ届いた（当たった・外れた・状態異常が入った／入らなかった）瞬間に出す。
+   * ダメージの無い技（どくのいき）は damage が来ないので、状態異常の出来事も合図にする。
+   */
+  BattleScene.prototype._playCenterEffect = function (event) {
+    if (this._centerEffectDone || !event.target) return;
+    if (!isHitEvent(event.type) && !isStatusResultEvent(event.type)) return;
+
+    var effectId = this._effectIdFor(this._currentSkill, this._currentSkillActor);
+    if (!effectId) return;
+
+    var pos = this._rowMiddle(event.target);
+    if (!pos) return;
+
+    this._centerEffectDone = true;
+    this.skillEffects.play(effectId, this.game.clock, pos.x, pos.y,
+      this._skillEffectColor(this._currentSkill, effectId), 1);
+  };
+
+  /**
+   * その個体が並んでいる段の中心。並びは画面の中央に寄せてあるので、横は画面の真ん中
+   */
+  BattleScene.prototype._rowMiddle = function (monster) {
+    var row = null;
+    if (this._viewEnemies().indexOf(monster) >= 0) row = this.layout.enemyRow;
+    else if (this._viewAllies().indexOf(monster) >= 0) row = this.layout.allyRow;
+    if (!row) return null;
+
+    return { x: this.game.canvas.width / 2, y: row.y + (row.spriteSize || 96) / 2 };
   };
 
   /**
@@ -853,7 +1051,11 @@
    * 強化・弱体の技だけは「何が変わるか」で色を変える
    * （守りなら青、攻撃なら赤…のほうが、属性の色より意味が伝わるため）。
    */
-  BattleScene.prototype._skillEffectColor = function (skill) {
+  BattleScene.prototype._skillEffectColor = function (skill, effectId) {
+    // 型に色が書いてあれば、それを使う（どくのいきの毒の色など。data/effects.js）
+    var shape = effectId ? ((this.game.data.effects || {}).shapes || {})[effectId] : null;
+    if (shape && shape.color) return shape.color;
+
     if (skill.modifier) {
       var color = this._modifierColor(skill.modifier);
       if (color) return color;
@@ -889,6 +1091,11 @@
   function isHitEvent(type) {
     return type === "damage" || type === "miss"
         || type === "immune" || type === "modifier";
+  }
+
+  /** 状態異常が入った／入らなかった出来事か */
+  function isStatusResultEvent(type) {
+    return type === "status" || type === "statusMiss" || type === "statusImmune";
   }
 
   /** その個体が持っている動きを再生する（持っていなければ何もしない） */
@@ -954,6 +1161,8 @@
     this.animator.snap(this.allies);
     this.animator.snap(this.enemies);
     this._syncModifierMarks();
+    // 状態異常の印も個体そのものに戻す（見せきれなかった出来事があってもここで揃う）
+    this.shownStatusIds = null;
 
     this.phase = "message";   // 決定キーで次のターンへ進む
   };
@@ -1611,6 +1820,8 @@
     // 計算前のHPも控えておく。計算はここで一気に終わるので、
     // これが無いと攻撃を見せる前にHPバーが減ってしまう
     this.snapshotHp = this._captureHp();
+    // 状態異常の印も同じ（掛かる出来事を見せる前に、印だけ先に出ないように）
+    this._captureStatusMarks();
 
     var events = this.system.takeTurn(this.actions);
 
@@ -1737,7 +1948,11 @@
 
     var result = this.itemUsage.use(action.itemId, target, this.game.inventory);
     if (!result.success) {
-      events.push({ type: "custom", text: this.texts.itemNoEffect });
+      // 選んだあと、使う番までに相手が倒された（道具は減らない）
+      var text = (result.reason === "fainted")
+        ? fill(this.texts.itemTargetFainted, { name: target.getName() })
+        : this.texts.itemNoEffect;
+      events.push({ type: "custom", text: text });
       return;
     }
 
@@ -1757,6 +1972,13 @@
       event.revealTarget = target;
       event.revealHp = target.currentHp;
       event.healAmount = result.amount;
+    }
+    // 状態異常を治す道具は、この文を見せた瞬間に印を消す（治ったあとの中身をまるごと渡す）
+    if (result.effectType === "cureStatus" && target.getStatusDefs) {
+      var left = target.getStatusDefs();
+      event.statusTarget = target;
+      event.statusIds = [];
+      for (var s = 0; s < left.length; s++) event.statusIds.push(left[s].id);
     }
     events.push(event);
   };
@@ -1939,6 +2161,9 @@
 
     // 浮かぶ数字は一番手前に描く
     this.floatingText.render(ctx);
+
+    // 発動した強化・弱体・特性・加護の札（画面上部）
+    this._renderEffectPopups(ctx, w);
 
     // 発光は画面全体に重ねる
     this.screenEffects.renderOverlay(ctx, w, h);
@@ -2200,12 +2425,76 @@
   /**
    * 印として見せている状態異常。
    *
-   * バフ／デバフ（_shownModifiersFor）と違って、こちらは個体をそのまま見ている。
-   * 状態異常は「掛かった瞬間」も「毒で削れる瞬間」も出来事として1つずつ見せるので、
-   * 印だけ先に出てしまう心配が無い。
+   * ▼ なぜ個体をそのまま見ないか（バフ／デバフの _shownModifiersFor と同じ理由）
+   * 1ターンぶんの計算は takeTurn で一度に終わるので、見せ始める前から状態異常はもう掛かっている。
+   * 個体をそのまま描くと、コマンドを決めた直後に毒の印が出てしまう
+   * （特性「毒のとげ」で実際に起きた。どくばりなど技の状態異常も同じだった）。
+   *
+   * そこで、見せている間（shownStatusIds がある間）はターン開始時の写しを出し、
+   * 「掛かった」「治った」の出来事を見せた瞬間に増減させる。見せ終わったら個体に戻す。
+   * 写しに無い個体（交代で入ってきた仲間）は、個体をそのまま見る。
    */
   BattleScene.prototype._shownStatusesFor = function (monster) {
-    return (monster && monster.getStatusDefs) ? monster.getStatusDefs() : [];
+    if (!monster || !monster.getStatusDefs) return [];
+
+    var ids = this._shownStatusIdsOf(monster);
+    if (!ids) return monster.getStatusDefs();
+
+    var result = [];
+    for (var i = 0; i < ids.length; i++) {
+      var def = this.game.data.getStatus ? this.game.data.getStatus(ids[i]) : null;
+      if (def) result.push(def);
+    }
+    return result;
+  };
+
+  /** 写しの中の、その個体の状態異常id（写しが無い・載っていなければ null） */
+  BattleScene.prototype._shownStatusIdsOf = function (monster) {
+    var list = this.shownStatusIds;
+    if (!list) return null;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].monster === monster) return list[i].ids;
+    }
+    return null;
+  };
+
+  /** ターンの計算の前に、いま見えている状態異常を写しておく */
+  BattleScene.prototype._captureStatusMarks = function () {
+    var everyone = (this.allies || []).concat(this.enemies || []);
+    var list = [];
+    for (var i = 0; i < everyone.length; i++) {
+      var defs = everyone[i].getStatusDefs ? everyone[i].getStatusDefs() : [];
+      var ids = [];
+      for (var j = 0; j < defs.length; j++) ids.push(defs[j].id);
+      list.push({ monster: everyone[i], ids: ids });
+    }
+    this.shownStatusIds = list;
+  };
+
+  /**
+   * 状態異常の出来事を見せた瞬間に、印を増やす・消す。
+   *   status    … 掛かった（即死は印を残さないので足さない）
+   *   statusEnd … 治った・切れた
+   *   statusIds … 道具で治したときなど、その時点の中身をまるごと渡す出来事
+   */
+  BattleScene.prototype._revealStatusMark = function (event) {
+    var owner = event.statusTarget || event.target;
+    var ids = owner ? this._shownStatusIdsOf(owner) : null;
+    if (!ids) return;
+
+    if (event.statusIds) {
+      ids.length = 0;
+      for (var k = 0; k < event.statusIds.length; k++) ids.push(event.statusIds[k]);
+      return;
+    }
+
+    var index = ids.indexOf(event.statusId);
+    if (event.type === "status") {
+      var def = this.game.data.getStatus ? this.game.data.getStatus(event.statusId) : null;
+      if (index < 0 && def && !def.instantKill) ids.push(event.statusId);
+    } else if (event.type === "statusEnd") {
+      if (index >= 0) ids.splice(index, 1);
+    }
   };
 
   /**
@@ -2433,12 +2722,15 @@
     }
     y += lh;
 
-    // 威力・命中・PP
+    // 威力・命中・PP。ダメージを与えない技（回復・支援・状態異常だけ）は威力を出さない
     var accuracy = (skill.accuracy === undefined)
       ? ((this.game.data.battle || {}).defaultAccuracy || 1)
       : skill.accuracy;
+    var statsTemplate = NS.BattleSystem.dealsDamage(skill)
+      ? this.texts.skillStats
+      : (this.texts.skillStatsNoPower || this.texts.skillStats);
     this.panel.drawText(
-      fill(this.texts.skillStats, {
+      fill(statsTemplate, {
         power: skill.power || 0,
         accuracy: Math.round(accuracy * 100),
         pp: skill.pp || 0

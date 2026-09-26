@@ -184,6 +184,12 @@
     var lines = [];
 
     for (var i = 0; i < entries.length; i++) {
+      // 話題の見出し（{ section: "戦い" }）。札は付けず、色を変えて1行で出す
+      if (entries[i].section) {
+        lines.push({ text: (this.texts.sectionMark || "■ ") + entries[i].section, tag: null, heading: true });
+        continue;
+      }
+
       var type = this.types[entries[i].type] || null;
       var wrapped = wrapText(entries[i].text || "", chars);
 
@@ -340,7 +346,11 @@
     for (var i = this.scroll; i < end; i++) {
       var line = lines[i];
       if (line.tag) this._drawTag(line.tag, origin.x, y);
-      if (line.text) {
+      if (line.heading) {
+        // 見出しは札の位置から書き始め、目立つ色にする
+        this.panel.drawText(line.text, origin.x, y,
+          { font: t.font, color: this.layout.sectionColor || t.cursorColor });
+      } else if (line.text) {
         this.panel.drawText(line.text, textX, y, { font: t.smallFont, color: t.textColor });
       }
       y += lh;

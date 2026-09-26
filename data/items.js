@@ -279,6 +279,84 @@
     },
 
     /**
+     * --- 店で買う第一章クリア後の装備（腐食の毒沼クリアでよろず屋に並ぶ） ---
+     * お金の使いみち。α-9 のテストプレイで、クリア時に 2700G 余ったため足した（数値と値段は作者が決めたもの）。
+     * 工房で作れるいちばん良い装備（素材で作る意味）は超えない強さにしてある：
+     *   探索者の長剣 攻+9 は灼牙の戦刃 攻+10 のすぐ下、厚革の胴着 防+14 は黄泉鱗の鎧 防+17 の下
+     */
+
+    explorerSword: {
+      id: "explorerSword",
+      name: "探索者の長剣",
+      category: "equipment",
+      description: "探索者が深く潜るときに選ぶ、癖のない長剣。",
+      maxStack: 9,
+      price: 800,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "weapon",
+        effects: [
+          { type: "statBonus", stat: "attack", value: 9 }
+        ]
+      }
+    },
+
+    thickLeatherVest: {
+      id: "thickLeatherVest",
+      name: "厚革の胴着",
+      category: "equipment",
+      description: "何枚も革を重ねた胴着。重いが、そのぶん体を守る。",
+      maxStack: 9,
+      price: 1200,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "armor",
+        effects: [
+          { type: "statBonus", stat: "defense", value: 14 },
+          { type: "statBonus", stat: "hp", value: 10 }
+        ]
+      }
+    },
+
+    spiritRing: {
+      id: "spiritRing",
+      name: "精気の指輪",
+      category: "equipment",
+      description: "精気の実を磨いて嵌めた指輪。技を出す力が増す。",
+      maxStack: 9,
+      price: 770,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "statBonus", stat: "pp", value: 3 }
+        ]
+      }
+    },
+
+    travelerCharm: {
+      id: "travelerCharm",
+      name: "旅人の護符",
+      category: "equipment",
+      description: "長く潜る探索者のお守り。毒・痺れ・眠気を少し遠ざける。",
+      maxStack: 9,
+      price: 700,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", status: "poison", value: 3 },
+          { type: "resistBonus", status: "paralysis", value: 3 },
+          { type: "resistBonus", status: "sleep", value: 3 }
+        ]
+      }
+    },
+
+    /**
      * --- アクセサリー ---
      * 2つ着けられる。属性・耐性・速さなど、方向を足す装備。
      * ステータスの加算は武器・防具より小さくしてある（2つ重なるため）。

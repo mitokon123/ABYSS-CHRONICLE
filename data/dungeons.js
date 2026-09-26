@@ -8,6 +8,9 @@
  * subtitle    : 一覧に出す短い説明
  * description : 詳細に出す説明
  * floors      : 最深階。ここまで潜るとボスがいる
+ * recommendedLevel : 推奨レベル。**そのダンジョンに初めて入るときの目安**。ダンジョン選択に「推奨Lv5」と出る
+ *   ★ 下のコメントに出てくる「推奨レベル16」「推奨Lv20」は、主を倒す目安として以前書いたもの。
+ *     画面に出す推奨はこちら（坑道5・亀裂9・深層13・毒沼17）
  * unlockedBy  : 挑めるようになる条件（null なら最初から挑める）。次の書き方ができる
  *     "mossyMine"                        … そのダンジョンをクリア
  *     ["mossyMine", "scorchingFissure"]  … 並べた全部をクリア
@@ -98,6 +101,7 @@
                    "壁は苔に覆われ、おとなしいモンスターが住み着いている。\n" +
                    "深淵へ降りる者は、まずここを通る。",
       floors: 3,
+      recommendedLevel: 5,
       unlockedBy: null,
       generation: { width: 25, height: 18, roomMin: 3, roomMax: 7, roomCount: 8, attempts: 200 },
       encounter: {
@@ -140,6 +144,7 @@
                    "炎をまとうモンスターが群れており、火に弱い者には厳しい。\n" +
                    "道は狭く入り組んでいる。",
       floors: 4,
+      recommendedLevel: 9,
       unlockedBy: "mossyMine",
       generation: { width: 25, height: 18, roomMin: 3, roomMax: 5, roomCount: 10, attempts: 220 },
       encounter: {
@@ -189,6 +194,7 @@
                    "ここまで潜った者だけが、その主と対峙できる。",
       // 5階だと一本道が長すぎたので4階に短縮した（亀裂と同じ深さ）
       floors: 4,
+      recommendedLevel: 13,
       unlockedBy: "scorchingFissure",
       generation: { width: 25, height: 18, roomMin: 4, roomMax: 8, roomCount: 7, attempts: 200 },
       // 推奨レベルは16。敵はそれより少し下に置いて、育ててから来る場所にしてある
@@ -323,6 +329,7 @@
       //   そのぶん1階ごとの密度を上げてある（B2Fから2体、B3Fは主の直前）。
       //   加護は1階降りるごとなので、ここで選べるのは2回（深層は3回）
       floors: 3,
+      recommendedLevel: 17,
       unlockedBy: "silentDepths",
       // 沼なので、深層より部屋を大きく・数を少なくして「開けた場所」にする
       generation: { width: 25, height: 18, roomMin: 4, roomMax: 9, roomCount: 6, attempts: 200 },

@@ -51,7 +51,9 @@
     // 特性の分類（図鑑での並びと見出しに使う）
     ability: {
       stat:   { id: "stat",   name: "能力変化", order: 1, color: "#4fb0d1" },
-      damage: { id: "damage", name: "ダメージ", order: 2, color: "#e8542a" }
+      damage: { id: "damage", name: "ダメージ", order: 2, color: "#e8542a" },
+      // 戦闘中に何かを起こす特性（再生・放電・先手など）
+      special: { id: "special", name: "特殊", order: 3, color: "#b48ce0" }
     }
   };
 })(window.MyGame);

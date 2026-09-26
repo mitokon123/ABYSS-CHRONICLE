@@ -81,9 +81,10 @@
     var starters = (gameData.player || {}).starterMonsters || [];
 
     for (var i = 0; i < starters.length; i++) {
-      party.add(
-        NS.MonsterInstance.create(starters[i].species, starters[i].level, gameData, random)
-      );
+      var monster = NS.MonsterInstance.create(starters[i].species, starters[i].level, gameData, random);
+      // 最初の1体は「最初の相棒」。逃がせない（物語の場面で主人公のそばに立つため）
+      if (i === 0) monster.partner = true;
+      party.add(monster);
     }
     return party;
   };

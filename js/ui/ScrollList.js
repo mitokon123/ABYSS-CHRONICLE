@@ -21,17 +21,25 @@
  * 一番上へ戻ったときに見出しが隠れる不具合もあった。
  *
  * 持ち物・図鑑・店・工房など、分類ごとに区切られた一覧で使い回す。
+ *
+ * ▼ 行を自分で描く使い方（仲間・預かり所の一覧）
+ *   rect.frame: false … 外枠を描かず、rect の左上から行を並べる（余白なし）
+ *   rect.clipLeft     … 枠の左へはみ出して描いてよい幅（行の左に出すカーソル「▶」の分）
+ *   options.renderRow(row, index, y, selected) … 1行を描く関数。y は行の上端。
+ *     これを渡すと、文字の行の代わりにこの関数で描く（スクロール・バー・ホイールはそのまま）
  */
 (function (NS) {
   "use strict";
 
   /**
    * @param {MyGame.Panel} panel
-   * @param {object} rect { x, y, w, h, rowHeight, visibleRows }
+   * @param {object} rect { x, y, w, h, rowHeight, visibleRows, frame, clipLeft }
+   * @param {object} [options] { renderRow }
    */
-  function ScrollList(panel, rect) {
+  function ScrollList(panel, rect, options) {
     this.panel = panel;
     this.rect = rect;
+    this.renderRow = (options && options.renderRow) || null;
     this.rows = [];
     this.index = 0;          // 選択中の行（entry のみ）
     this.scroll = 0;         // いま表示しているずれ（px）
@@ -67,6 +75,12 @@
     return Math.max(0, Math.min(this._maxScroll(), value));
   };
 
+  /** 行を並べ始める左上。外枠なし（frame: false）なら rect の左上そのもの */
+  ScrollList.prototype._origin = function () {
+    if (this.rect.frame === false) return { x: this.rect.x, y: this.rect.y };
+    return this.panel.innerOrigin(this.rect);
+  };
+
   ScrollList.prototype._theme = function () {
     return this.panel.theme.scrollbar || {};
   };
@@ -100,6 +114,30 @@
     this.index = index;
     this._scrollToIndex();
     this.scroll = this.scrollTarget;   // 作り直しの直後は待たずに合わせる
+  };
+
+  /**
+   * 行を差し替える。setRows と違って、今のスクロール位置を残す。
+   * 呼び出し側が選択を持っている一覧（仲間の一覧）で、毎フレーム中身を合わせるのに使う。
+   * 選択が外から変わったとき（「様子を見る」で↑↓したなど）だけ、そこまでスクロールする。
+   * @param {object[]} rows
+   * @param {number} index 呼び出し側が選んでいる行
+   */
+  ScrollList.prototype.syncRows = function (rows, index) {
+    this.rows = rows || [];
+    var valid = (index >= 0 && index < this.rows.length);
+    var next = valid ? index : this._firstSelectable();
+    var changed = (next !== this.index);
+    this.index = next;
+    if (changed) this._scrollToIndex();
+    this.scrollTarget = this._clampScroll(this.scrollTarget);
+    this.scroll = this._clampScroll(this.scroll);
+  };
+
+  /** 一番上へ戻す（一覧を切り替えたとき） */
+  ScrollList.prototype.resetScroll = function () {
+    this.scroll = 0;
+    this.scrollTarget = 0;
   };
 
   /** 選択中の行（選択できる行が無ければ null） */
@@ -226,7 +264,7 @@
   ScrollList.prototype._scrollbarRect = function () {
     if (this._maxScroll() <= 0) return null;
     var s = this._theme();
-    var origin = this.panel.innerOrigin(this.rect);
+    var origin = this._origin();
     var width = s.width || 6;
     var margin = s.margin || 4;
     return {
@@ -273,14 +311,14 @@
 
   /** 行を見せている範囲（バーの列は含めない） */
   ScrollList.prototype._viewRect = function () {
-    var origin = this.panel.innerOrigin(this.rect);
+    var origin = this._origin();
     var bar = this._scrollbarRect() ? this._barSpace() : 0;
     return { x: this.rect.x, y: origin.y, w: this.rect.w - bar, h: this._viewHeight() };
   };
 
   /** 行1つ分の当たり判定の範囲（描画位置に合わせる） */
   ScrollList.prototype._rowRect = function (index) {
-    var origin = this.panel.innerOrigin(this.rect);
+    var origin = this._origin();
     var bar = this._scrollbarRect() ? this._barSpace() : 0;
     return {
       x: this.rect.x,
@@ -350,11 +388,11 @@
   ScrollList.prototype.render = function (clock) {
     var t = this.panel.theme;
     var rect = this.rect;
-    this.panel.drawBox(rect);
+    if (rect.frame !== false) this.panel.drawBox(rect);
 
     this._approachTarget();
 
-    var origin = this.panel.innerOrigin(rect);
+    var origin = this._origin();
     var rowHeight = this._rowHeight();
     var view = this._viewHeight();
     var track = this._scrollbarRect();
@@ -363,14 +401,22 @@
     var range = this._visibleRange();
 
     // 枠の中だけに描く（端の行が途中で切れて見えるのは、スクロールの途中だと分かるので良い）
+    var clipLeft = rect.clipLeft || 0;
     var ctx = this.panel.ctx;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(rect.x, origin.y, rect.w, view);
+    ctx.rect(rect.x - clipLeft, origin.y, rect.w + clipLeft, view);
     ctx.clip();
 
     for (var i = range.start; i < range.end; i++) {
       var row = this.rows[i];
+
+      // 行を自分で描く使い方（仲間の一覧など）
+      if (this.renderRow) {
+        this.renderRow(row, i, origin.y + rowHeight * i - this.scroll, i === this.index);
+        continue;
+      }
+
       var y = origin.y + rowHeight * (i + 1) - 6 - this.scroll;
 
       if (row.type === "header") {

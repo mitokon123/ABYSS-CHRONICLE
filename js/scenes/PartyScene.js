@@ -53,7 +53,23 @@
     this.reorderFrom = -1;  // 並び替えの移動元
 
     this.equipList = new NS.ScrollList(this.panel, this.layout.equipList || this.layout.detail);
+    // 仲間・預かり所の一覧。行（絵とHPバーの箱）は _renderRow が描き、
+    // スクロール・ホイール・右端のバーは ScrollList に任せる（他の一覧と同じ動き）
+    var self = this;
+    this.listView = new NS.ScrollList(this.panel, this._listViewRect(), {
+      renderRow: function (row, index, y) { self._renderRow(row.monster, index, y); }
+    });
     this.actionMenu = new NS.CommandMenu(this.panel, this.layout.actionMenu);
+    // 探索中に技を使う：技を選ぶ → 相手を選ぶ
+    this.fieldSkillMenu = new NS.CommandMenu(this.panel, this.layout.fieldSkillMenu || this.layout.actionMenu);
+    this.fieldTargetMenu = new NS.CommandMenu(this.panel, this.layout.fieldTargetMenu || this.layout.actionMenu);
+    this.fieldSkillId = null;
+    // 「逃がしますか?」の はい／いいえ。元に戻せないので、既定は「やめる」
+    this.releaseMenu = new NS.CommandMenu(this.panel, (this.layout.releaseConfirm || {}).menu);
+    this.releaseMenu.setItems([
+      { label: this.texts.releaseNo  || "no",  value: "no" },
+      { label: this.texts.releaseYes || "yes", value: "yes" }
+    ]);
     this.backButton = new NS.BackButton(this.panel, game.data);
     // 名前をつける文字盤（Canvas では日本語入力が使えないため）
     this.nameInput = new NS.NameInput(this.panel, game.data);
@@ -66,6 +82,7 @@
     this.mode = "list";
     this.reorderFrom = -1;
     this._notice = null;
+    this.listView.resetScroll();
   };
 
   /** いま見ている側の一覧 */
@@ -100,6 +117,9 @@
     }
 
     if (this.mode === "affection") { this._updateAffectionMode(input); return; }
+    if (this.mode === "release") { this._updateReleaseMode(input); return; }
+    if (this.mode === "fieldSkill")  { this._updateFieldSkillMode(input); return; }
+    if (this.mode === "fieldTarget") { this._updateFieldTargetMode(input); return; }
     if (this.mode === "equip")   { this._updateEquipMode(input); return; }
     if (this.mode === "action")  { this._updateActionMode(input); return; }
     if (this.mode === "reorder") { this._updateReorderMode(input); return; }
@@ -122,55 +142,56 @@
     }
   };
 
+  /**
+   * 上下・マウス・ホイール・右端のバーで選択と表示を動かす。
+   * 動かし方は持ち物・図鑑などの一覧（ScrollList）とそろえてある：
+   *   上下キー … 選択を1つ動かし、枠の外ならそこまでスクロール（端で折り返す）
+   *   ホイール … 選択は動かさず、中身だけをずらす
+   *   右端のバー … つまんで動かす（入りきらないときだけ出る。預かり所で使う）
+   */
   PartyScene.prototype._moveCursor = function (input) {
-    var size = this._currentList().size();
-    if (size <= 0) return;
+    this._syncListView();
+    if (this._currentList().size() <= 0) return;
 
-    if (input.isPressed("up")) this.index = (this.index - 1 + size) % size;
-    if (input.isPressed("down")) this.index = (this.index + 1) % size;
-
-    // マウス：重ねた行へ選択を移す
-    var hovered = this._hoveredRow(input);
-    if (hovered >= 0) this.index = hovered;
+    this.listView.handleInput(input);
+    this.index = this.listView.index;
   };
 
   /**
-   * カーソルが乗っている行の番号（乗っていなければ -1）。
-   * 一覧は画面に収まる分だけを窓のようにずらして描くので、その範囲だけを見る。
+   * 一覧の見た目（ScrollList）の中身を、いまの表と選択に合わせる。
+   * 行は個体の並びそのもの（見出しは無い）。描くのは _renderRow
    */
-  PartyScene.prototype._hoveredRow = function (input) {
-    if (!input.getPointer) return -1;
-
-    var pointer = input.getPointer();
-    if (!pointer.inside) return -1;
-    if (!pointer.moved && !pointer.clicked) return -1;
-
-    var L = this.layout.list;
+  PartyScene.prototype._syncListView = function () {
     var list = this._currentList();
-    var visible = L.visible || 6;
-    var start = this._listStart();
-
-    for (var i = start; i < Math.min(list.size(), start + visible); i++) {
-      var rect = { x: L.x, y: L.y + L.rowHeight * (i - start), w: L.w, h: L.h };
-      if (NS.Panel.containsPoint(rect, pointer)) return i;
+    var rows = [];
+    for (var i = 0; i < (list ? list.size() : 0); i++) {
+      rows.push({ type: "entry", value: i, monster: list.get(i) });
     }
-    return -1;
+    this.listView.syncRows(rows, this.index);
   };
 
-  /** 一覧の先頭に出している番号（描画と当たり判定で同じ計算を使う） */
-  PartyScene.prototype._listStart = function () {
+  /**
+   * 一覧の枠。行の箱（list.w）の右に、スクロールバーの分だけ幅を足す。
+   * 高さは visible 行ぶん。行の左に出す「▶」の分だけ、左へはみ出して描けるようにする
+   */
+  PartyScene.prototype._listViewRect = function () {
     var L = this.layout.list;
-    var size = this._currentList().size();
+    var bar = this.theme.scrollbar || {};
     var visible = L.visible || 6;
-
-    var start = Math.min(this.index - Math.floor(visible / 2), size - visible);
-    return Math.max(0, start);
+    return {
+      x: L.x, y: L.y,
+      w: L.w + (bar.width || 6) + (bar.margin || 4) * 2,
+      h: L.rowHeight * visible,
+      rowHeight: L.rowHeight,
+      visibleRows: visible,
+      frame: false,
+      clipLeft: L.cursorSpace || 0
+    };
   };
 
-  /** 行をマウスで押したか */
+  /** 行をマウスで押したか（_moveCursor のあとに呼ぶ。バーを離した瞬間は数えない） */
   PartyScene.prototype._clickedRow = function (input) {
-    if (!input.getPointer || !input.getPointer().clicked) return false;
-    return this._hoveredRow(input) >= 0;
+    return this.listView.clickedEntry(input);
   };
 
   /** 上部の「連れていく / 預かり所」をマウスで押したか */
@@ -209,6 +230,13 @@
     // 何も変えない項目なので先頭に置く（間違えて押しても損がない）
     items.push({ label: this.texts.actionInspect || "inspect", value: "inspect" });
 
+    // 探索中だけ、回復などの技を使える（戦闘の外。攻撃の技は出ない。Game.isFieldSkill）
+    var selected = this._selected();
+    if (this.game.run && this.tab === "party" && selected && !selected.isFainted() &&
+        this.game.fieldSkillsOf(selected).length > 0) {
+      items.push({ label: this.texts.actionFieldSkill || "skill", value: "fieldSkill" });
+    }
+
     if (this.tab === "party") {
       // 探索中は預けられない（預かり所は拠点にある）
       if (this.allowStorage) {
@@ -221,8 +249,187 @@
 
     items.push({ label: this.texts.actionEquip || "equip", value: "equip" });
     items.push({ label: this.texts.actionName || "name", value: "name" });
+    // 逃がすのは拠点でだけ（探索中に連れている仲間を手放すと、挑戦の記録と食い違うため）
+    if (this.allowStorage) {
+      items.push({ label: this.texts.actionRelease || "release", value: "release" });
+    }
     items.push({ label: this.texts.actionCancel || "cancel", value: "cancel" });
     return items;
+  };
+
+  // --- 探索中に技を使う ---
+
+  /** 使える技の一覧を出す（「キュア  PP2」。PPが足りない技は薄く出す） */
+  PartyScene.prototype._beginFieldSkill = function () {
+    var user = this._selected();
+    if (!user) return;
+
+    var items = [];
+    var ids = this.game.fieldSkillsOf(user);
+    for (var i = 0; i < ids.length; i++) {
+      var skill = this.game.data.getSkill(ids[i]);
+      var affordable = !skill.pp || !user.canPayPp || user.canPayPp(skill.pp);
+      items.push({
+        label: skill.name + "  " + fill(this.texts.fieldSkillCost, { pp: skill.pp || 0 }),
+        value: ids[i],
+        color: affordable ? null : this.theme.hintColor
+      });
+    }
+    this.fieldSkillMenu.setItems(items);
+    this.mode = "fieldSkill";
+    this._notice = null;
+  };
+
+  PartyScene.prototype._updateFieldSkillMode = function (input) {
+    var result = this.fieldSkillMenu.handleInput(input);
+    if (!result) return;
+    if (result.type === "cancel") { this.mode = "list"; return; }
+    if (result.type !== "confirm") return;
+
+    var user = this._selected();
+    var skill = this.game.data.getSkill(result.value);
+    if (skill && skill.pp && user.canPayPp && !user.canPayPp(skill.pp)) {
+      this._notice = this.texts.fieldSkillNoPp || null;
+      this.game.playError();
+      return;
+    }
+    this.fieldSkillId = result.value;
+    this._buildFieldTargets();
+    this.fieldTargetMenu.index = this.index;   // まずは使う本人に合わせておく
+    this.mode = "fieldTarget";
+  };
+
+  /** 使う相手の一覧（連れている仲間。名前とHP）。使うたびに作り直してHPを更新する */
+  PartyScene.prototype._buildFieldTargets = function () {
+    var keep = this.fieldTargetMenu.index;
+    var items = [];
+    var party = this.game.party;
+    for (var i = 0; i < party.size(); i++) {
+      var m = party.get(i);
+      items.push({
+        label: m.getName() + "  " + m.currentHp + "/" + m.getMaxHp(),
+        value: i,
+        color: m.isFainted() ? this.theme.hintColor : null
+      });
+    }
+    this.fieldTargetMenu.setItems(items);
+    if (keep > 0 && keep < items.length) this.fieldTargetMenu.index = keep;
+  };
+
+  /**
+   * 相手を決めて使う。使ったあとも相手選びに残る（続けて回復できるように）。Esc で技選びへ戻る
+   */
+  PartyScene.prototype._updateFieldTargetMode = function (input) {
+    var result = this.fieldTargetMenu.handleInput(input);
+    if (!result) return;
+    if (result.type === "cancel") { this._beginFieldSkill(); return; }
+    if (result.type !== "confirm") return;
+
+    var user = this._selected();
+    var target = this.game.party.get(result.value);
+    var skill = this.game.data.getSkill(this.fieldSkillId);
+    var done = this.game.useFieldSkill(user, this.fieldSkillId, target);
+
+    if (done.success) {
+      this._notice = fill(this.texts.fieldSkillUsed, {
+        user: user.getName(), skill: skill ? skill.name : "",
+        target: target.getName(), amount: done.amount
+      });
+      this.game.audio.playSe("heal");
+      this._buildFieldTargets();
+      return;
+    }
+
+    var key = { noPp: "fieldSkillNoPp", fainted: "fieldSkillFainted", full: "fieldSkillFull" }[done.reason];
+    this._notice = key ? fill(this.texts[key], { target: target ? target.getName() : "" }) : null;
+    this.game.playError();
+  };
+
+  // --- 逃がす ---
+
+  /** 「逃がしますか?」を出す。最後の1体は、聞く前に断る */
+  PartyScene.prototype._beginRelease = function () {
+    var monster = this._selected();
+    if (!monster) return;
+
+    // 最初の相棒は逃がせない（聞く前に断る）
+    if (monster.partner) {
+      this._notice = fill(this.texts.cannotReleasePartner, { name: monster.getName() });
+      this.game.playError();
+      this.mode = "list";
+      return;
+    }
+    if (this.tab === "party" && this.game.party.size() <= 1) {
+      this._notice = this.texts.cannotReleaseLast || null;
+      this.game.playError();
+      this.mode = "list";
+      return;
+    }
+    this.releaseMenu.index = 0;   // 既定は「やめる」
+    this.mode = "release";
+    this._notice = null;
+  };
+
+  PartyScene.prototype._updateReleaseMode = function (input) {
+    var result = this.releaseMenu.handleInput(input);
+    if (!result) return;
+
+    if (result.type === "cancel" || result.value === "no") {
+      this.mode = "list";
+      return;
+    }
+    if (result.value !== "yes") return;
+
+    var done = this.game.releaseMonster(this.tab, this.index);
+    this.mode = "list";
+
+    if (!done.success) {
+      this._notice = (done.reason === "stackFull") ? (this.texts.releaseStackFull || null)
+                   : (done.reason === "last") ? (this.texts.cannotReleaseLast || null)
+                   : (done.reason === "partner")
+                     ? fill(this.texts.cannotReleasePartner, { name: done.monster.getName() })
+                   : null;
+      this.game.playError();
+      return;
+    }
+    this._notice = fill(this.texts.released, { name: done.monster.getName() });
+    this._clampIndex();
+  };
+
+  /** 「逃がしますか?」の窓。後ろを暗く落として、問いかけだけに目を向けさせる */
+  PartyScene.prototype._renderReleaseConfirm = function (ctx) {
+    var C = this.layout.releaseConfirm;
+    var monster = this._selected();
+    if (!C || !monster) return;
+    var t = this.theme;
+
+    ctx.save();
+    ctx.fillStyle = C.veil || "rgba(4,6,12,0.72)";
+    ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
+    ctx.fillStyle = C.background || "#0d1220";
+    ctx.fillRect(C.box.x, C.box.y, C.box.w, C.box.h);
+    ctx.restore();
+    this.panel.drawBox(C.box);
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.font = t.font || "14px monospace";
+    // 元に戻せない操作なので、見出しは危ない色にする
+    ctx.fillStyle = t.dangerColor || "#e8542a";
+    ctx.fillText(fill(this.texts.releaseTitle, { name: monster.getName() }), C.title.x, C.title.y);
+
+    ctx.font = t.smallFont || "12px monospace";
+    ctx.fillStyle = t.textColor || "#e8eaf0";
+    ctx.fillText(this.texts.releaseBody || "", C.body.x, C.body.y);
+
+    // 装備を着けているときだけ「持ち物に戻る」と添える
+    if ((monster.equipment || []).length > 0) {
+      ctx.fillStyle = t.hintColor || "#5b6688";
+      ctx.fillText(this.texts.releaseNoteEquip || "", C.note.x, C.note.y);
+    }
+    ctx.restore();
+
+    this.releaseMenu.render(this.game.clock);
   };
 
   PartyScene.prototype._updateActionMode = function (input) {
@@ -242,6 +449,8 @@
       case "reorder": this._beginReorder(); break;
       case "equip":   this._beginEquip(); break;
       case "name":    this._beginNaming(); break;
+      case "release": this._beginRelease(); break;
+      case "fieldSkill": this._beginFieldSkill(); break;
     }
   };
 
@@ -475,6 +684,10 @@
     this.tab = (this.tab === "party") ? "storage" : "party";
     this._clampIndex();
     this._notice = null;
+    // 別の一覧になったので、一番上から見せる（選択がその先にあればそこまで送る）
+    this.listView.resetScroll();
+    this.listView.index = -1;
+    this._syncListView();
   };
 
   // --- 出し入れ ---
@@ -568,13 +781,9 @@
     if (!list || list.isEmpty()) {
       this.panel.drawText(empty || "", L.list.x, L.list.y + 30);
     } else {
-      // 預かり所は6体より多く入るので、画面に収まる分だけを窓のようにずらして出す
-      var visible = L.list.visible || 6;
-      var start = this._listStart();
-
-      for (var i = start; i < Math.min(list.size(), start + visible); i++) {
-        this._renderRow(list.get(i), i, start);
-      }
+      // 預かり所は6体より多く入るので、枠の中でスクロールさせる（ScrollList）
+      this._syncListView();
+      this.listView.render(this.game.clock);
 
       // 装備を選んでいる間は、詳細の代わりに候補の一覧を出す
       if (this.mode === "equip") this._renderEquipList(list.get(this.index));
@@ -583,6 +792,11 @@
 
     // 「この仲間に何をするか」の項目
     if (this.mode === "action") this.actionMenu.render(this.game.clock);
+    // 「逃がしますか?」は一覧の手前に重ねる（操作説明はその上に出す）
+    if (this.mode === "release") this._renderReleaseConfirm(ctx);
+    // 探索中に使う技と、その相手
+    if (this.mode === "fieldSkill") this.fieldSkillMenu.render(this.game.clock);
+    if (this.mode === "fieldTarget") this.fieldTargetMenu.render(this.game.clock);
 
     // 名前をつけている間は、文字盤を画面の手前に重ねる。
     // 案内は文字盤が自分で出すので、ここのヒントと「戻る」は出さない
@@ -779,6 +993,9 @@
     else if (this.mode === "inspect") hint = this.texts.hintInspect;
     else if (this.mode === "affection") hint = this.texts.hintAffection;
     else if (this.mode === "action") hint = this.texts.hintAction;
+    else if (this.mode === "release") hint = this.texts.hintRelease;
+    else if (this.mode === "fieldSkill") hint = this.texts.hintFieldSkill;
+    else if (this.mode === "fieldTarget") hint = this.texts.hintFieldTarget;
     else if (this.mode === "reorder") hint = this.texts.hintReorder;
     else if (this.tab === "storage" && this.game.storage.isEmpty()) {
       // 何も預けていないときは「どうすれば預けられるか」を出す
@@ -797,12 +1014,17 @@
    * @param {number} i 一覧の中での番号
    * @param {number} [start] 画面に出している先頭の番号（描く位置の基準）
    */
-  PartyScene.prototype._renderRow = function (monster, i, start) {
+  /**
+   * 一覧の1行（1体ぶんの箱）。ScrollList から呼ばれる
+   * @param {number} top 行の上端（スクロールのずれ込み）
+   */
+  PartyScene.prototype._renderRow = function (monster, i, top) {
+    if (!monster) return;
     var L = this.layout;
     var t = this.theme;
     var rect = {
       x: L.list.x,
-      y: L.list.y + L.list.rowHeight * (i - (start || 0)),
+      y: top,
       w: L.list.w,
       h: L.list.h
     };

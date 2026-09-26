@@ -280,7 +280,7 @@
         { level: 5, skill: "rockThrow" }
       ],
       evolvesTo: null,
-      abilities: ["thickSkin"],
+      abilities: ["earthPower"],
       expReward: 12,
       goldReward: 8,
       drops: [
@@ -511,7 +511,7 @@
         { level: 8, skill: "aqua" }
       ],
       evolvesTo: null,
-      abilities: ["thickSkin"],
+      abilities: ["kingsDignity"],
       expReward: 80,
       goldReward: 50,
       // 他の2体の主と同じく、専用の素材を必ず落とす
@@ -559,7 +559,7 @@
         { level: 4, skill: "gust" }
       ],
       evolvesTo: null,
-      abilities: ["swiftFoot"],
+      abilities: ["windFlow"],
       expReward: 15,
       goldReward: 8,
       drops: [
@@ -645,7 +645,7 @@
         { level: 7, skill: "ember" }
       ],
       evolvesTo: null,
-      abilities: ["thickSkin"],
+      abilities: ["hardShell"],
       // 硬くて時間がかかるわりに実入りは薄い。稼ぎ相手はヒビイワのほう
       expReward: 20,
       goldReward: 3,
@@ -690,7 +690,7 @@
         { level: 3, skill: "ember" }
       ],
       evolvesTo: null,
-      abilities: ["fireSoul"],
+      abilities: ["firstStrike"],
       expReward: 12,
       goldReward: 6,
       // いちばん多く出るので、いちばん安い素材を配る役
@@ -773,7 +773,7 @@
         { level: 5, skill: "darkSpore" }
       ],
       evolvesTo: null,
-      abilities: ["duskborn"],
+      abilities: ["soulDrain"],
       expReward: 17,
       goldReward: 5,
       // いちばん多く出るので、いちばん安い素材を配る役（スミビと同じ役回り）。
@@ -820,7 +820,7 @@
         { level: 8, skill: "darkSpore" }
       ],
       evolvesTo: null,
-      abilities: ["tough"],
+      abilities: ["regen"],
       expReward: 22,
       goldReward: 9,
       drops: [
@@ -870,7 +870,7 @@
         { level: 6, skill: "thunderBolt" }
       ],
       evolvesTo: null,
-      abilities: ["charged"],
+      abilities: ["discharge"],
       expReward: 25,
       goldReward: 14,
       drops: [
@@ -919,7 +919,7 @@
         { level: 9, skill: "aqua" }
       ],
       evolvesTo: null,
-      abilities: ["thickSkin"],
+      abilities: ["waterHeart"],
       expReward: 20,
       goldReward: 10,
       // 定義だけあって入手経路の無かった「スライムのかけら」を、ここで配る
@@ -1056,7 +1056,7 @@
         { level: 12, skill: "bite" }
       ],
       evolvesTo: null,
-      abilities: ["swiftFoot"],
+      abilities: ["poisonThorn"],
       expReward: 28,
       goldReward: 10,
       drops: [
@@ -1096,7 +1096,7 @@
         { level: 10, skill: "venomBreath" }
       ],
       evolvesTo: null,
-      abilities: ["thickSkin"],
+      abilities: ["hardShell"],
       expReward: 32,
       goldReward: 14,
       drops: [
@@ -1138,7 +1138,7 @@
         { level: 12, skill: "darkSpore" }
       ],
       evolvesTo: null,
-      abilities: ["duskborn"],
+      abilities: ["undeadSoul"],
       expReward: 36,
       goldReward: 17,
       drops: [

@@ -720,7 +720,14 @@
 
   // --- HP 操作 ---
 
-  MonsterInstance.prototype.isFainted = function () { return this.currentHp <= 0; };
+  /**
+   * 倒れているか。
+   * 特性「亡者の魂」で踏みとどまっているあいだ（_undying。BattleSystem が立てる）は、
+   * HPが0でも倒れていない扱いにする。そのターンの終わりに BattleSystem が外す
+   */
+  MonsterInstance.prototype.isFainted = function () {
+    return this.currentHp <= 0 && !this._undying;
+  };
 
   MonsterInstance.prototype.takeDamage = function (amount) {
     this.currentHp = Math.max(0, this.currentHp - amount);
@@ -728,6 +735,8 @@
   };
 
   MonsterInstance.prototype.heal = function (amount) {
+    // 亡者の魂で踏みとどまっている者は、回復を受け付けない（そのターンの終わりに倒れる）
+    if (this._undying) return this.currentHp;
     this.currentHp = Math.min(this.getMaxHp(), this.currentHp + amount);
     return this.currentHp;
   };
@@ -950,6 +959,8 @@
       skills: this.skills.slice(),
       equipment: (this.equipment || []).slice(),
       affection: this.affection || 0,
+      // 最初の相棒（はじめから一緒にいるスライム）。逃がせない。物語の場面にも立つ
+      partner: this.partner ? true : undefined,
       // 状態異常。ふつうは拠点へ帰った時点で空になるが、
       // 毒（persists）はダンジョンの途中でセーブすると残ったままになる。
       // これを保存しないと、セーブして再開するだけで毒が消せてしまう
@@ -1003,6 +1014,8 @@
     // 名前は setNickname を通す（古いセーブや、長さの決まりが変わった場合にそろえる）
     instance.setNickname(saved.nickname);
     instance.exp = saved.exp || 0;
+    // 最初の相棒の印。古いセーブには無いので、Game._ensurePartner が付け直す
+    instance.partner = !!saved.partner;
     // 愛情度。古いセーブには無いので 0 から。
     // HP・PP を戻すより先に入れる（最大値が愛情度で上がっているため）
     instance.affection = saved.affection || 0;

@@ -36,10 +36,14 @@
       return [format(texts.chestGot, { name: name, count: added })];
     },
 
-    /** 仲間のHP・PPを割合で回復する */
+    /**
+     * 仲間のHP・PPを割合で回復する。
+     * cureStatus: true なら状態異常もすべて治す（毒は戦闘が終わっても残るので、ここで落とせる）
+     */
     heal: function (effect, game, random, texts) {
       var members = game.party.getMembers();
       var healed = false;
+      var cured = false;
 
       for (var i = 0; i < members.length; i++) {
         var monster = members[i];
@@ -53,8 +57,17 @@
           if (monster.currentPp < monster.getMaxPp()) healed = true;
           monster.currentPp = Math.min(monster.getMaxPp(), monster.currentPp + pp);
         }
+        if (effect.cureStatus && monster.statusEffects && monster.statusEffects.length > 0) {
+          monster.clearAllStatuses();
+          cured = true;
+        }
       }
-      return [healed ? texts.springHealed : texts.springFull];
+
+      // 探索画面では1行につなげて出すので、両方のときは短い1文にまとめる
+      if (healed && cured) return [texts.springHealedCured || texts.springHealed];
+      if (healed) return [texts.springHealed];
+      if (cured) return [texts.springCured];
+      return [texts.springFull];
     },
 
     /**

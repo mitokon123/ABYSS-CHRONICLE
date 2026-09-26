@@ -43,9 +43,10 @@
     hideBondRewardUntilReached: true,
     stages: [
       { id: "meet",  name: "出会い", need: 0 },
-      { id: "used",  name: "慣れ",   need: 20,  statBonus: 0.03 },
-      { id: "trust", name: "信頼",   need: 60,  statBonus: 0.03 },
-      { id: "bond",  name: "絆",     need: 120, bondReward: true }
+      // 必要な回数は α-9 のテストプレイで「思ったより簡単」だったので 1.5倍にした（20/60/120 → 30/90/180）
+      { id: "used",  name: "慣れ",   need: 30,  statBonus: 0.03 },
+      { id: "trust", name: "信頼",   need: 90,  statBonus: 0.03 },
+      { id: "bond",  name: "絆",     need: 180, bondReward: true }
     ]
   };
 })(window.MyGame);

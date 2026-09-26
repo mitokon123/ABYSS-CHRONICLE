@@ -291,6 +291,80 @@
       }
     },
 
+    /**
+     * 息：中心で吐き出された煙が、左右へもくもくと広がる（どくのいき・火の息・奈落の息）。
+     *
+     *   1. 煙の玉 … 中心から左右へ流れながら膨らみ、薄れて消える（3つに1つは accentColor）
+     *   2. 粒     … 煙の中から昇る。particle で形を選ぶ
+     *                "bubble"（既定）… 輪の泡（毒）／ "spark" … 四角い火の粉（火・闇）
+     *   3. 芯     … 吐き出した瞬間だけ、中心が濃く光る
+     *   lift … 煙が昇る高さ（火は熱で高く昇る）
+     * 並び全体に1回だけ出す型（data/skills.js の effectAt: "center"）。
+     */
+    miasma: function (ctx, d, t, p) {
+      var spread = d.spread || 240;
+      var height = d.height || 60;
+      var lift = (d.lift === undefined) ? 12 : d.lift;
+      var accent = d.accentColor || p.color;
+      var particleColor = d.particleColor || accent;
+      var i;
+
+      // 1. 煙の玉。左右交互に振り分け、届く距離をばらけさせる
+      var puffs = d.count || 16;
+      for (i = 0; i < puffs; i++) {
+        var sub = span(t, wobble(i) * 0.25, 0.75);
+        if (sub <= 0) continue;
+
+        var dir = (i % 2 === 0) ? 1 : -1;
+        var reach = spread * (0.1 + wobble(i + 5) * 0.9);
+        var x = p.x + dir * reach * easeOut(sub);
+        var y = p.y + (wobble(i + 9) - 0.5) * height * easeOut(sub) - sub * lift;
+        var r = sizeOf(d, i) * (0.45 + easeOut(sub) * 0.9);
+
+        setAlpha(ctx, fadeOut(sub) * 0.42);
+        ctx.fillStyle = (i % 3 === 0) ? accent : p.color;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 2. 粒。煙が広がってから、あちこちで昇る
+      var bubbles = d.bubbles || 12;
+      var spark = (d.particle === "spark");
+      ctx.strokeStyle = particleColor;
+      ctx.fillStyle = particleColor;
+      ctx.lineWidth = 1.5;
+      for (i = 0; i < bubbles; i++) {
+        var bs = span(t, 0.2 + wobble(i + 21) * 0.45, 0.35);
+        if (bs <= 0) continue;
+
+        var bx = p.x + (wobble(i + 31) - 0.5) * spread * 1.7;
+        var by = p.y + height * 0.35 - easeOut(bs) * height;
+        var br = (2 + wobble(i + 41) * 3) * (d.particleScale || 1);
+
+        setAlpha(ctx, fadeOut(bs) * 0.9);
+        if (spark) {
+          // 火の粉：小さな四角が揺れながら昇り、だんだん小さくなる
+          var sz = br * (1 - bs * 0.6);
+          var sway = Math.sin((bs + wobble(i + 51)) * Math.PI * 4) * 4;
+          ctx.fillRect(bx + sway - sz / 2, by - sz / 2, sz, sz);
+        } else {
+          ctx.beginPath();
+          ctx.arc(bx, by, br, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      // 3. 吐き出した瞬間の芯
+      if (t < 0.25) {
+        setAlpha(ctx, (1 - t / 0.25) * 0.7);
+        ctx.fillStyle = accent;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 22 * (0.6 + t * 1.6), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    },
+
     /** 砕ける：粒が横へ飛び、落ちていく */
     shards: function (ctx, d, t, p) {
       var count = d.count || 12;

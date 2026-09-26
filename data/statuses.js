@@ -30,6 +30,9 @@
  *   accuracyMul : 命中率に掛ける倍率
  *   effects     : 特性・装備・加護とまったく同じ書き方の効果。EffectSystem がそのまま読む
  *   instantKill : true なら当たった時点で戦闘不能
+ *   motionSpeed : 戦闘中、ふだんの動き（浮く・呼吸する・コマ絵）の速さの倍率。
+ *                 1 がふつう、0.3 なら鈍く、0 なら止まる（その瞬間の形のまま固まる）。
+ *                 複数掛かっているときはいちばん遅いものが効く。攻撃・のけぞりの動きには掛からない
  *
  * ▼ 決まりごと
  *   ・同じ状態異常を重ねてかけても、残りターン数が建て直されるだけ（バフ／デバフと同じ）
@@ -97,6 +100,8 @@
       duration: { min: 3, max: 5 },
       curable: true,
       blocksTurn: 0.5,
+      // しびれて動きが鈍くなる（ふだんの動きが3割の速さ）
+      motionSpeed: 0.3,
       message: "{name} はしびれて動けなくなった",
       blockMessage: "{name} は身体が痺れている",
       cureMessage: "{name} のしびれが取れた。"
@@ -117,6 +122,8 @@
       curable: true,
       blocksTurn: "always",
       wakeOnDamage: 0.5,
+      // 眠っているあいだは、ふだんの動きが完全に止まる（その瞬間の形で固まる）
+      motionSpeed: 0,
       message: "{name} は眠ってしまった",
       blockMessage: "{name} は眠っている",
       cureMessage: "{name} は目を覚ました。"

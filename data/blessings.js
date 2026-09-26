@@ -14,6 +14,11 @@
  * effects     : 効果の配列
  * locked      : true なら最初は選択肢に出ない。謎の商人から買うと恒久的に解放される
  * price       : 買値（locked のものだけ意味を持つ）
+ * unlockedBy  : 謎の商人に並ぶ条件（locked のものだけ）。書き方は data/dungeons.js の unlockedBy と同じ。
+ *               省略すると、商人が現れた時点（静寂の深層クリア）から並ぶ
+ *
+ * ▼ 効果は特性と同じ種類がすべて使える（regen / drain / firstStrike / counterStatus / undying も）。
+ *   戦闘で働いたときの文には、加護の名前が出る（「スライム の 疾き初手!」）
  *
  * ▼ 加護はパーティ全員に掛かる
  *   誰に付けるかを選ばせると選択が長くなるため、全員に掛かる形にしている。
@@ -169,6 +174,90 @@
         { type: "damageDealt", value: 1.12 },
         { type: "damageTaken", value: 0.88 }
       ]
+    },
+
+    // --- 第一章クリア後に謎の商人が売る加護（腐食の毒沼をクリアすると並ぶ） ---
+    //
+    // α-9 のテストプレイで、クリア時にお金が余ったため足した（効果・値段・出やすさは作者が決めたもの）。
+    // 出やすさは weight で決まる（data/run.js の rarityTiers：1.0 よく出る／0.7 ふつう／0.5 少ない／それ未満 まれ）。
+    // 水・地・風は、火・光（最初から）と雷・闇（商人）にそろえた属性の加護。
+    // 残りの4つは特性と同じ仕組みの効果を、仲間全員に掛ける版（data/abilities.js の説明を参照）
+
+    waterVein: {
+      id: "waterVein",
+      name: "水脈の恵み",
+      description: "水属性の技で与えるダメージが20%増える。",
+      weight: 1.0,
+      locked: true,
+      unlockedBy: "venomMarsh",
+      price: 300,
+      effects: [ { type: "damageDealt", value: 1.20, element: "water" } ]
+    },
+
+    earthEcho: {
+      id: "earthEcho",
+      name: "大地の響き",
+      description: "地属性の技で与えるダメージが20%増える。",
+      weight: 1.0,
+      locked: true,
+      unlockedBy: "venomMarsh",
+      price: 300,
+      effects: [ { type: "damageDealt", value: 1.20, element: "earth" } ]
+    },
+
+    windWhisper: {
+      id: "windWhisper",
+      name: "風のささやき",
+      description: "風属性の技で与えるダメージが20%増える。",
+      weight: 1.0,
+      locked: true,
+      unlockedBy: "venomMarsh",
+      price: 300,
+      effects: [ { type: "damageDealt", value: 1.20, element: "wind" } ]
+    },
+
+    drainFang: {
+      id: "drainFang",
+      name: "吸う牙",
+      description: "通常攻撃で与えたダメージの15%だけ、HPが回復する。",
+      weight: 0.25,
+      locked: true,
+      unlockedBy: "venomMarsh",
+      price: 1500,
+      effects: [ { type: "drain", value: 0.15, normalAttackOnly: true } ]
+    },
+
+    lifeLamp: {
+      id: "lifeLamp",
+      name: "命の灯",
+      description: "毎ターンの終わりに、HPが最大値の8%回復する。",
+      weight: 0.7,
+      locked: true,
+      unlockedBy: "venomMarsh",
+      price: 1000,
+      effects: [ { type: "regen", value: 0.08 } ]
+    },
+
+    ironWall: {
+      id: "ironWall",
+      name: "鉄壁の構え",
+      description: "HPが半分以上のあいだ、受けるダメージが15%減る。",
+      weight: 0.5,
+      locked: true,
+      unlockedBy: "venomMarsh",
+      price: 1350,
+      effects: [ { type: "damageTaken", value: 0.85, condition: { hpAbove: 0.5 } } ]
+    },
+
+    swiftStart: {
+      id: "swiftStart",
+      name: "疾き初手",
+      description: "戦闘の最初のターンだけ、仲間全員が先に動く。",
+      weight: 0.5,
+      locked: true,
+      unlockedBy: "venomMarsh",
+      price: 1000,
+      effects: [ { type: "firstStrike" } ]
     }
   };
 })(window.MyGame);

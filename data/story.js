@@ -532,6 +532,27 @@
       },
 
       /**
+       * --- 第一章の区切り（場面6のすぐあと） ---
+       * 場面6と別にしてあるのは、場面6をもう見たセーブでも、次に拠点へ戻ったとき一度だけ流すため。
+       * 新しい地方と地方選択は α-10 で入れる。それまではここで第一章が終わる
+       */
+      chapter1End: {
+        id: "chapter1End",
+        trigger: "homeReturn",
+        when: { cleared: "venomMarsh", seenAny: ["marshCleared"] },
+        order: 55,
+        bgm: "none",
+        bg: "stars",
+        letterbox: true,
+        pages: [
+          { style: "title", transition: "black", actors: [], lines: [
+            "第一章　揺籃の穴",
+            "― 完 ―"
+          ] }
+        ]
+      },
+
+      /**
        * --- 場面7 報告が受理される ---
        * 場面4を「負け／逃げ／勝ち」で見たあと、ヨミリュウを仲間にして拠点に戻ったとき（一度だけ）。
        * 場面4-誘う を見た場合は流さない。場面6の前でも後でもよい

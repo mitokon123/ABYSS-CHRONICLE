@@ -51,6 +51,10 @@
     this.order = null;       // 買おうとしている内容 { itemId, price, count, max }
     this.notice = new NS.Notice(this.theme.notice);
 
+    // 店主の台詞（data/shop.js の lines）。{ text, since }。出ていなければ null
+    this._talk = null;
+    this._idleTimer = 0;
+
     this._rebuildList();
   }
 
@@ -67,9 +71,55 @@
     this.order = null;
     this.notice.clear();
     this._rebuildList();
+    this._say("greet");
   };
 
   ShopScene.prototype.getTab = function () { return TABS[this.tabIndex]; };
+
+  // --- 店主の台詞 ---
+
+  /**
+   * 店主に一言しゃべらせる（data/shop.js の lines）。
+   * 条件（when）を満たす台詞の中から選ぶ。直前と同じ台詞はなるべく避ける
+   * @param {string} kind greet / buy / sell / noMoney / idle
+   */
+  ShopScene.prototype._say = function (kind) {
+    var shop = this.getShop();
+    var list = (shop && shop.lines && shop.lines[kind]) || [];
+    var candidates = [];
+    for (var i = 0; i < list.length; i++) {
+      var entry = (typeof list[i] === "string") ? { text: list[i] } : list[i];
+      if (entry.when && !(this.game.story && this.game.story.isConditionMet(entry.when, this.game))) continue;
+      candidates.push(entry.text);
+    }
+    this._idleTimer = 0;
+    if (candidates.length === 0) return;
+
+    var last = this._talk ? this._talk.text : null;
+    if (candidates.length > 1) {
+      var filtered = [];
+      for (var j = 0; j < candidates.length; j++) if (candidates[j] !== last) filtered.push(candidates[j]);
+      candidates = filtered;
+    }
+    this._talk = { text: candidates[Math.floor(Math.random() * candidates.length)], since: 0 };
+  };
+
+  /** ふきだしの時間と、何もしていないときの独り言 */
+  ShopScene.prototype._updateTalk = function (dt) {
+    var S = this.layout.speech || {};
+    if (this._talk) this._talk.since += dt || 0;
+    this._idleTimer += dt || 0;
+    if (this.phase === "list" && this._idleTimer >= (S.idleInterval || 9000)) this._say("idle");
+  };
+
+  /** 店主の絵を押したか（押すと一言しゃべる） */
+  ShopScene.prototype._clickedKeeper = function (input) {
+    var pos = this.layout.keeper;
+    var pointer = input.getPointer ? input.getPointer() : null;
+    if (!pos || !pointer || !pointer.clicked) return false;
+    var size = pos.size || 64;
+    return NS.Panel.containsPoint({ x: pos.x, y: pos.y, w: size, h: size }, pointer);
+  };
 
   /** いま見ている店（1軒も開いていなければ null） */
   ShopScene.prototype.getShop = function () {
@@ -107,6 +157,11 @@
 
       var blessing = blessings[id];
       if (!blessing.locked) continue;   // 最初から使えるものは売らない
+      // 後から並ぶ加護（data/blessings.js の unlockedBy）。条件の書き方はダンジョンと同じ
+      if (blessing.unlockedBy && NS.DungeonCatalog &&
+          !NS.DungeonCatalog.isConditionMet(blessing.unlockedBy, this.game.clearedDungeons, this.game.data)) {
+        continue;
+      }
 
       var owned = this.game.hasBoughtBlessing(id);
       var affordable = this.game.canAfford(blessing.price || 0);
@@ -137,6 +192,7 @@
     var t = this.theme;
     var rows = [];
     var lastCategory = null;
+    var lastFrom = null;
 
     for (var i = 0; i < stock.length; i++) {
       var item = stock[i].item;
@@ -146,7 +202,20 @@
       if (category !== lastCategory) {
         rows.push(this._categoryHeader(category));
         lastCategory = category;
+        lastFrom = null;
       }
+
+      // 手に入る場所（data/shop.js の from）が変わったら、その下に小見出しを挟む。
+      // 素材を「どのステージのものか」で分けて見せる（装備の武器・防具の小見出しと同じ形）
+      var from = stock[i].from;
+      if (from && from !== lastFrom) {
+        rows.push({
+          type: "header",
+          label: "  " + this.shop.getFromName(from),
+          color: (category && category.subColor) || t.subTextColor
+        });
+      }
+      lastFrom = from;
 
       var affordable = this.game.canAfford(stock[i].price);
       rows.push({
@@ -213,6 +282,7 @@
     var input = this.game.input;
 
     this.notice.update(dt);
+    this._updateTalk(dt);
 
     // 「戻る」ボタン。個数を決めている途中なら1つ前へ戻す
     if (this.backButton.handleInput(input)) {
@@ -230,6 +300,7 @@
     if (input.isPressed("nextTab")) this._changeShop(1);
     if (this._clickedShopTab(input)) return;
     if (this._clickedTab(input)) return;
+    if (this._clickedKeeper(input)) { this._say("idle"); return; }
 
     // ScrollList が扱うのは上下移動だけ。決定・取消はここで見る
     this.list.handleInput(input);
@@ -259,6 +330,7 @@
     if (max <= 0) {
       this._showNotice(this._blockedReason(mode, choice));
       this.game.playError();
+      if (mode === "buy" && !this.game.canAfford(choice.price)) this._say("noMoney");
       return;
     }
 
@@ -363,9 +435,11 @@
       }
       // 加護は「お金が動いた」音ではなく、決定音（Game が鳴らす）だけ
       this._showNotice(text);
+      this._say("buy");
     } else {
       this._showNotice(this.texts[result.reason] || result.reason);
       this.game.playError();
+      if (result.reason === "notEnoughGold") this._say("noMoney");
     }
 
     this.order = null;
@@ -398,6 +472,8 @@
     this.tabIndex = 0;
     this.notice.clear();
     this._rebuildList();
+    this._talk = null;
+    this._say("greet");   // 店が変われば店主も変わるので、あいさつし直す
   };
 
   /** 上段の店タブをマウスで押したか */
@@ -417,6 +493,8 @@
         this.tabIndex = 0;
         this.notice.clear();
         this._rebuildList();
+        this._talk = null;
+        this._say("greet");
       }
       return true;
     }
@@ -481,8 +559,11 @@
     this._showNotice(result.success
       ? fill(this.texts.bought, { name: item.name, count: result.count, price: result.gold })
       : (this.texts[result.reason] || result.reason));
-    if (result.success) this.game.audio.playSe("buy");
-    else this.game.playError();
+    if (result.success) { this.game.audio.playSe("buy"); this._say("buy"); }
+    else {
+      this.game.playError();
+      if (result.reason === "notEnoughGold") this._say("noMoney");
+    }
 
     this.order = null;
     this.phase = "list";
@@ -499,7 +580,7 @@
       ? fill(this.texts.sold, { name: item.name, count: result.count, price: result.gold })
       : (this.texts[result.reason] || result.reason));
     // 売るときも買うときと同じ「お金が動いた」音
-    if (result.success) this.game.audio.playSe("buy");
+    if (result.success) { this.game.audio.playSe("buy"); this._say("sell"); }
     else this.game.playError();
 
     this.order = null;
@@ -689,6 +770,47 @@
     var size = pos.size || 64;
     this.sprites.drawMotion(shop.keeper, pos.x, pos.y, size, size,
       NS.Motion.of(this.game.data, shop.keeperMotion, this.game.clock, 0));
+    this._renderSpeech();
+  };
+
+  /**
+   * 店主のふきだし。店主の左に出し、しっぽを店主へ向ける。
+   * 出るときはふわっと浮かび、life が過ぎたら薄れて消える
+   */
+  ShopScene.prototype._renderSpeech = function () {
+    var talk = this._talk;
+    var S = this.layout.speech;
+    if (!talk || !S) return;
+    var life = S.life || 6000;
+    if (talk.since >= life) return;
+
+    var fadeIn = S.fadeIn || 200, fadeOut = S.fadeOut || 500;
+    var alpha = Math.min(1, talk.since / fadeIn, (life - talk.since) / fadeOut);
+    var ctx = this.panel.ctx;
+    var t = this.theme;
+    var box = { x: S.x, y: S.y, w: S.w, h: S.h };
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, alpha);
+    this.panel.drawBox(box);
+    // しっぽ（店主のほうへ）
+    ctx.fillStyle = t.panelBg || "rgba(0,0,0,0.9)";
+    ctx.strokeStyle = t.panelBorder || "#3a4560";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(box.x + box.w - 1, S.tailY - 6);
+    ctx.lineTo(box.x + box.w + (S.tailLength || 12), S.tailY);
+    ctx.lineTo(box.x + box.w - 1, S.tailY + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    var lines = wrapText(talk.text, S.charsPerLine || 19).slice(0, 2);
+    for (var i = 0; i < lines.length; i++) {
+      this.panel.drawText(lines[i], box.x + (S.padX || 12), box.y + (S.padTop || 24) + (S.lineHeight || 18) * i,
+        { font: S.font || t.smallFont, color: t.textColor });
+    }
+    ctx.restore();
   };
 
   ShopScene.prototype._renderGold = function () {

@@ -40,6 +40,10 @@
     this.fieldSize = (gameData.config || {}).battleFieldSize || 3;
     this.finished = false;
     this.result = null; // "win" | "lose" | "flee" | その他（外部から終了させた場合）
+    // 何ターン目か（特性「先手」が最初のターンを見分けるのに使う）
+    this.turnCount = 0;
+    // このターンに特性「亡者の魂」が働いた側（1ターンに1体まで）
+    this._undyingSides = {};
   }
 
   /**
@@ -52,6 +56,7 @@
     this.enemies = enemies || [];
     this.finished = false;
     this.result = null;
+    this.turnCount = 0;
 
     // 枠を埋めるのはこのときだけ。以後は交代（replaceSlot）でしか変わらない
     this._resetFieldMarks();
@@ -68,6 +73,7 @@
    *                 消し忘れると、その個体は次の戦闘以降ずっと行動しなくなる
    *   _defending … 防御中
    *   _appeared  … この戦闘で一度でも場に出た（勝ったときに愛情度が入る。控えには入らない）
+   *   _undying / _undyingUsed … 特性「亡者の魂」で踏みとどまっている／この戦闘で使った
    */
   BattleSystem.prototype._resetFieldMarks = function () {
     var i;
@@ -75,10 +81,14 @@
       this.allies[i]._removed = false;
       this.allies[i]._defending = false;
       this.allies[i]._appeared = false;
+      this.allies[i]._undying = false;
+      this.allies[i]._undyingUsed = false;
     }
     for (i = 0; i < this.enemies.length; i++) {
       this.enemies[i]._removed = false;
       this.enemies[i]._defending = false;
+      this.enemies[i]._undying = false;
+      this.enemies[i]._undyingUsed = false;
     }
   };
 
@@ -157,20 +167,38 @@
       if (this._tryFlee(events)) return events;
     }
 
+    this.turnCount++;
+    this._undyingSides = {};
+
     var order = this._buildTurnOrder(fieldAllies, fieldEnemies, actions);
+
+    // 加護の「先手」は全員に掛かるので、1体ずつ名乗らせず、ターンの頭に1行でまとめて知らせる
+    this._announcePartyFirstStrike(order, events);
 
     for (var i = 0; i < order.length; i++) {
       var step = order[i];
       // 先に倒された者、盤面から取り除かれた者（スカウトされた等）は行動しない
       if (step.actor.isFainted() || step.actor._removed) continue;
 
+      // 特性「先手」で先に動いた者は、そうと分かるように名乗る（加護のぶんは上でまとめて出した）
+      if (typeof step.firstStrike === "string" && step.firstStrikeKind !== "blessing") {
+        events.push(this._abilityEvent(step.actor, step.side, step.firstStrike, step.firstStrikeKind));
+      }
+
       this._performAction(step, events);
       if (this._checkFinish(events)) return events;
     }
 
+    // 亡者の魂で踏みとどまっていた者は、ここで倒れる
+    this._expireUndying(events);
+    if (this._checkFinish(events)) return events;
+
     // 状態異常のダメージ（毒）と、残りターンを減らす処理
     this._tickStatuses(events);
     if (this._checkFinish(events)) return events;
+
+    // 特性「再生」。毒のあとに戻すので、毒で倒れた者は戻らない
+    this._tickRegen(events);
 
     // バフ／デバフの残りターンを1つ減らす（ターンの最後にまとめて）
     this._tickModifiers(events);
@@ -333,11 +361,11 @@
     var slots = this.slots;
 
     for (i = 0; i < fieldEnemies.length; i++) {
-      enemySteps.push({
+      enemySteps.push(this._withFirstStrike({
         actor: fieldEnemies[i], side: "enemy",
         action: this._chooseEnemyAction(fieldEnemies[i], fieldAllies),
         speed: this._rollSpeed(fieldEnemies[i])
-      });
+      }));
     }
 
     // スカウトを選んだ味方がいれば、その1体だけが先に行動する
@@ -355,13 +383,45 @@
     for (i = 0; i < slots.length; i++) {
       if (slots[i].isFainted()) continue;
       var action = (actions && actions[i]) || { type: "skip" };
-      steps.push({
+      steps.push(this._withFirstStrike({
         actor: slots[i], side: "ally",
         action: action, speed: this._rollSpeed(slots[i])
-      });
+      }));
     }
 
     return this._sortBySpeed(steps);
+  };
+
+  /**
+   * 「先手」（firstStrike）が働くなら、行動に印を付けて返す。働くのは戦闘の最初のターンだけ。
+   *   firstStrike     … 出どころの名前（特性・加護）。働かなければ付けない
+   *   firstStrikeKind … 出どころの種類（"ability" / "blessing" など）
+   */
+  BattleSystem.prototype._withFirstStrike = function (step) {
+    if (this.turnCount !== 1) return step;
+    var found = this._findEffect(step.actor, "firstStrike");
+    if (found) {
+      step.firstStrike = found.name || "";
+      step.firstStrikeKind = found.kind;
+    }
+    return step;
+  };
+
+  /**
+   * 加護の「先手」を、ターンの頭に1行でまとめて知らせる（側と加護ごとに1回）。
+   * 加護は仲間全員に掛かるので、1体ずつ「○○ の 疾き初手!」と並ぶと読みにくいため
+   */
+  BattleSystem.prototype._announcePartyFirstStrike = function (order, events) {
+    var told = {};
+    for (var i = 0; i < order.length; i++) {
+      var step = order[i];
+      if (step.firstStrikeKind !== "blessing" || typeof step.firstStrike !== "string") continue;
+      var key = step.side + ":" + step.firstStrike;
+      if (told[key]) continue;
+      told[key] = true;
+      events.push({ type: "partyFirstStrike", side: step.side, targetSide: step.side,
+        abilityName: step.firstStrike, sourceKind: "blessing" });
+    }
   };
 
   /**
@@ -389,6 +449,10 @@
     }
 
     steps.sort(function (a, b) {
+      // 特性「先手」が働いている者は、素早さに関係なく先に並ぶ（その中では素早さ順）
+      var firstA = (a.firstStrike !== null && a.firstStrike !== undefined) ? 1 : 0;
+      var firstB = (b.firstStrike !== null && b.firstStrike !== undefined) ? 1 : 0;
+      if (firstA !== firstB) return firstB - firstA;
       if (b.speed !== a.speed) return b.speed - a.speed;
       return a._tie - b._tie;
     });
@@ -758,7 +822,8 @@
    *   攻撃力に比例させると、育てるほど回復量まで伸びて手がつけられなくなるため。
    */
   BattleSystem.prototype._applyHeal = function (actor, target, skill, side, events) {
-    if (!target || !target.heal || target.isFainted()) return;
+    // 亡者の魂で踏みとどまっている者（HP0）も回復できない
+    if (!target || !target.heal || target.isFainted() || target._undying) return;
 
     var spec = skill.heal || {};
     var min = (typeof spec.min === "number") ? spec.min
@@ -1063,13 +1128,213 @@
     // 倒しきった相手からも吸えるので、faint より先に処理する
     this._applyDrain(actor, skill, result.damage, side, events);
 
+    // 特性「亡者の魂」。倒れるはずのところを、このターンだけ踏みとどまる
+    if (target.isFainted()) this._tryUndying(target, opposite(side), events);
+
     if (target.isFainted()) {
       events.push({ type: "faint", side: side, targetName: target.getName(), target: target });
+      // 倒されても、とげや電気は相手に返る
+      this._applyCounterStatus(actor, target, skill, side, events);
       return;
     }
 
+    // 特性「放電」「毒のとげ」。攻撃してきた相手を状態異常にすることがある
+    this._applyCounterStatus(actor, target, skill, side, events);
+
     // 殴られて目を覚ます（眠り）。倒れた相手には意味がないので、そのあとに置く
     this._wakeOnDamage(target, events);
+  };
+
+  // --- 戦闘中に働く特性（data/abilities.js） ---
+
+  /**
+   * その個体に掛かっている、指定した種類の効果を並べて返す。
+   * 特性・装備・加護のどこから来たものでも拾う（書き方が共通なので）。
+   * 条件（condition）を満たさないものは外す。
+   *
+   * @param {object} monster
+   * @param {string} type 効果の種類（"regen" など）
+   * @param {function} [filter] 効果を受け取り、使うなら true
+   * @returns {object[]} [{ effect, name, kind }]。name は出どころの名前、
+   *   kind は出どころの種類（"ability" 特性／"equipment" 装備／"blessing" 加護／"" 不明）
+   */
+  BattleSystem.prototype._findEffects = function (monster, type, filter) {
+    if (!this.effects || !monster) return [];
+
+    var effects = this.effects.collectEffects(monster);
+    var result = [];
+    for (var i = 0; i < effects.length; i++) {
+      var effect = effects[i];
+      if (effect.type !== type) continue;
+      if (filter && !filter(effect)) continue;
+      if (!this.effects._matchCondition(monster, effect.condition)) continue;
+      var source = this._effectSource(monster, effect);
+      result.push({ effect: effect, name: source.name, kind: source.kind });
+    }
+    return result;
+  };
+
+  /** _findEffects の最初の1件（無ければ null） */
+  BattleSystem.prototype._findEffect = function (monster, type, filter) {
+    return this._findEffects(monster, type, filter)[0] || null;
+  };
+
+  /**
+   * その効果がどこから来たか。{ name, kind }（分からなければ name は空文字、kind も空文字）
+   *   kind … "ability" 特性／"equipment" 装備／"blessing" 加護
+   * 画面が文やポップアップの色を出し分けるのに使う
+   */
+  BattleSystem.prototype._effectSource = function (monster, effect) {
+    var i;
+    var abilities = (this.effects.abilitySystem)
+      ? this.effects.abilitySystem.getAbilities(monster) : [];
+    for (i = 0; i < abilities.length; i++) {
+      if ((abilities[i].effects || []).indexOf(effect) >= 0) return { name: abilities[i].name, kind: "ability" };
+    }
+    var equipments = this.effects.getEquipments(monster);
+    for (i = 0; i < equipments.length; i++) {
+      if (((equipments[i].equip || {}).effects || []).indexOf(effect) >= 0) {
+        return { name: equipments[i].name, kind: "equipment" };
+      }
+    }
+    // 加護（そのラン限り）。個体には効果だけが配られているので、定義から名前を探す
+    var blessings = this.data.blessings || {};
+    for (var id in blessings) {
+      if (!Object.prototype.hasOwnProperty.call(blessings, id)) continue;
+      if ((blessings[id].effects || []).indexOf(effect) >= 0) return { name: blessings[id].name, kind: "blessing" };
+    }
+    return { name: "", kind: "" };
+  };
+
+  /** 「○○ の 先手!」のような、特性が働いた合図の出来事 */
+  BattleSystem.prototype._abilityEvent = function (monster, side, name, kind) {
+    return { type: "ability", targetSide: side,
+      targetName: monster.getName(), target: monster, abilityName: name, sourceKind: kind || "" };
+  };
+
+  /**
+   * 特性「放電」「毒のとげ」（counterStatus）。
+   * 攻撃を受けた側が持っていれば、攻撃してきた相手を状態異常にすることがある。
+   *
+   * 通りやすさは技の状態異常と同じく「確率 × 相手の耐性」。
+   * すでに同じ状態異常に掛かっている相手には働かない（かけ直しの文が毎回出ないように）。
+   * 即死は扱わない（返しで即死させる特性は作らない方針）。
+   */
+  BattleSystem.prototype._applyCounterStatus = function (attacker, defender, skill, side, events) {
+    if (!attacker || attacker === defender || attacker.isFainted()) return;
+
+    var normal = (skill.id === this.getNormalAttackId());
+    var found = this._findEffects(defender, "counterStatus", function (effect) {
+      return effect.trigger !== "normalAttack" || normal;
+    });
+
+    for (var i = 0; i < found.length; i++) {
+      var spec = found[i].effect;
+      var def = this.data.getStatus ? this.data.getStatus(spec.status) : null;
+      if (!def || def.instantKill) continue;
+      if (attacker.getStatus && attacker.getStatus(spec.status)) continue;
+      if (attacker.isImmuneToStatus && attacker.isImmuneToStatus(spec.status)) continue;
+
+      var chance = (spec.chance === undefined) ? 1 : spec.chance;
+      chance *= this._statusResistMultiplier(attacker, spec.status);
+      if (this.random.next() >= chance) continue;
+
+      var applied = attacker.addStatus(spec.status, this.random);
+      if (!applied) continue;
+
+      events.push(this._abilityEvent(defender, opposite(side), found[i].name, found[i].kind));
+      events.push({
+        type: "status", targetSide: side,
+        targetName: attacker.getName(), target: attacker,
+        statusId: spec.status, statusName: def.name, renewed: applied.renewed
+      });
+    }
+  };
+
+  /**
+   * 特性「亡者の魂」（undying）。倒れるはずの個体を、このターンだけHP0で残す。
+   *
+   *   ・同じ側で1ターンに1体まで（_undyingSides）
+   *   ・1体につき1戦闘に1回まで（_undyingUsed）
+   *   ・攻撃で倒れたときだけ。毒・即死では働かない（ここを呼ぶのは _resolveHit だけ）
+   * 踏みとどまっているあいだは MonsterInstance.isFainted が false を返すので、
+   * まだ動いていなければ手番が回ってくる。回復は受け付けない（MonsterInstance.heal）。
+   * ターンの終わりに _expireUndying で倒れる。
+   *
+   * @returns {boolean} 踏みとどまったか
+   */
+  BattleSystem.prototype._tryUndying = function (target, targetSide, events) {
+    if (target._undyingUsed || this._undyingSides[targetSide]) return false;
+
+    var found = this._findEffect(target, "undying");
+    if (!found) return false;
+
+    target._undying = true;
+    target._undyingUsed = true;
+    this._undyingSides[targetSide] = true;
+
+    events.push({ type: "undying", targetSide: targetSide,
+      targetName: target.getName(), target: target, abilityName: found.name, sourceKind: found.kind });
+    return true;
+  };
+
+  /** 踏みとどまっていた者を、ターンの終わりに倒す */
+  BattleSystem.prototype._expireUndying = function (events) {
+    var groups = [{ list: this.slots, side: "ally" }, { list: this.enemies, side: "enemy" }];
+
+    for (var g = 0; g < groups.length; g++) {
+      var list = groups[g].list || [];
+      for (var i = 0; i < list.length; i++) {
+        var monster = list[i];
+        if (!monster._undying) continue;
+
+        monster._undying = false;
+        monster.currentHp = 0;
+        events.push({ type: "undyingEnd", targetSide: groups[g].side,
+          targetName: monster.getName(), target: monster });
+        events.push({ type: "faint", targetSide: groups[g].side,
+          targetName: monster.getName(), target: monster });
+      }
+    }
+  };
+
+  /** 戦闘が終わるときに、踏みとどまりの印を外す（持ち越さない） */
+  BattleSystem.prototype._clearUndying = function () {
+    var everyone = (this.allies || []).concat(this.enemies || []);
+    for (var i = 0; i < everyone.length; i++) everyone[i]._undying = false;
+  };
+
+  /**
+   * 特性「再生」（regen）。ターンの終わりに、最大HPの割合だけ戻す。
+   * 満タンのときは何も出さない。
+   */
+  BattleSystem.prototype._tickRegen = function (events) {
+    var groups = [{ list: this.getFieldAllies(), side: "ally" },
+                  { list: this.getFieldEnemies(), side: "enemy" }];
+
+    for (var g = 0; g < groups.length; g++) {
+      for (var i = 0; i < groups[g].list.length; i++) {
+        var monster = groups[g].list[i];
+        if (!monster.heal || monster.isFainted()) continue;
+
+        var found = this._findEffect(monster, "regen");
+        if (!found) continue;
+
+        var amount = Math.max(1, Math.floor(monster.getMaxHp() * (found.effect.value || 0)));
+        var before = monster.currentHp;
+        monster.heal(amount);
+        var healed = monster.currentHp - before;
+        if (healed <= 0) continue;
+
+        // 形は回復の出来事とそろえてある（画面側は healAmount を見て回復の演出を出す）
+        events.push({
+          type: "regen", targetSide: groups[g].side,
+          targetName: monster.getName(), abilityName: found.name, sourceKind: found.kind,
+          target: monster,
+          healAmount: healed, revealTarget: monster, revealHp: monster.currentHp
+        });
+      }
+    }
   };
 
   /**
@@ -1080,11 +1345,28 @@
    * そろえてあるので、画面側の再生処理は変更しなくてよい。
    */
   BattleSystem.prototype._applyDrain = function (actor, skill, damage, side, events) {
-    if (!skill.drain || damage <= 0) return;
+    if (damage <= 0) return;
     if (!actor || !actor.heal || actor.isFainted()) return;
 
+    // 技の drain が無ければ、特性（吸精）の drain を見る。両方あっても技のほうだけ
+    var rate = skill.drain || 0;
+    var abilityName = null;
+    var abilityKind = "";
+    if (!rate) {
+      var normal = (skill.id === this.getNormalAttackId());
+      var found = this._findEffect(actor, "drain", function (effect) {
+        return !effect.normalAttackOnly || normal;
+      });
+      if (found) {
+        rate = found.effect.value || 0;
+        abilityName = found.name;
+        abilityKind = found.kind;
+      }
+    }
+    if (!rate) return;
+
     // 1未満に切り捨てられて「吸ったのに0」にならないよう、最低1は戻す
-    var amount = Math.max(1, Math.floor(damage * skill.drain));
+    var amount = Math.max(1, Math.floor(damage * rate));
     var before = actor.currentHp;
     actor.heal(amount);
 
@@ -1096,6 +1378,10 @@
       // 吸うのは行動した本人。書かないと「敵の」が付いてしまう
       targetSide: side,
       targetName: actor.getName(),
+      // 特性で吸ったときは名前を出す（技の吸血は技名が既に出ている）
+      abilityName: abilityName,
+      sourceKind: abilityKind,
+      target: actor,
       healAmount: healed,
       revealTarget: actor,
       revealHp: actor.currentHp
@@ -1107,7 +1393,7 @@
    *
    *   技      基礎 = 攻撃力×skill.attackFactor + 技威力×skill.powerFactor - 防御力×defenseFactor
    *   通常攻撃 基礎 = 攻撃力×normal.attackFactor                          - 防御力×defenseFactor
-   *   ダメージ = floor( max(0, 基礎) × 属性倍率 × 会心倍率 × 防御 × 特性装備 × 乱数 )
+   *   ダメージ = floor( max(0, 基礎) × 属性倍率 × クリティカル倍率 × 防御 × 特性装備 × 乱数 )
    *
    * 「通常攻撃」は normalAttackSkill の技だけ。体当たりなどの無属性技は技の式。
    *
@@ -1143,7 +1429,7 @@
       ? numberOr((battle.critical || {}).multiplier, 1)
       : 1;
 
-    // 防御中はどんなダメージも軽くなる（属性も会心も問わない）
+    // 防御中はどんなダメージも軽くなる（属性もクリティカルも問わない）
     var defendMultiplier = defender._defending
       ? numberOr((battle.defend || {}).multiplier, 1)
       : 1;
@@ -1190,9 +1476,9 @@
     return this.random.next() < evasion;
   };
 
-  /** 会心が出たか。確率は 共通値 + 技の criticalBonus */
+  /** クリティカルが出たか。確率は 共通値 + 技の criticalBonus */
   BattleSystem.prototype._rollCritical = function (skill) {
-    // 会心を出さない技（範囲全体の技など）
+    // クリティカルを出さない技（範囲全体の技など）
     if (skill.canCritical === false) return false;
 
     var config = (this.data.battle || {}).critical || {};
@@ -1281,6 +1567,7 @@
     }
     // 掛かっている強化・弱体は持ち帰らせない
     this.clearAllModifiers();
+    this._clearUndying();
     events.push({ type: "battleEnd", result: this.result });
   };
 
@@ -1308,6 +1595,7 @@
     this.result = result;
     // 掛かっている強化・弱体は持ち帰らせない
     this.clearAllModifiers();
+    this._clearUndying();
     events.push({ type: "battleEnd", result: result });
     return events;
   };
@@ -1427,6 +1715,21 @@
     }
     return -1;
   }
+
+  /**
+   * その技がダメージを与えるか。
+   *
+   * 威力0の意味は技によって違う。
+   *   回復・バフ／デバフ・状態異常を持つ技 … 威力0なら掛けるだけでダメージは無い
+   *   それ以外（通常攻撃） … 威力0でも通常攻撃と同じ計算でダメージを与える
+   * _resolveHit の「威力を持たない技はここで終わり」と同じ判定。
+   * 図鑑・戦闘の技の説明で「威力」を出すかどうかにも使う
+   */
+  BattleSystem.dealsDamage = function (skill) {
+    if (!skill) return false;
+    if (skill.power) return true;
+    return !(skill.heal || skill.modifier || skill.status);
+  };
 
   NS.BattleSystem = BattleSystem;
 })(window.MyGame);

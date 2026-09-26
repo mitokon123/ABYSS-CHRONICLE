@@ -225,6 +225,22 @@
       // 味方（下段）。HPバーの下にPPバーを出すぶん、敵より縦に長い
       allyRow:     { y: 250, spriteSize: 96, slotGap: 210, statusY: 350, statusW: 190, statusH: 64 },
 
+      // 発動の札（強化・弱体・特性・加護が働いたとき、画面上部の真ん中に出る）
+      //   新しい札が上、古い札は下へ押し出される（max 枚まで）。duration で消える
+      //   ★ 2枚までにしてある。3枚目は敵の絵（y 62〜）に重なってしまうため
+      //   colors … 左端の色帯と文字の色。buff 強化／debuff 弱体／ability 特性／blessing 加護／equipment 装備
+      effectPopup: {
+        y: 6, w: 320, h: 24, gap: 3, max: 2, rise: 6,
+        duration: 1600, fadeIn: 120, fadeOut: 350,
+        barWidth: 5, textOffsetX: 30,
+        font: "14px monospace",
+        background: "rgba(10,15,28,0.88)",
+        colors: {
+          buff: "#5fd18c", debuff: "#e8542a",
+          ability: "#b48ce0", blessing: "#ffd75e", equipment: "#7fd9e8"
+        }
+      },
+
       // メッセージ欄
       message: { x: 20, y: 428, w: 760, h: 152 },
       messageLines: 6,  // 一度に表示する行数（超えると送り待ちになる）
@@ -371,7 +387,18 @@
       status: { x: 360, y: 122, w: 400, h: 372, rowHeight: 52, spriteSize: 36, hpBarWidth: 190 },
 
       notice: { x: 400, y: 526 },
-      hint:   { x: 48, y: 570 }
+      hint:   { x: 48, y: 570 },
+
+      // Esc で出す「タイトルに戻りますか？」の窓。見た目はセーブ画面の確認と同じ
+      confirm: {
+        veil:       "rgba(4,6,12,0.72)",
+        background: "#0d1220",
+        box:   { x: 220, y: 200, w: 360, h: 210 },
+        title: { x: 400, y: 244 },
+        body:  { x: 400, y: 276 },
+        note:  { x: 400, y: 300 },
+        menu:  { x: 336, y: 314, w: 128, h: 68, lineHeight: 28 }
+      }
     },
 
     /**
@@ -668,6 +695,8 @@
       legend: { x: 320, y: 86, gap: 74 },
       tag: { w: 34, h: 16 },
       tagTextColor: "#0a0f1c",
+      // 話題の見出し（「■ 戦い」など。data/patchnotes.js の { section }）の色
+      sectionColor: "#8fb8ff",
 
       // visibleRows … 一度に出すバージョンの数。
       //   ★ バージョンは増え続けるので、入りきらない前提で送れるようにしてある。
@@ -712,6 +741,13 @@
 
       // 店主。詳細欄の右上に立たせる（動きは data/shop.js の keeperMotion）
       keeper: { x: 684, y: 88, size: 80 },
+      // 店主のふきだし（台詞は data/shop.js の lines）。店主の左に出す
+      //   tailY        … しっぽの高さ（店主の口のあたり）
+      //   life         … 出している時間（ms）。fadeIn / fadeOut は出始めと消え際
+      //   idleInterval … 何もしていないとき、店主が独り言を言う間隔（ms）
+      speech: { x: 396, y: 98, w: 272, h: 56, padX: 12, padTop: 24, lineHeight: 18,
+                font: "13px monospace", charsPerLine: 19, tailY: 124, tailLength: 12,
+                life: 6000, fadeIn: 200, fadeOut: 500, idleInterval: 9000 },
 
       // 買う個数を決めるとき
       quantityStep: 10,  // ←→ で一度に増減する数
@@ -775,6 +811,8 @@
       //   lockedColor… まだ行けない場所の色（中身を見せない）
       themeBar:    { width: 6 },
       lockedColor: "#242a3a",
+      // 推奨レベルに、連れている仲間の最高レベルが届いていないときの色
+      underLevelColor: "#e8896a",
 
       // 右の詳細欄。説明・出現モンスター・手に入るものを縦に並べる
       //   charsPerLine … 説明文を折り返す文字数
@@ -885,8 +923,10 @@
       // 「連れていく / 預かり所」の切り替え表示（gap は2つ目の左へのずれ）
       tabs: { x: 200, y: 42, gap: 150 },
       // 一覧の1行分の配置。2体目以降は rowHeight ずつ下にずれる
-      //   visible … 画面に同時に出す行数（預かり所はこれより多く入るので窓のようにずらす）
-      list: { x: 32, y: 58, w: 480, h: 62, rowHeight: 70, visible: 6 },
+      //   visible … 画面に同時に出す行数（預かり所はこれより多く入るので、枠の中でスクロールする。
+      //             右端にスクロールバーが出る。動かし方は持ち物・図鑑の一覧と同じ）
+      //   cursorSpace … 行の左に出す「▶」の幅（枠の左へはみ出して描く分）
+      list: { x: 32, y: 58, w: 480, h: 62, rowHeight: 70, visible: 6, cursorSpace: 22 },
       spriteSize: 48,
       hpBarWidth: 220,
       // 先頭から何体が戦闘に出るかを示す線
@@ -901,6 +941,20 @@
       // 「この仲間をどうするか」の項目。
       // h は最低の高さで、項目が増えたぶんは CommandMenu が自動で伸ばす
       actionMenu: { x: 300, y: 180, w: 220, h: 140, lineHeight: 28 },
+      // 探索中に使う技の一覧と、その相手の一覧（「この仲間をどうするか」と同じ場所に重ねる）
+      //   h は最低の高さ。項目が増えたぶんは CommandMenu が自動で伸ばす
+      fieldSkillMenu:  { x: 300, y: 180, w: 240, h: 68,  lineHeight: 28 },
+      fieldTargetMenu: { x: 300, y: 150, w: 260, h: 110, lineHeight: 28 },
+      // 「逃がしますか?」の窓。拠点の「タイトルに戻りますか?」と同じ見た目
+      releaseConfirm: {
+        veil:       "rgba(4,6,12,0.72)",
+        background: "#0d1220",
+        box:   { x: 220, y: 200, w: 360, h: 210 },
+        title: { x: 400, y: 244 },
+        body:  { x: 400, y: 276 },
+        note:  { x: 400, y: 300 },
+        menu:  { x: 336, y: 314, w: 128, h: 68, lineHeight: 28 }
+      },
 
       /**
        * 「様子を見る」の画面。画面ぜんぶを1枚の枠にして、3列に分ける。

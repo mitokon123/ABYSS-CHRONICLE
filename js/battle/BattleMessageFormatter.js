@@ -109,7 +109,27 @@
                                    : (event.raised ? t.modifierUp : t.modifierDown)),
                     { target: this._targetName(event), skill: event.skillName });
       case "drain":
+        // 特性（吸精）で吸ったときは、特性の名前を出す
+        if (event.abilityName) {
+          return fill(t.abilityDrain, { target: this._targetName(event),
+            ability: event.abilityName, amount: event.healAmount });
+        }
         return fill(t.drained, { target: this._targetName(event), amount: event.healAmount });
+
+      // 戦闘中に働く特性（data/abilities.js）
+      case "ability":
+        return fill(t.abilityTriggered,
+                    { target: this._targetName(event), ability: event.abilityName });
+      case "regen":
+        return fill(t.abilityRegen, { target: this._targetName(event),
+          ability: event.abilityName, amount: event.healAmount });
+      case "undying":
+        return fill(t.undying,
+                    { target: this._targetName(event), ability: event.abilityName });
+      case "undyingEnd":
+        return fill(t.undyingEnd, { target: this._targetName(event) });
+      case "partyFirstStrike":
+        return fill(t.partyFirstStrike, { ability: event.abilityName });
       case "heal":
         return fill(t.healed, { target: this._targetName(event), amount: event.healAmount });
       case "healFull":

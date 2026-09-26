@@ -931,14 +931,12 @@
     lines.push({ text: (this.texts.elementLabel || "") + " " + (element ? element.name : "-"),
                  color: element ? element.color : null });
 
-    // 威力0の意味は技によって違う。
-    //   ふつうの技 … 通常攻撃と同じ計算なので「-」と出す
-    //   支援の技（回復・バフ・デバフ） … そもそもダメージを与えないので、行ごと出さない
-    //     （キュアに「威力 -」と並ぶと、殴る技のように見えてしまうため）
-    var isSupport = !skill.power && (skill.modifier || skill.heal);
+    // ダメージを与えない技（回復・バフ／デバフ・状態異常だけの技）は、威力の行ごと出さない。
+    //   キュアやどくのいきに「威力」と並ぶと、殴る技のように見えてしまうため。
+    //   判定は戦闘と同じ BattleSystem.dealsDamage
     if (skill.power) {
       lines.push({ text: (this.texts.powerLabel || "") + " " + skill.power });
-    } else if (!isSupport) {
+    } else if (NS.BattleSystem.dealsDamage(skill)) {
       lines.push({ text: (this.texts.powerLabel || "") + " " + (this.texts.powerNormal || "-") });
     }
     lines.push({ text: (this.texts.ppLabel || "") + " " + (skill.pp || 0) });

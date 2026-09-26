@@ -178,6 +178,97 @@
         gravity: 100,
         minSize: 4,
         maxSize: 8
+      },
+
+      /**
+       * 毒の息。並びの中心で吐き出され、左右へもくもくと広がる。
+       * 1体ずつではなく並び全体に1回だけ出す型なので、技の側に effectAt: "center" を書く。
+       *   spread  … 左右にどこまで広がるか（敵3体の両端 ±210 より少し広く）
+       *   height  … 上下の広がり
+       *   count / minSize / maxSize … 煙の玉の数と大きさ
+       *   bubbles … 煙の中から昇る泡の数
+       *   color / accentColor … 毒の色は属性に無いので、ここで固定する
+       *     （紫の煙に、毒の印と同じ緑を混ぜる。data/statuses.js の poison.color）
+       *   ほかに書けるもの（火の息・奈落の息で使う）
+       *     color を書かない … 技の属性の色になる
+       *     particle       … 昇る粒の形。"bubble"（泡の輪・既定）／"spark"（四角い粒）
+       *     particleColor  … 粒の色（省略で accentColor）
+       *     lift           … 煙が昇る高さ（既定 12）
+       *     particleScale  … 粒の大きさの倍率（既定 1）
+       */
+      miasma: {
+        shape: "miasma",
+        duration: 1000,
+        glow: 14,
+        color: "#9b59c9",
+        accentColor: "#7fd06a",
+        spread: 250,
+        height: 70,
+        count: 22,
+        minSize: 18,
+        maxSize: 34,
+        bubbles: 16
+      },
+
+      /**
+       * 火の息。どくのいきと同じ「息」の形で、色は火の属性色（橙）。
+       * 3つに1つの煙を黄色にし、火の粉（spark）を散らす。熱で煙が高く昇る（lift）
+       */
+      flameBreath: {
+        shape: "miasma",
+        duration: 950,
+        glow: 18,
+        accentColor: "#ffd75e",
+        particle: "spark",
+        spread: 250,
+        height: 70,
+        lift: 34,
+        count: 24,
+        minSize: 16,
+        maxSize: 32,
+        bubbles: 22
+      },
+
+      /**
+       * あわ。色は水の属性色（青）。
+       * 3つに1つの煙を淡い水色にし、大きめの泡の輪（particleScale）をたくさん昇らせる。
+       * 泡は軽いので少しだけ浮く
+       */
+      bubbleBreath: {
+        shape: "miasma",
+        duration: 1000,
+        glow: 14,
+        accentColor: "#bfe9ff",
+        particleColor: "#e6f7ff",
+        particle: "bubble",
+        particleScale: 1.8,
+        spread: 250,
+        height: 70,
+        lift: 16,
+        count: 20,
+        minSize: 14,
+        maxSize: 28,
+        bubbles: 26
+      },
+
+      /**
+       * 奈落の息。色は闇の属性色（紫）。
+       * 3つに1つの煙を濃い闇色にして底の深さを出し、薄紫の粒が漂う。煙はあまり昇らない（重い闇）
+       */
+      abyssBreath: {
+        shape: "miasma",
+        duration: 1100,
+        glow: 16,
+        accentColor: "#3a2466",
+        particleColor: "#c9b8ff",
+        particle: "spark",
+        spread: 260,
+        height: 80,
+        lift: 4,
+        count: 26,
+        minSize: 20,
+        maxSize: 38,
+        bubbles: 18
       }
     }
   };

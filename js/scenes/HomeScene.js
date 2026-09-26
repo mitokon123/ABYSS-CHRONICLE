@@ -47,6 +47,14 @@
     // 初めての場面で出る説明（出ているあいだはメニューを操作できない）
     this.tutorial = new NS.TutorialBox(this.panel, game);
 
+    // Esc で出す「タイトルに戻りますか？」。セーブせずに戻ってしまう事故を防ぐ
+    this.confirming = false;
+    this.confirmMenu = new NS.CommandMenu(this.panel, (this.layout.confirm || {}).menu);
+    this.confirmMenu.setItems([
+      { label: this.texts.toTitleNo  || "いいえ", value: "no" },
+      { label: this.texts.toTitleYes || "はい",   value: "yes" }
+    ]);
+
     // 画面に出している所持金。実際の額へ向かって少しずつ動かす
     this._shownGold = null;
 
@@ -57,6 +65,8 @@
   /** 進行データ（パーティ・持ち物・発見記録）を用意する */
   HomeScene.prototype._ensureParty = function () {
     this.game.ensureProgress();
+    // 拠点では仲間を常に全快にしておく（スカウトした仲間・装備の着け替えも含めて）
+    this.game.restoreAtHome();
   };
 
   /**
@@ -132,14 +142,34 @@
       return;
     }
 
+    if (this.confirming) {
+      this._updateConfirm();
+      return;
+    }
+
     var result = this.menu.handleInput(this.game.input);
     if (!result) return;
 
     if (result.type === "cancel") {
-      this.game.scenes.change(new NS.TitleScene(this.game));
+      this.confirmMenu.index = 0;   // 既定は「いいえ」
+      this.confirming = true;
       return;
     }
     if (result.type === "confirm") this._select(result.value);
+  };
+
+  /** 「タイトルに戻りますか？」の操作。Esc と「いいえ」は拠点に残る */
+  HomeScene.prototype._updateConfirm = function () {
+    var result = this.confirmMenu.handleInput(this.game.input);
+    if (!result) return;
+
+    if (result.type === "cancel" || result.value === "no") {
+      this.confirming = false;
+      return;
+    }
+    if (result.value === "yes") {
+      this.game.scenes.change(new NS.TitleScene(this.game));
+    }
   };
 
   HomeScene.prototype._select = function (value) {
@@ -265,8 +295,41 @@
     this.menu.render(this.game.clock);
     this._renderPartyStatus();
     this._renderNotice(ctx);
+    // 操作説明は暗幕より上に出す（確認中の操作が読めるように）
+    if (this.confirming) this._renderConfirm(ctx);
     this._renderHint(ctx);
     this.tutorial.render();
+  };
+
+  /** 「タイトルに戻りますか？」の窓。後ろを暗く落として問いかけだけに目を向けさせる */
+  HomeScene.prototype._renderConfirm = function (ctx) {
+    var C = this.layout.confirm;
+    if (!C) return;
+    var t = this.theme;
+
+    ctx.save();
+    ctx.fillStyle = C.veil || "rgba(4,6,12,0.72)";
+    ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
+    ctx.fillStyle = C.background || "#0d1220";
+    ctx.fillRect(C.box.x, C.box.y, C.box.w, C.box.h);
+    ctx.restore();
+    this.panel.drawBox(C.box);
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.font = t.font || "14px monospace";
+    ctx.fillStyle = t.cursorColor || "#ffd75e";
+    ctx.fillText(this.texts.toTitleTitle || "", C.title.x, C.title.y);
+
+    ctx.font = t.smallFont || "12px monospace";
+    ctx.fillStyle = t.textColor || "#e8eaf0";
+    ctx.fillText(this.texts.toTitleBody || "", C.body.x, C.body.y);
+
+    ctx.fillStyle = t.hintColor || "#5b6688";
+    ctx.fillText(this.texts.toTitleNote || "", C.note.x, C.note.y);
+    ctx.restore();
+
+    this.confirmMenu.render(this.game.clock);
   };
 
   /**
@@ -438,7 +501,8 @@
 
   HomeScene.prototype._renderHint = function (ctx) {
     var pos = this.layout.hint || { x: 48, y: 570 };
-    this.panel.drawText(this.texts.hint || "", pos.x, pos.y,
+    var text = this.confirming ? this.texts.toTitleHint : this.texts.hint;
+    this.panel.drawText(text || "", pos.x, pos.y,
       { font: this.theme.smallFont, color: this.theme.hintColor });
   };
 

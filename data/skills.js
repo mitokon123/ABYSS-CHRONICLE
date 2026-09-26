@@ -3,10 +3,13 @@
  * スキル（技）の定義。数値はすべてここで管理する。
  *
  * power         : 威力（0 なら通常攻撃と同じ計算になる）
+ *                 ★ ただし heal / modifier / status のどれかを持つ技は、威力0だと
+ *                   「掛けるだけでダメージを与えない技」になる。
+ *                   その技は図鑑・戦闘の説明に「威力」の行が出ない（BattleSystem.dealsDamage）
  * pp            : 使うのに必要なPP。0 なら何度でも使える
  * accuracy      : 命中率（0〜1）。書かなければ battle.js の defaultAccuracy（=100%）
- * criticalBonus : 会心率への上乗せ（書かなければ 0）
- * canCritical   : false と書くと会心が出なくなる。
+ * criticalBonus : クリティカル率への上乗せ（書かなければ 0）
+ * canCritical   : false と書くとクリティカルが出なくなる。
  *                 範囲全体の技はこれを付ける方針（1体ずつ判定すると、
  *                 運だけで一気に崩れる回ができてしまうため）
  * evadable      : false と書くと、相手の回避率（monsters.js の evasion）で
@@ -39,11 +42,19 @@
  * element       : 属性id（elements.js を参照）。"none" は耐性の影響を受けない
  * effect        : 当たったときの演出の型（data/effects.js の shapes のid）
  *                 省略すると演出なし。色は element から決まるので指定しない
+ *                 （型の側に color が書いてあれば、そちらが優先。毒の息 miasma など）
+ * effectAt      : "center" と書くと、演出を1体ずつではなく、並び全体の中心に1回だけ出す。
+ *                 範囲技を「1回の息」に見せたいときに使う（どくのいき）
  * se            : 出した瞬間の音（data/audio.js の se のid）。省略で無音。
  *                 ★ se を書いた技は、当たったときの打撃／斬撃音を鳴らさない（技の音だけで完結）。
  *                 se の無い技は、effect の型（data/effects.js の hitSe）から打撃／斬撃が鳴る
  * hitSe         : 当たった音を自分で決めたいときだけ書く（"hit" / "slash" で鳴らす、null で止める）。ふつうは書かない
  * description   : 技を選ぶときに出る説明文
+ * fieldUse      : 探索中（戦闘の外）に、仲間画面の「技を使う」から使えるか。
+ *                 ・威力を持つ技（攻撃の技）は、何を書いても使えない
+ *                 ・HPを回復する技（heal）は、書かなくても使える（使わせたくないときは false）
+ *                 ・それ以外の技は true と書いたものだけ（いまの仕組みで働くのは回復だけ）
+ *                 判定は Game.isFieldSkill
  * showInDex     : false なら図鑑の「技」に載せない（省略すると載る）。
  *                 通常攻撃は覚える技ではなくコマンドなので、これで隠してある
  *
@@ -90,7 +101,7 @@
       target: "enemy",
       element: "none",
       effect: "slash",
-      description: "鋭くかみつく。会心が出やすいが、やや外れやすい。"
+      description: "鋭くかみつく。クリティカルが出やすいが、やや外れやすい。"
     },
 
     // 各属性の基本技。威力15 / PP2 / 命中100% でそろえてある
@@ -179,7 +190,7 @@
 
     // ゲーム中で初めての範囲全体の技。マグマウルフだけが使う。
     // 1体あたりの威力は基本技と同じ15で、3体に届くぶん総量は3倍になる。
-    // そのかわり会心が出ず、PPも重い（息の技に共通の決まり）
+    // そのかわりクリティカルが出ず、PPも重い（息の技に共通の決まり）
     fireBreath: {
       id: "fireBreath",
       name: "火の息",
@@ -188,12 +199,14 @@
       accuracy: 1.0,
       target: "allEnemies",
       element: "fire",
-      effect: "burst",
+      // 炎の息が並びの中心から広がる（どくのいきと同じ出し方）
+      effect: "flameBreath",
+      effectAt: "center",
       se: "fireBreath",
       // 息は広がるのでよけようがない。回避率を持つ相手にも必ず当たる
       evadable: false,
-      // 範囲全体の技は会心を出さない。
-      // 3体それぞれで会心を判定すると、運だけで一気に崩れる回ができてしまう
+      // 範囲全体の技はクリティカルを出さない。
+      // 3体それぞれでクリティカルを判定すると、運だけで一気に崩れる回ができてしまう
       canCritical: false,
       description: "熱い息を吐き、相手全体を焼く。1体ずつへの威力は低いが、よけられない。"
     },
@@ -228,7 +241,7 @@
     },
 
     // 竜だけが使う範囲技。火の息と同じ枠（威力15/PP3）で、属性だけが違う。
-    // 範囲技の方針どおり、よけられず・会心も出ない
+    // 範囲技の方針どおり、よけられず・クリティカルも出ない
     abyssBreath: {
       id: "abyssBreath",
       name: "奈落の息",
@@ -237,7 +250,9 @@
       accuracy: 1.0,
       target: "allEnemies",
       element: "dark",
-      effect: "burst",
+      // 闇の息が並びの中心から広がる（どくのいきと同じ出し方）
+      effect: "abyssBreath",
+      effectAt: "center",
       se: "darkBreath",
       evadable: false,
       canCritical: false,
@@ -348,7 +363,9 @@
       accuracy: 1.0,
       target: "allEnemies",
       element: "none",
-      effect: "burst",
+      // 毒の息が並びの中心から広がる（1体ずつではなく1回だけ）
+      effect: "miasma",
+      effectAt: "center",
       se: "venomBreath",
       // 息は広がるのでよけようがない（範囲技の方針）
       evadable: false,
@@ -362,7 +379,7 @@
     /**
      * あわ。ヌシガエルが使う水の範囲技。
      *
-     * 火の息・奈落の息と同じ枠（PP3 / 全体 / よけられない / 会心なし）。
+     * 火の息・奈落の息と同じ枠（PP3 / 全体 / よけられない / クリティカルなし）。
      * 水属性の範囲技はこれが初めてで、火・闇に続く3つ目の「息」枠になる。
      * ★ 威力だけ12のまま（火の息・奈落の息は15に上げた）。主の技なので別枠で見ている
      *
@@ -379,7 +396,9 @@
       accuracy: 1.0,
       target: "allEnemies",
       element: "water",
-      effect: "burst",
+      // 泡の息が並びの中心から広がる（どくのいきと同じ出し方）
+      effect: "bubbleBreath",
+      effectAt: "center",
       se: "bubble",
       // 泡は広がって割れるのでよけようがない（範囲技の方針）
       evadable: false,

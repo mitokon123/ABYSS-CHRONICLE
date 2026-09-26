@@ -122,7 +122,8 @@
    * @param {MyGame.Inventory} inventory
    * @returns {{success:boolean, reason:string, amount:number, itemName:string,
    *            effectType:string}}
-   *   reason: "used" | "noItem" | "noEffect" | "unknown"
+   *   reason: "used" | "noItem" | "noEffect" | "fainted"（相手が倒れている） | "unknown"
+   *   使えなかったときは持ち物は減らない
    *   effectType … 効果の種類。画面側が「HPが回復した」「毒が抜けた」を出し分けるのに使う
    */
   ItemUsage.prototype.use = function (itemId, target, inventory) {
@@ -137,6 +138,14 @@
 
     if (!item || !item.effect) return fail("unknown");
     if (inventory && !inventory.has(itemId, 1)) return fail("noItem");
+
+    // 倒れている仲間には使えない（このゲームに蘇生は無い）。
+    // 戦闘では「選んだときは立っていたが、使う番までに倒された」ことがあり、
+    // ここで止めないと回復薬で生き返っていた。亡者の魂で踏みとどまっている者（HP0）も同じ
+    // ★ 蘇生の道具を足すときは、その効果の種類だけここを通すようにする
+    if (target && ((target.isFainted && target.isFainted()) || target._undying)) {
+      return fail("fainted");
+    }
 
     var handler = EFFECT_HANDLERS[type];
     if (!handler) return fail("unknown");

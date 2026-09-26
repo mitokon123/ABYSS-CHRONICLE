@@ -19,6 +19,7 @@
  *        table : [{ item, weight, min, max }] 中身の候補（重み付き抽選）
  *   type "heal"     … 仲間を回復する
  *        hpRatio / ppRatio : 最大値に対する割合（1.0 で全回復）
+ *        cureStatus        : true なら状態異常（毒など）もすべて治す
  *   type "damage"   … 仲間全員にダメージ
  *        hpRatio      : 最大HPに対する割合
  *        leaveAtLeast : 最低これだけHPを残す（罠だけで全滅しないようにする）
@@ -66,7 +67,8 @@
       once: true,
       confirm: true,   // 元気なうちに使ってしまわないよう、使うかどうかを選べる
       se: "spring",
-      effect: { type: "heal", hpRatio: 0.5, ppRatio: 0.5 }
+      // HP・PPを全回復し、状態異常（毒など）も治す
+      effect: { type: "heal", hpRatio: 1.0, ppRatio: 1.0, cureStatus: true }
     },
 
     trap: {

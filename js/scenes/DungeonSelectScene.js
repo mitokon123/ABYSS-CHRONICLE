@@ -191,6 +191,31 @@
       : "";
     this.panel.drawText(floors, origin.x, origin.y + 58,
       { font: t.smallFont, color: t.hintColor });
+
+    // 推奨レベル（初めて入るときの目安）。最深階の隣に出す
+    if (unlocked && dungeon.recommendedLevel) {
+      this.panel.ctx.font = t.smallFont;
+      var gap = this.panel.ctx.measureText(floors).width + 16;
+      this.panel.drawText(this._recommendedText(dungeon), origin.x + gap, origin.y + 58,
+        { font: t.smallFont, color: this._recommendedColor(dungeon) });
+    }
+  };
+
+  /** 「推奨Lv5」 */
+  DungeonSelectScene.prototype._recommendedText = function (dungeon) {
+    return (this.texts.recommendedLabel || "推奨Lv{level}").replace("{level}", dungeon.recommendedLevel);
+  };
+
+  /**
+   * 推奨レベルの色。連れている仲間でいちばん高いレベルが推奨に届いていなければ、
+   * 注意の色にする（まだ早いかもしれない、と一目で分かるように）
+   */
+  DungeonSelectScene.prototype._recommendedColor = function (dungeon) {
+    var t = this.theme;
+    var members = (this.game.party && this.game.party.getMembers) ? this.game.party.getMembers() : [];
+    var best = 0;
+    for (var i = 0; i < members.length; i++) best = Math.max(best, members[i].level || 0);
+    return (best >= dungeon.recommendedLevel) ? t.subTextColor : (this.layout.underLevelColor || "#e8896a");
   };
 
   /**

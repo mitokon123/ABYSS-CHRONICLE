@@ -19,7 +19,7 @@
       useSkill:     "{actor} の {skill}!",                  // actor, skill
       wait:         "{actor} は ようすを みている...",       // actor
       miss:         "しかし {target} には当たらなかった!",  // target
-      critical:     "会心の一撃!",
+      critical:     "クリティカル!",
 
       // 相性の良し悪しは文章では知らせない（空にすると、その行は出なくなる）。
       // 数字と画面の効果で伝える。
@@ -56,6 +56,16 @@
       // HPを回復する技（data/skills.js の heal）
       healed:       "{target} の HPが {amount} 回復した!",   // target, amount
       healFull:     "しかし {target} は 元気なままだ",       // target
+
+      // 戦闘中に働く特性（data/abilities.js の regen / counterStatus / drain / firstStrike / undying）。
+      //   abilityTriggered … 特性が働いた合図。このあとに毒・麻痺などの文が続く（放電・毒のとげ・先手）
+      abilityTriggered: "{target} の {ability}!",             // target, ability
+      abilityRegen:     "{target} は {ability}で HPが {amount} 回復した", // target, ability, amount
+      abilityDrain:     "{target} は {ability}で HPを {amount} 吸い取った", // target, ability, amount
+      undying:          "{target} は {ability}で 踏みとどまった!", // target, ability
+      undyingEnd:       "{target} の魂が 尽きた…",              // target
+      // 加護の「先手」は全員に掛かるので、ターンの頭に1行でまとめて出す
+      partyFirstStrike: "{ability}の加護で 仲間が先に動く!",   // ability
       expGained:    "{amount} の経験値を獲得!",             // amount
       goldGained:   "{amount}G を手に入れた!",              // amount
       levelUp:      "{actor} はレベル {level} に上がった!", // actor, level
@@ -118,6 +128,14 @@
 
     /** 戦闘画面（3対3・素早さ順） */
     battleUi: {
+      // 画面上部の発動の札（強化・弱体・特性・加護が働いたとき）
+      popupStatUp:   "{stat}上昇",                              // stat
+      popupStatDown: "{stat}低下",                              // stat
+      popupStats:    { hp: "HP", attack: "攻撃力", defense: "防御力", speed: "素早さ", pp: "PP", other: "能力" },
+      popupPartyAll: "仲間全員",
+      popupEnemyAll: "敵全員",
+      popupEnemyPrefix: "敵の",   // 札の持ち主が敵のとき、名前の前に付ける
+
       // ターンの頭
       turnPrompt:  "どうする?",
       hintTurn:    "↑↓: 選択    決定: 決定",
@@ -132,6 +150,8 @@
       selectTarget:"だれに?",
       selectSkill: "どの技?",
       skillStats:  "威力{power}　命中{accuracy}%　PP{pp}",   // power, accuracy, pp
+      // ダメージを与えない技（回復・バフ／デバフ・状態異常だけ）。威力を並べない
+      skillStatsNoPower: "命中{accuracy}%　PP{pp}",          // accuracy, pp
       selectItem:  "どの道具?",
       noItems:     "使える道具がない",
       notEnoughPp: "PPが足りない!",
@@ -147,6 +167,8 @@
         default:    "{name} に効果があった"                  // name
       },
       itemNoEffect:"しかし 効果がなかった",
+      // 選んだ相手が、使う番までに倒されていた（道具は減らない）
+      itemTargetFainted: "しかし {name} は 倒れていた",       // name
       // 交代（その仲間のこのターンの行動になる）。
       // 倒れた仲間は自動では下がらない。次のターンに交代だけ選べる
       commandFainted: "{name} は 倒れている",               // name
@@ -230,7 +252,14 @@
       lockedShort:"{name} はまだ使えない",                   // name
       statusTitle:"パーティ",
       emptyParty: "仲間がいない",
-      hint:       "↑↓: 選択    決定: 決定    Esc: タイトルへ"
+      hint:       "↑↓: 選択    決定: 決定    Esc: タイトルへ",
+      // Esc でタイトルへ戻る前の確認。既定は「いいえ」
+      toTitleTitle: "タイトルに戻りますか？",
+      toTitleBody:  "セーブしていない進行は失われます",
+      toTitleNote:  "※ 残したいときは先に「セーブ」を",
+      toTitleYes:   "はい",
+      toTitleNo:    "いいえ",
+      toTitleHint:  "↑↓: 選択    決定: 決定    Esc: やめる"
     },
 
     /**
@@ -517,6 +546,8 @@
       },
       usedAlone:   "{item} を使った",                   // item（相手を選ばないもの）
       noEffect:    "しかし 効果がなかった",
+      // 倒れている仲間には使えない（蘇生は無い）
+      targetFainted: "{name} は 倒れていて 使えない",       // name
       cannotUse:   "ここでは使えない",
       hintList:    "↑↓: 選択    決定: 使う    Esc: 戻る",
       hintTarget:  "↑↓: 相手を選ぶ    決定: 決定    Esc: やめる"
@@ -561,7 +592,7 @@
       statusNote:   "相手の耐性で通りにくくなる",
       ppLabel:      "消費PP",
       accuracyLabel:"命中",
-      criticalLabel:"会心",
+      criticalLabel:"クリティカル",
       knownLabel:   "判明",
       unknownName:  "???",
       unknownDesc:  "まだ出会っていない。",
@@ -594,6 +625,8 @@
       title:      "ダンジョン",
       subtitle:   "挑む場所を選ぶ",
       floorsLabel:"最深 B{floors}F",           // floors
+      // 推奨レベル（初めて入るときの目安。data/dungeons.js の recommendedLevel）
+      recommendedLabel: "推奨Lv{level}",       // level
       cleared:    "クリア済",
       locked:     "未開放",
       lockedHint: "{name} をクリアすると挑める", // name
@@ -623,7 +656,9 @@
       chestGot:     "{name} を {count}個 手に入れた!",     // name, count
       chestFull:    "しかし {name} を持ちきれなかった...", // name
       spring:       "澄んだ泉がわいている。",
-      springHealed: "仲間のHPとPPが回復した!",
+      springHealed: "仲間のHPとPPが全回復した!",
+      springCured:  "仲間の状態異常が治った!",
+      springHealedCured: "仲間のHP・PPが全回復し、状態異常も治った!",
       springFull:   "しかし 誰も疲れていなかった",
       // 使うかどうかを聞くとき（data/features.js の confirm: true）
       //   〇〇Prompt の 〇〇 は仕掛けのid。新しい仕掛けにも同じ書き方で足せる
@@ -726,7 +761,28 @@
       actionReorder:"並び替える",
       actionName:    "名前を変える",
       actionEquip:  "装備",
+      actionRelease:"逃がす",
+      // 探索中に技を使う（回復の技など。攻撃の技は出ない）
+      actionFieldSkill: "技を使う",
+      fieldSkillCost:   "PP{pp}",                                        // pp
+      fieldSkillUsed:   "{user} の {skill}! {target} の HPが {amount} 回復した", // user, skill, target, amount
+      fieldSkillNoPp:   "PPが足りない",
+      fieldSkillFull:   "{target} は元気なままだ",                        // target
+      fieldSkillFainted:"{target} は倒れていて使えない",                  // target
+      hintFieldSkill:   "↑↓: 技を選ぶ    決定: 決定    Esc: やめる",
+      hintFieldTarget:  "↑↓: 相手を選ぶ    決定: 使う（続けて使える）    Esc: 技選びへ",
       actionCancel: "やめる",
+      // 逃がすときの確認（拠点でだけ選べる）。既定は「いいえ」
+      releaseTitle:      "{name} を逃がしますか?",               // name
+      releaseBody:       "逃がした仲間は、もう戻ってきません",
+      releaseNoteEquip:  "着けている装備は持ち物に戻ります",
+      releaseYes:        "逃がす",
+      releaseNo:         "やめる",
+      released:          "{name} を逃がした",                    // name
+      cannotReleaseLast: "最後の1体は逃がせない",
+      cannotReleasePartner: "{name} は最初の相棒だ。逃がすことはできない", // name
+      releaseStackFull:  "装備を持ち物に戻せない（持てる数がいっぱい）",
+      hintRelease:       "↑↓: 選択    決定: 決定    Esc: やめる",
 
       stored:      "{name} を預かり所へ預けた",       // name
       tookOut:     "{name} をパーティに加えた",       // name
@@ -741,6 +797,14 @@
       // 特性と装備でいま効いている効果をまとめた欄（「様子を見る」の右下）。
       // ステータスや耐性の加算は数値の隣に「(+15)」と出ているので、ここには並べない
       effectLabel: "効果",
+      // 戦闘中に働く特性の効果を1行にしたもの（js/systems/EffectSystem.js の describeEffect）
+      effectRegen:        "毎ターン HP{percent}%回復",          // percent
+      effectCounter:      "被弾時 {percent}%で相手を{status}",  // percent, status
+      effectCounterNormal:"通常攻撃の被弾時 {percent}%で相手を{status}", // percent, status
+      effectDrain:        "与ダメージの{percent}%を吸収",       // percent
+      effectDrainNormal:  "通常攻撃の与ダメージの{percent}%を吸収", // percent
+      effectFirstStrike:  "最初のターンに必ず先に動く",
+      effectUndying:      "倒されてもそのターンは踏みとどまる",
 
       // 装備
       equipLabel:   "装備",

@@ -76,6 +76,8 @@
       result.push({
         item: item,
         price: this.getBuyPrice(item, entry),
+        // どのステージで手に入るものか（data/shop.js の from）。素材を場所ごとに分けて並べる
+        from: entry.from || null,
         // 同じ分類・同じ値段のときに、書いた順を保つための控え
         listed: i
       });
@@ -89,8 +91,10 @@
   /**
    * 店に並べる順番。
    *   1. 分類（data/categories.js の item.order）… 回復 → 装備 → 素材 → 重要
-   *   2. 値段の安い順 … 手が届くものから目に入る
-   *   3. data/shop.js に書いた順 … 上の2つが同じときだけ
+   *   2. 手に入る場所（data/shop.js の from）のステージ順 … 素材をステージごとにまとめる
+   *      （from を書いていない品は、その分類の先頭）
+   *   3. 値段の安い順 … 手が届くものから目に入る
+   *   4. data/shop.js に書いた順 … 上が同じときだけ
    *
    * 並び順を変えたいときは categories.js の order を入れ替えるのが手軽。
    */
@@ -98,8 +102,25 @@
     var categoryDiff = this._categoryOrder(a.item) - this._categoryOrder(b.item);
     if (categoryDiff !== 0) return categoryDiff;
 
+    var fromDiff = this._fromOrder(a.from) - this._fromOrder(b.from);
+    if (fromDiff !== 0) return fromDiff;
+
     if (a.price !== b.price) return a.price - b.price;
     return a.listed - b.listed;
+  };
+
+  /** 手に入る場所の並び（ダンジョンの order）。書いていなければ先頭 */
+  ShopSystem.prototype._fromOrder = function (from) {
+    if (!from) return -1;
+    var dungeon = (this.data.dungeons || {})[from];
+    return (dungeon && typeof dungeon.order === "number") ? dungeon.order : 999;
+  };
+
+  /** 手に入る場所の名前（見出しに使う）。書いていなければ null */
+  ShopSystem.prototype.getFromName = function (from) {
+    if (!from) return null;
+    var dungeon = (this.data.dungeons || {})[from];
+    return (dungeon && dungeon.name) || from;
   };
 
   ShopSystem.prototype._categoryOrder = function (item) {

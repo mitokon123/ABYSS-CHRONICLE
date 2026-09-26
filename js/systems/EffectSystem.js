@@ -20,6 +20,8 @@
  *   { type:"damageDealt",    value:1.25, element:"fire" }
  *   { type:"damageTaken",    value:0.9 }
  *   { type:"resistBonus",    element:"fire", value:3 }  … 耐性の数値そのものを上げる
+ *   戦闘中に働くもの（regen / counterStatus / drain / firstStrike / undying）は
+ *   ここでは集めるだけで、働かせるのは BattleSystem（_findEffects で拾う）
  *
  * ▼ 倍率と加算の違い
  *   statMultiplier は掛け算、statBonus は足し算。
@@ -316,11 +318,39 @@
         target = party.allElements || "全";
       }
       text = target + "への耐性 " + (effect.value >= 0 ? "+" : "") + effect.value;
+    } else if (effect.type === "regen") {
+      text = fillText(party.effectRegen || "HP{percent}%", { percent: percentOf(effect.value) });
+    } else if (effect.type === "counterStatus") {
+      var counterDef = (gameData.statuses || {})[effect.status];
+      text = fillText((effect.trigger === "normalAttack")
+                        ? party.effectCounterNormal : party.effectCounter,
+        { percent: percentOf(effect.chance === undefined ? 1 : effect.chance),
+          status: counterDef ? counterDef.name : effect.status });
+    } else if (effect.type === "drain") {
+      text = fillText(effect.normalAttackOnly ? party.effectDrainNormal : party.effectDrain,
+        { percent: percentOf(effect.value) });
+    } else if (effect.type === "firstStrike") {
+      text = party.effectFirstStrike || "";
+    } else if (effect.type === "undying") {
+      text = party.effectUndying || "";
     }
 
     if (text && effect.condition) text += describeCondition(effect.condition);
     return text;
   };
+
+  /** 0.06 → 6（割合を%の整数に） */
+  function percentOf(value) {
+    return Math.round((value || 0) * 100);
+  }
+
+  /** 文言の {key} を埋める。文言が無ければ空文字 */
+  function fillText(template, values) {
+    if (!template) return "";
+    return String(template).replace(/\{(\w+)\}/g, function (match, key) {
+      return (values[key] !== undefined) ? values[key] : match;
+    });
+  }
 
   /** 条件つきの効果に「（HP25%以下のとき）」のようなただし書きを足す */
   function describeCondition(condition) {

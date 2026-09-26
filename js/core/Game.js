@@ -182,7 +182,39 @@
     if (typeof this.gold !== "number") {
       this.gold = (this.data.player || {}).startingGold || 0;
     }
+    this._ensurePartner();
     this._recordInitialDiscoveries();
+  };
+
+  /**
+   * 「最初の相棒」の印が誰にも付いていなければ付け直す。
+   *
+   * 印は後から足したので、古いセーブには無い。最初の仲間は種族が決まっている
+   * （data/player.js の starterMonsters の先頭。いまはスライム）ので、
+   * その種族のうち、連れている仲間の並びで最初の1体 → 無ければ預かり所の最初の1体を相棒とみなす。
+   * 一度付けばセーブに残るので、以後は動かない。
+   */
+  Game.prototype._ensurePartner = function () {
+    if (!this.party || !this.storage) return;
+    var lists = [this.party.getMembers(), this.storage.getMembers()];
+    var i, j;
+
+    for (i = 0; i < lists.length; i++) {
+      for (j = 0; j < lists[i].length; j++) {
+        if (lists[i][j].partner) return;
+      }
+    }
+
+    var first = ((this.data.player || {}).starterMonsters || [])[0];
+    if (!first) return;
+    for (i = 0; i < lists.length; i++) {
+      for (j = 0; j < lists[i].length; j++) {
+        if (lists[i][j].speciesId === first.species) {
+          lists[i][j].partner = true;
+          return;
+        }
+      }
+    }
   };
 
   /**
@@ -766,6 +798,101 @@
     return this.addMonster(monster);
   };
 
+  // --- 探索中に使う技 ---
+
+  /**
+   * その技を探索中（戦闘の外）で使えるか。決まりは data/skills.js の fieldUse の説明。
+   *   ・威力を持つ技（攻撃の技）は使えない
+   *   ・fieldUse: false と書いた技は使えない
+   *   ・HPを回復する技（heal）は、書かなくても使える
+   *   ・それ以外は fieldUse: true と書いた技だけ
+   */
+  Game.isFieldSkill = function (skill) {
+    if (!skill || skill.power) return false;
+    if (skill.fieldUse === false) return false;
+    if (skill.heal) return true;
+    return skill.fieldUse === true;
+  };
+
+  /** その仲間が探索中に使える技のid */
+  Game.prototype.fieldSkillsOf = function (monster) {
+    var result = [];
+    var skills = (monster && monster.skills) || [];
+    for (var i = 0; i < skills.length; i++) {
+      if (Game.isFieldSkill(this.data.getSkill(skills[i]))) result.push(skills[i]);
+    }
+    return result;
+  };
+
+  /**
+   * 探索中に技を使う（いまはHPの回復だけ）。
+   * 回復量は戦闘と同じく data/skills.js の heal（{ min, max } か { amount }）。PPも戦闘と同じだけ払う。
+   *
+   * @returns {{success:boolean, reason?:string, amount?:number}}
+   *   reason … "notUsable" / "userFainted"（使う側が倒れている）/ "noPp" /
+   *            "fainted"（相手が倒れている。蘇生は無い）/ "full"（相手が満タン）
+   *   使えなかったときは PP を払わない
+   */
+  Game.prototype.useFieldSkill = function (user, skillId, target) {
+    var skill = this.data.getSkill(skillId);
+    if (!user || !target || !Game.isFieldSkill(skill)) return { success: false, reason: "notUsable" };
+    if (user.isFainted && user.isFainted()) return { success: false, reason: "userFainted" };
+    if (skill.pp && user.canPayPp && !user.canPayPp(skill.pp)) return { success: false, reason: "noPp" };
+    if (target.isFainted && target.isFainted()) return { success: false, reason: "fainted" };
+    if (!skill.heal) return { success: false, reason: "notUsable" };
+    if (target.currentHp >= target.getMaxHp()) return { success: false, reason: "full" };
+
+    var spec = skill.heal;
+    var min = (typeof spec.min === "number") ? spec.min
+            : ((typeof spec.amount === "number") ? spec.amount : 0);
+    var max = (typeof spec.max === "number") ? spec.max : min;
+    if (max < min) max = min;
+    var amount = (max > min) ? new NS.Random().nextInt(min, max) : min;
+
+    var before = target.currentHp;
+    target.heal(amount);
+    if (skill.pp && user.payPp) user.payPp(skill.pp);
+    return { success: true, amount: target.currentHp - before };
+  };
+
+  /**
+   * 仲間を逃がす（パーティか預かり所から取り除く）。元には戻せない。
+   *
+   *   ・パーティの最後の1体は逃がせない（戦えなくなるため。預けるときと同じ決まり）
+   *   ・着けている装備は持ち物へ戻す。1つでも戻せない（持てる数がいっぱい）ときは逃がさない
+   *     （装備が消えてしまわないように、先に全部戻せるか確かめてから外す）
+   *   ・図鑑の記録（仲間にした・覚えた技・愛情度の段階）はそのまま残る
+   *
+   * @param {string} where "party" か "storage"
+   * @param {number} index
+   * @returns {{success:boolean, reason?:string, monster?:object}}
+   *   reason … "partner"（最初の相棒）/ "last"（最後の1体）/ "stackFull"（装備を戻せない）/ "none"（いない）
+   */
+  Game.prototype.releaseMonster = function (where, index) {
+    var list = (where === "storage") ? this.storage : this.party;
+    var monster = list ? list.get(index) : null;
+    if (!monster) return { success: false, reason: "none" };
+
+    // 最初の相棒は逃がせない
+    if (monster.partner) return { success: false, reason: "partner", monster: monster };
+    if (where !== "storage" && this.party.size() <= 1) return { success: false, reason: "last" };
+
+    // 装備を全部持ち物へ戻せるか、先に確かめる
+    var equipped = (monster.equipment || []).slice();
+    for (var i = 0; i < equipped.length; i++) {
+      var item = this.data.getItem(equipped[i]);
+      var maxStack = (item && item.maxStack !== undefined) ? item.maxStack : 99;
+      if (this.inventory.getCount(equipped[i]) + 1 > maxStack) {
+        return { success: false, reason: "stackFull", monster: monster };
+      }
+    }
+    for (var j = 0; j < equipped.length; j++) this.inventory.add(equipped[j], 1);
+    monster.equipment = [];
+
+    list.remove(index);
+    return { success: true, monster: monster };
+  };
+
   // --- 装備 ---
 
   /**
@@ -806,7 +933,47 @@
 
     this.inventory.remove(itemId, 1);
     monster.equipment.push(itemId);
+    this._refreshVitals(monster);
     return { success: true, replaced: replaced };
+  };
+
+  /**
+   * 装備を替えて最大HP・PPが動いたあとの、今のHP・PPの合わせ方。
+   *
+   *   拠点（挑戦中でない）… 満タンにする（拠点では常に全快。restoreAtHome と同じ考え方）
+   *   挑戦中               … 最大値を超えたぶんだけ削る（着け替えで回復できてしまわないように）
+   *
+   * ★ これが無かったころは、HP+の装備を外しても今のHPがそのまま残り、
+   *   「HP 103/98」のように最大値を超えた表示になっていた。
+   */
+  Game.prototype._refreshVitals = function (monster) {
+    if (!monster) return;
+    if (!this.run && (this.data.run || {}).healOnReturn && monster.healFull) {
+      monster.healFull();
+      return;
+    }
+    if (monster.getMaxHp) monster.currentHp = Math.min(monster.currentHp, monster.getMaxHp());
+    if (monster.getMaxPp) monster.currentPp = Math.min(monster.currentPp, monster.getMaxPp());
+  };
+
+  /**
+   * 拠点にいるあいだは、仲間（預かり所も含む）を常に全快・状態異常なしにしておく。
+   *
+   * 帰ってきたときの回復（endRun）だけだと、拠点でスカウトした仲間を連れに加えたときや、
+   * 装備を替えて最大HPが動いたときに、半端なHPのまま残ってしまう。拠点を開くたびに整える。
+   * 回復と同じ条件（data/run.js の healOnReturn）で扱う。
+   */
+  Game.prototype.restoreAtHome = function () {
+    if (this.run || !(this.data.run || {}).healOnReturn) return;
+    if (!this.party || !this.storage) return;
+
+    var lists = [this.party.getMembers(), this.storage.getMembers()];
+    for (var i = 0; i < lists.length; i++) {
+      for (var j = 0; j < lists[i].length; j++) {
+        if (lists[i][j].healFull) lists[i][j].healFull();
+      }
+    }
+    this._clearAllStatuses();
   };
 
   /** その枠に着けている装備の id（着けた順） */
@@ -837,6 +1004,7 @@
     if (this.inventory.add(itemId, 1) <= 0) return null;
 
     list.splice(index, 1);
+    this._refreshVitals(monster);
     return itemId;
   };
 
