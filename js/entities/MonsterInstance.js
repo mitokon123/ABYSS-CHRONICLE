@@ -562,34 +562,130 @@
   // --- ステータス計算（式・数値は data/growth.js） ---
 
   /**
-   * 指定ステータスの成長率を返す。
+   * 指定ステータスの成長率の段階を返す（from の小さい順）。
    *
-   * monsters.js の growthRate は数値でもオブジェクトでも書ける。
+   * monsters.js の growthRate は数値・オブジェクト・段階の配列で書ける。
    *   growthRate: 0.08                      … 全ステータス共通
    *   growthRate: { hp: 0.12, attack: 0.06 } … ステータスごと
+   *   growthRate: { hp: [{ from: 1, rate: 0.16 }, { from: 22, rate: 0.20 }] }
+   *                                          … レベルで成長率が変わる（何段階でも）
    * 書かれていない項目は default → growth.js の defaultGrowthRate の順に使い、
-   * 最後に minGrowthRate〜maxGrowthRate の範囲へ収める。
+   * どの値も minGrowthRate より小さくはしない。maxGrowthRate は書いてあるときだけ効く（今は書いていない）。
    *
-   * @param {string} statKey "hp" / "attack" / "defense" / "speed"
+   * @param {string} statKey "hp" / "attack" / "defense" / "speed" / "pp"
+   * @returns {{from:number, rate:number}[]}
    */
-  MonsterInstance.prototype.getGrowthRate = function (statKey) {
+  MonsterInstance.prototype._growthStages = function (statKey) {
     var growth = this._data.growth || {};
     var fallback = numberOr(growth.defaultGrowthRate, 0);
     var defined = this._species && this._species.growthRate;
 
-    var rate;
+    var value;
     if (typeof defined === "number") {
-      rate = defined;
+      value = defined;
     } else if (defined && typeof defined === "object") {
-      rate = numberOr(defined[statKey], numberOr(defined.default, fallback));
-    } else {
-      rate = fallback;
+      value = defined[statKey];
+      if (value === undefined) value = defined["default"];
     }
+    if (value === undefined || value === null) value = fallback;
 
-    var min = numberOr(growth.minGrowthRate, rate);
-    var max = numberOr(growth.maxGrowthRate, rate);
-    return Math.max(min, Math.min(max, rate));
+    var clamp = function (rate) {
+      var min = numberOr(growth.minGrowthRate, rate);
+      var max = numberOr(growth.maxGrowthRate, rate);
+      return Math.max(min, Math.min(max, rate));
+    };
+
+    if (!Array.isArray(value)) return [{ from: 1, rate: clamp(numberOr(value, fallback)) }];
+
+    var stages = [];
+    for (var i = 0; i < value.length; i++) {
+      if (!value[i]) continue;
+      stages.push({ from: numberOr(value[i].from, 1), rate: clamp(numberOr(value[i].rate, fallback)) });
+    }
+    if (stages.length === 0) return [{ from: 1, rate: clamp(fallback) }];
+    stages.sort(function (a, b) { return a.from - b.from; });
+    return stages;
   };
+
+  /**
+   * そのレベルで効いている成長率（図鑑・様子を見るなどの表示用）。
+   * @param {string} statKey
+   * @param {number} [level] 省略するといまのレベル
+   */
+  MonsterInstance.prototype.getGrowthRate = function (statKey, level) {
+    return stageAt(this._growthStages(statKey), level || this.level, "rate", 0);
+  };
+
+  /**
+   * Lv1 から level までに伸びた量（成長率の合計）。ステータス計算の本体。
+   *
+   *   レベルが1上がるたびに、「(そのレベルで効いている成長率 + 全体の足し算) × 全体の倍率」だけ伸びる。
+   *   全体の足し算・倍率は data/growth.js の globalGrowth（全モンスター共通。Lv〇から）。
+   *
+   * ★ 段階が切り替わっても、それまでに伸びた分はそのまま。変わるのは「そこから先」の伸びだけ。
+   *   段階も全体の倍率も無ければ (level - 1) × 成長率 になり、α-9 までと同じ。
+   *
+   * @param {string} statKey
+   * @param {number} [level] 省略するといまのレベル
+   */
+  MonsterInstance.prototype.getGrowthProgress = function (statKey, level) {
+    level = level || this.level;
+    if (level <= 1) return 0;
+
+    var stages = this._growthStages(statKey);
+    var global = globalGrowthStages(this._data);
+
+    // 段階と全体の倍率の切り替わりで区切り、区間ごとにまとめて足す
+    var points = [2];
+    var addPoint = function (from) {
+      if (from > 2 && from <= level && points.indexOf(from) < 0) points.push(from);
+    };
+    for (var i = 0; i < stages.length; i++) addPoint(stages[i].from);
+    for (var j = 0; j < global.length; j++) addPoint(global[j].from);
+    points.sort(function (a, b) { return a - b; });
+
+    // 1レベルあたりの伸び = (種族の成長率 + 全体の足し算) × 全体の倍率
+    var total = 0;
+    for (var k = 0; k < points.length; k++) {
+      var start = points[k];
+      var end = (k + 1 < points.length) ? points[k + 1] : level + 1;
+      var perLevel = (stageAt(stages, start, "rate", 0) + stageAt(global, start, "add", 0))
+                   * stageAt(global, start, "multiplier", 1);
+      total += (end - start) * Math.max(0, perLevel);
+    }
+    return total;
+  };
+
+  /**
+   * 段階の並び（from の小さい順）から、そのレベルで効いている値を取り出す。
+   * 最初の段階の from より前のレベルは、最初の段階の値を使う。
+   */
+  function stageAt(stages, level, key, fallback) {
+    if (!stages || stages.length === 0) return fallback;
+    var found = stages[0];
+    for (var i = 1; i < stages.length; i++) {
+      if (stages[i].from <= level) found = stages[i];
+    }
+    return numberOr(found[key], fallback);
+  }
+
+  /**
+   * data/growth.js の globalGrowth を from の小さい順に並べたもの。
+   * 最初の from より前は倍率 1（何も変えない）なので、先頭に Lv1 の段階を足しておく
+   */
+  function globalGrowthStages(data) {
+    var list = ((data && data.growth) || {}).globalGrowth || [];
+    var result = [];
+    for (var i = 0; i < list.length; i++) {
+      if (!list[i]) continue;
+      result.push({ from: numberOr(list[i].from, 1),
+                    multiplier: numberOr(list[i].multiplier, 1),
+                    add: numberOr(list[i].add, 0) });
+    }
+    result.sort(function (a, b) { return a.from - b.from; });
+    if (result.length > 0 && result[0].from > 1) result.unshift({ from: 1, multiplier: 1, add: 0 });
+    return result;
+  }
 
   /**
    * 耐性の合計を、決められた範囲（data/battle.js の resistance）に収める。
@@ -654,22 +750,37 @@
 
   /**
    * 実効ステータスを計算する。
-   * 式: floor( 基礎値 × (1 + (Lv-1) × 成長率) × 性格補正 × 効果倍率 ) + 個体値 + 効果加算
+   * 式: floor( 基礎値 × (1 + 伸びた量) × 性格補正 × 効果倍率 ) + 個体値 + 効果加算
+   *   伸びた量       … getGrowthProgress（段階が無ければ (Lv-1) × 成長率）
    *   効果倍率／効果加算 … 特性と装備（EffectSystem がまとめて集計する）
    */
   MonsterInstance.prototype._calcStat = function (baseKey, ivKey, natureKey) {
     if (!this._species) return 1;
-    var rate = this.getGrowthRate(ivKey);
+    var progress = this.getGrowthProgress(ivKey);
     var nature = this.getNature();
     var natureMul = nature ? (nature[natureKey] || 1) : 1;
     var effectMul = this.getEffectStatMultiplier(ivKey);
 
     var base = this._species[baseKey] || 0;
-    var value = base * (1 + (this.level - 1) * rate) * natureMul * effectMul;
+    var value = base * (1 + progress) * natureMul * effectMul;
 
     // 加算はマイナスの装備でも0未満にならないようにする
     var total = Math.floor(value) + (this.ivs[ivKey] || 0) + this.getEffectStatBonus(ivKey);
-    return Math.max(1, total);
+    return this._capStat(Math.max(1, total));
+  };
+
+  /**
+   * 能力値の上限（data/growth.js の statCap。α-10 で 9999）で止める。
+   * 装備・加護・戦闘中の強化もすべて掛けたあとの値に効く（画面の欄が4桁までの幅のため）。
+   *
+   * ★ 主・特殊な出方の敵（setEncounterMultipliers の補正が掛かっている間）は止めない。
+   *   主の強さは倍率で作っているので、上限で止めると倍率が効かなくなるため
+   */
+  MonsterInstance.prototype._capStat = function (value) {
+    var cap = (this._data.growth || {}).statCap;
+    if (typeof cap !== "number") return value;
+    if (this.encounterEffects && this.encounterEffects.length > 0) return value;
+    return Math.min(cap, value);
   };
 
   MonsterInstance.prototype.getMaxHp = function () {
@@ -694,10 +805,10 @@
     if (!this._species) return 0;
 
     var base = this._species.basePp || 0;
-    var value = base * (1 + (this.level - 1) * this.getGrowthRate("pp"))
+    var value = base * (1 + this.getGrowthProgress("pp"))
               * this.getEffectStatMultiplier("pp");
 
-    return Math.max(1, Math.floor(value) + this.getEffectStatBonus("pp"));
+    return this._capStat(Math.max(1, Math.floor(value) + this.getEffectStatBonus("pp")));
   };
 
   // --- PP 操作 ---
@@ -778,13 +889,39 @@
     return Math.floor(base * (1 + (this.level - 1) * perLevel));
   };
 
-  /** 次のレベルに必要な経験値: floor( expBase * level ^ expExponent ) */
-  MonsterInstance.prototype.getExpToNextLevel = function () {
+  /**
+   * 次のレベルに必要な経験値: floor( expBase × level ^ expExponent × 段階の倍率 )
+   *   段階の倍率 … data/growth.js の expStages。「Lv〇に上がる分から何倍」（全員共通）
+   * @param {number} [level] 省略するといまのレベル（そのレベルから次へ上がるのに要る量）
+   */
+  MonsterInstance.prototype.getExpToNextLevel = function (level) {
+    level = level || this.level;
     var growth = this._data.growth || {};
     var base = growth.expBase || 10;
     var exponent = growth.expExponent || 1.5;
-    return Math.floor(base * Math.pow(this.level, exponent));
+    return Math.floor(base * Math.pow(level, exponent) * expStageMultiplier(growth, level + 1));
   };
+
+  /**
+   * これまでに得た経験値の合計（いまのレベルまでに使った分 ＋ いまのレベルで貯めている分）。
+   * 保存はしておらず、いまの必要経験値の表から計算し直す
+   */
+  MonsterInstance.prototype.getTotalExp = function () {
+    var total = this.exp || 0;
+    for (var level = 1; level < this.level; level++) total += this.getExpToNextLevel(level);
+    return total;
+  };
+
+  /** そのレベルに上がるのに掛かる倍率（data/growth.js の expStages。無ければ 1） */
+  function expStageMultiplier(growth, targetLevel) {
+    var stages = growth.expStages || [];
+    var best = null;
+    for (var i = 0; i < stages.length; i++) {
+      if (!stages[i] || numberOr(stages[i].from, 1) > targetLevel) continue;
+      if (!best || stages[i].from > best.from) best = stages[i];
+    }
+    return best ? numberOr(best.multiplier, 1) : 1;
+  }
 
   /**
    * 経験値を加算し、必要ならレベルアップする。

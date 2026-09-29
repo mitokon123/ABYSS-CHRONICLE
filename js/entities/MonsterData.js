@@ -36,15 +36,6 @@
         if (learnset[i].level === level) result.push(learnset[i].skill);
       }
       return result;
-    },
-
-    /**
-     * 指定レベルで進化するかを判定し、進化先idを返す（しない場合 null）。
-     */
-    evolutionAtLevel: function (species, level) {
-      var evo = species && species.evolvesTo;
-      if (!evo) return null;
-      return (level >= evo.level) ? evo.to : null;
     }
   };
 

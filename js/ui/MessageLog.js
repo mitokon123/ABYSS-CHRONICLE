@@ -3,7 +3,7 @@
  * メッセージを順番に表示するUI部品。
  * 溜まったメッセージを1画面ずつ出し、決定キーで次へ進む。
  *
- * シーン側は push() で文字列を積み、isWaiting() が false になったら次の処理へ進む、
+ * シーン側は push() で文字列を積み、hasPending() が false になったら次の処理へ進む、
  * という使い方をする。表示の見た目は data/ui.js の theme に従う。
  */
 (function (NS) {
@@ -25,11 +25,6 @@
   /** メッセージを1行追加する */
   MessageLog.prototype.push = function (line) {
     if (line) this.queue.push(line);
-  };
-
-  /** 表示待ちのメッセージが残っているか */
-  MessageLog.prototype.isWaiting = function () {
-    return this.queue.length > 0 || this.current.length > 0;
   };
 
   /** まだ表示していないメッセージが残っているか */

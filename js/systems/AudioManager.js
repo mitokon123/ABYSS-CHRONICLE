@@ -218,15 +218,6 @@
     });
   };
 
-  AudioManager.prototype.stopBgm = function () {
-    if (this._bgm) {
-      try { this._bgm.pause(); } catch (e) { /* 鳴っていなければ何もしなくてよい */ }
-      this._bgm = null;
-    }
-    this.currentBgmId = null;
-    this.pendingBgmId = null;
-  };
-
   // --- 効果音 ---
 
   /**

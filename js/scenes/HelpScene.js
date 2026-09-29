@@ -71,13 +71,15 @@
     var credits = (this.game.data.audio || {}).credits || [];
     var lines = [];
 
+    // 1件を「名前」「何に使っているか」「URL」の3行に分ける。
+    // 1行につなげると、URLが途中で折り返されて読みにくかったため
     for (var i = 0; i < credits.length; i++) {
       var c = credits[i];
-      var line = c.name || "";
-      if (c.label) line = c.label + "：" + line;
-      if (c.note) line += "（" + c.note + "）";
-      if (c.url) line += "  " + c.url;
-      lines.push(line);
+      var parts = [];
+      parts.push((c.label ? c.label + "：" : "") + (c.name || ""));
+      if (c.note) parts.push(c.note);
+      if (c.url) parts.push(c.url);
+      lines.push(parts.join("\n"));
     }
     return lines;
   };
@@ -170,8 +172,12 @@
     for (var p = 0; p < paragraphs.length; p++) {
       // 段落のあいだは1行空ける。続きものに見えないように
       if (p > 0) lines.push("");
-      var wrapped = wrapText(paragraphs[p], perLine);
-      for (var i = 0; i < wrapped.length; i++) lines.push(wrapped[i]);
+      // 段落の中の「\n」はそこで必ず改行する（音の出どころのURLなど）
+      var rows = String(paragraphs[p]).split("\n");
+      for (var r = 0; r < rows.length; r++) {
+        var wrapped = wrapText(rows[r], perLine);
+        for (var i = 0; i < wrapped.length; i++) lines.push(wrapped[i]);
+      }
     }
     return lines;
   };

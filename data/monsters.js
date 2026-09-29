@@ -37,11 +37,14 @@
  *     ここの値が効くのは、スカウトして仲間にしたあと。
  * maxLevel    : このモンスターのレベル上限（省略時は growth.js の defaultMaxLevel）
  *   growth.js の levelCap（99）を超えることはできない
- * growthRate  : 1レベルごとのステータス上昇率（0.01〜0.55。範囲外は丸められる）
+ * growthRate  : 1レベルごとのステータス上昇率（0.01 以上。上限なし）
  *   数値で書くと全ステータス共通：
  *     growthRate: 0.08
  *   オブジェクトで書くとステータスごとに指定できる（書かない項目は default を使う）：
  *     growthRate: { hp: 0.12, attack: 0.06, default: 0.08 }
+ *   段階の配列で書くと、レベルで成長率が変わる（何段階でも。α-10。詳しくは data/growth.js）：
+ *     growthRate: { hp: [{ from: 1, rate: 0.16 }, { from: 22, rate: 0.20 }], attack: 0.16 }
+ *     切り替わっても、それまでに伸びた分はそのまま。Lv22 以降で切り替えれば第一章の主は変わらない
  * description : 図鑑での説明文。**主人公が書いた記録**として書く（ストーリー構成.md の 2）。
  *   序盤の主人公はモンスターを恐れているので、警戒した事務的な書き方で揃える
  *   （属性 → 見た目・生態 → 注意書き → 弱い属性）。
@@ -69,7 +72,6 @@
  * scoutRate   : スカウト成功率の基準値（0〜1）
  * spawnRate   : 出現の重み（相対値）
  * learnset    : 覚える技 [{ level, skill }]
- * evolvesTo   : 進化情報（例 { to:"kingSlime", level:12 }）未進化は null
  * abilities   : 特性id（abilities.js を参照）。
  *   1体が持てる数は config.js の abilityMax まで（現在は1つ）
  *
@@ -126,6 +128,13 @@
     slime: {
       id: "slime",
       name: "スライム",
+      // 愛情度で書き足される記録と、絆の報酬（早見表/絆と記録.txt。作者が決めたもの）
+      records: {
+        used:  "水辺では、ほかのスライムと体を寄せ合って眠る。冷えると少し固くなる。",
+        trust: "撫でられるのが好きで、手を止めると体を押しつけてくる。怒ると小さく震える。",
+        bond:  "足元にいるのが、当たり前になった。この温かさを、もう怖いとは思わない。"
+      },
+      bondReward: { skill: "standGuard" },
       family: "slimeKind",
       element: "water",
       resistances: { water: 5, thunder: -2, dark: -1 },
@@ -135,7 +144,14 @@
                       blind: 0, curse: 0, instantDeath: 5 },
       // 上限99の3種のうちの1体。強さで抜けるのではなく、長く付き合える枠
       maxLevel: 99,
-      growthRate: { hp: 0.16, attack: 0.16, defense: 0.18, speed: 0.13, pp: 0.10 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.40 }, { from: 50, rate: 0.50 }, { from: 55, rate: 0.65 }, { from: 61, rate: 0.35 }, { from: 80, rate: 0.30 }],
+        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.40 }, { from: 40, rate: 0.55 }, { from: 50, rate: 0.70 }, { from: 71, rate: 0.60 }],
+        defense: [{ from: 1, rate: 0.18 }, { from: 25, rate: 1.00 }, { from: 40, rate: 1.30 }, { from: 50, rate: 1.60 }, { from: 61, rate: 0.85 }],
+        speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.55 }, { from: 40, rate: 0.74 }, { from: 50, rate: 0.93 }, { from: 61, rate: 0.66 }],
+        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.40 }, { from: 40, rate: 1.20 }, { from: 50, rate: 0.90 }, { from: 91, rate: 1.10 }]
+      },
       description: "水属性。柔らかい体は打撃を吸い込み、傷もすぐに塞がる。見た目よりずっとしぶとい。動きは遅いが、人を襲う可能性はある。近づくときは注意すること。闇と雷に弱い。",
       baseHp: 22,
       baseAttack: 5,
@@ -154,7 +170,6 @@
         // 深層（推奨Lv16）に入るより手前で覚えるので、潜る前に頼れる
         { level: 11, skill: "cure" }
       ],
-      evolvesTo: null,
       abilities: ["tough"],
       expReward: 8,
       goldReward: 4,
@@ -177,6 +192,12 @@
     batty: {
       id: "batty",
       name: "コウモリ",
+      records: {
+        used:  "昼は天井の割れ目に逆さに下がって眠る。群れの中でも決まった場所があるらしい。",
+        trust: "明かりを嫌うが、たき火の明かりだけは平気なようだ。肩に止まりたがる。",
+        bond:  "背後にいても、もう驚かない。そこにいるのが分かるから。"
+      },
+      bondReward: { skill: "hazyWing" },
       family: "beastKind",
       element: "dark",
       resistances: { dark: 3, earth: 3, fire: -2, thunder: -2 },
@@ -187,7 +208,14 @@
       // 上限99の3種のうちの1体。育て切ると素早さが全種で最も高くなる
       maxLevel: 99,
       // ステータスごとに成長率を変える例：素早さだけ伸びやすい
-      growthRate: { hp: 0.12, attack: 0.18, defense: 0.14, speed: 0.18, pp: 0.12 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.28 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.40 }, { from: 61, rate: 0.75 }],
+        attack:  [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.45 }, { from: 50, rate: 0.60 }, { from: 61, rate: 0.35 }],
+        defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.70 }, { from: 40, rate: 0.90 }, { from: 50, rate: 1.25 }, { from: 61, rate: 0.60 }],
+        speed:   [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.75 }, { from: 40, rate: 1.50 }, { from: 45, rate: 1.10 }, { from: 61, rate: 0.66 }],
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.65 }, { from: 40, rate: 0.82 }, { from: 50, rate: 0.98 }, { from: 61, rate: 0.59 }]
+      },
       description: "闇属性。暗がりを好み、素早く飛び回る。気づいたときには背後にいる。明かりを絶やさないこと。火に弱い。",
       baseHp: 16,
       baseAttack: 8,
@@ -205,7 +233,6 @@
         // 打たれ弱さ（防御2）を、自分で回復して補えるようにする
         { level: 9, skill: "drainBite" }
       ],
-      evolvesTo: null,
       abilities: ["swiftFoot"],
       expReward: 8,
       goldReward: 5,
@@ -220,15 +247,33 @@
     mossRat: {
       id: "mossRat",
       name: "コケネズミ",
+      records: {
+        used:  "背の苔は湿り気で色が変わる。乾くと灰色になり、少し元気がなくなる。",
+        trust: "拾ったものを巣に溜め込む癖がある。荷物の中身が、ときどき減っている。",
+        bond:  "小さな体で、誰より先に前へ出る。無理はするなと、何度言っても聞かない。"
+      },
+      bondReward: { effects: [
+        { type: "resistBonus", element: "fire", value: 3 },
+        { type: "resistBonus", element: "wind", value: 3 }
+      ] },
       family: "beastKind",
       element: "earth",
+      // 小さな牙で噛む
+      attackEffect: "slash",
       resistances: { earth: 5, wind: -1, fire: -2 },
       immunities: [],
       // ただの獣なので、どれもあまり効かない。特性「ど根性」ぶん即死だけ少し高い
       statusResist: { poison: 0, paralysis: 2, sleep: 2, seal: 0,
                       blind: 0, curse: 0, instantDeath: 0 },
       maxLevel: 60,
-      growthRate: { hp: 0.14, attack: 0.16, defense: 0.15, speed: 0.15, pp: 0.10 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.55 }, { from: 40, rate: 0.25 }, { from: 50, rate: 0.20 }],
+        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.24 }],
+        defense: [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.40 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.30 }],
+        speed:   [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.65 }, { from: 40, rate: 0.30 }],
+        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.50 }, { from: 40, rate: 0.25 }, { from: 50, rate: 0.18 }]
+      },
       description: "地属性。背に苔を生やした小型の獣。坑道の壁を走り回り、足元から来る。小さいからと油断しないこと。火に弱い。",
       baseHp: 17,
       baseAttack: 7,
@@ -241,7 +286,6 @@
         { level: 1, skill: "tackle" },
         { level: 4, skill: "bite" }
       ],
-      evolvesTo: null,
       abilities: ["guts"],
       expReward: 11,
       goldReward: 5,
@@ -256,6 +300,12 @@
     rocky: {
       id: "rocky",
       name: "イワゴロー",
+      records: {
+        used:  "一日の大半を動かずに過ごす。苔が生えるまで同じ場所にいることもある。",
+        trust: "考えているのか眠っているのか、見分けがつかない。呼ぶと少しだけ転がってくる。",
+        bond:  "重くて、遅くて、動じない。その背に寄りかかると落ち着く。"
+      },
+      bondReward: { effects: [ { type: "resistBonus", element: "water", value: 5 } ] },
       family: "constructKind",
       element: "earth",
       resistances: { earth: 4, water: -2 },
@@ -264,7 +314,14 @@
       statusResist: { poison: 10, paralysis: 0, sleep: 0, seal: 5,
                       blind: 0, curse: 0, instantDeath: 0 },
       maxLevel: 60,
-      growthRate: { hp: 0.18, attack: 0.15, defense: 0.20, speed: 0.06, pp: 0.10 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.40 }, { from: 50, rate: 0.48 }],
+        attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.37 }, { from: 50, rate: 0.44 }],
+        defense: [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.50 }, { from: 40, rate: 0.55 }, { from: 50, rate: 0.77 }],
+        speed:   [{ from: 1, rate: 0.06 }, { from: 25, rate: 0.29 }, { from: 40, rate: 0.36 }, { from: 50, rate: 0.32 }],
+        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.32 }, { from: 40, rate: 0.41 }, { from: 50, rate: 0.44 }]
+      },
       description: "地属性。岩が動いているとしか思えない。硬く、攻撃が通りにくいが移動は遅い。水に弱い。",
       baseHp: 25,
       baseAttack: 6,
@@ -279,7 +336,6 @@
         { level: 1, skill: "tackle" },
         { level: 5, skill: "rockThrow" }
       ],
-      evolvesTo: null,
       abilities: ["earthPower"],
       expReward: 12,
       goldReward: 8,
@@ -298,6 +354,12 @@
     glowBug: {
       id: "glowBug",
       name: "ヒカリムシ",
+      records: {
+        used:  "光は呼吸に合わせて強まり、弱まる。眠っているときは消えかけの火のようだ。",
+        trust: "褒めると明るく光る。分かりやすい。",
+        bond:  "暗い道で、いつも少し前を飛ぶ。この光についていけば迷わない。"
+      },
+      bondReward: { skill: "guidingLight" },
       family: "insectKind",
       element: "light",
       // 闇はもともと -3 だった。深層のヨミリュウ（闇の範囲技持ち）への答えが
@@ -309,7 +371,14 @@
                       blind: 0, curse: 0, instantDeath: 5 },
       // 深層のヨミリュウへの答えを担うので、坑道の雑魚だが上限は高くしてある
       maxLevel: 80,
-      growthRate: { hp: 0.14, attack: 0.16, defense: 0.16, speed: 0.18, pp: 0.15 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.50 }, { from: 50, rate: 0.40 }, { from: 71, rate: 0.35 }],
+        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.50 }, { from: 40, rate: 0.40 }, { from: 61, rate: 0.18 }, { from: 75, rate: 1.50 }],
+        defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.65 }, { from: 50, rate: 0.81 }, { from: 61, rate: 0.45 }],
+        speed:   [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.50 }, { from: 40, rate: 0.49 }, { from: 50, rate: 0.59 }, { from: 61, rate: 0.35 }],
+        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.90 }, { from: 40, rate: 0.99 }, { from: 61, rate: 0.55 }]
+      },
       description: "光属性。尾を光らせて飛ぶ虫。暗い坑道では道しるべになるが、その光に別のモンスターが寄ってくるかもしれない。闇に弱い。",
       baseHp: 18,
       baseAttack: 8,
@@ -327,7 +396,6 @@
         // 深層のヨミリュウ（闇に完全耐性・光が弱点）への答えがこれ
         { level: 13, skill: "shine" }
       ],
-      evolvesTo: null,
       abilities: ["glowing"],
       expReward: 14,
       goldReward: 7,
@@ -343,6 +411,12 @@
     sporin: {
       id: "sporin",
       name: "キノコン",
+      records: {
+        used:  "胞子は湿った日に多く撒く。乾いた場所では笠を閉じて、じっとしている。",
+        trust: "気に入らないことがあると、胞子で抗議してくる。くしゃみが止まらない。",
+        bond:  "胞子を撒く相手を、選ぶようになった……たぶん、信用されたのだと思う。"
+      },
+      bondReward: { skill: "sleepSpore" },
       family: "plantKind",
       element: "dark",
       resistances: { earth: 4, dark: 2, light: -1 },
@@ -351,7 +425,14 @@
       statusResist: { poison: 10, paralysis: 0, sleep: 0, seal: 0,
                       blind: 0, curse: 0, instantDeath: 3 },
       maxLevel: 70,
-      growthRate: { hp: 0.15, attack: 0.16, defense: 0.14, speed: 0.12, pp: 0.14 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.30 }, { from: 50, rate: 0.45 }, { from: 61, rate: 0.88 }],
+        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.40 }, { from: 50, rate: 0.60 }],
+        defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.65 }, { from: 61, rate: 0.45 }],
+        speed:   [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.21 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.51 }, { from: 61, rate: 0.41 }],
+        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.41 }, { from: 40, rate: 0.68 }, { from: 50, rate: 0.99 }, { from: 61, rate: 0.79 }]
+      },
       description: "闇属性。坑道の湿った隅に生えるキノコのモンスター。近づくと胞子を撒く。光に弱い。",
       baseHp: 24,
       baseAttack: 9,
@@ -364,7 +445,6 @@
         { level: 1, skill: "tackle" },
         { level: 5, skill: "darkSpore" }
       ],
-      evolvesTo: null,
       abilities: ["wildInstinct"],
       expReward: 16,
       goldReward: 8,
@@ -382,6 +462,15 @@
     mossGolem: {
       id: "mossGolem",
       name: "モスゴーレム",
+      records: {
+        used:  "苔は上を向いた面にだけ生える。長い時間、同じ姿勢で眠っていた証だ。",
+        trust: "動きは遅いが、足元の小さな仲間を踏まないよう、気をつけて歩く。",
+        bond:  "坑道の奥で眠っていた巨人が、今は隣を歩いている。不思議な気分だ。"
+      },
+      bondReward: { effects: [
+        { type: "statMultiplier", stat: "defense", value: 1.25 },
+        { type: "statMultiplier", stat: "hp", value: 1.08 }
+      ] },
       family: "constructKind",
       element: "earth",
       // 全身が苔に覆われているぶん、火と光に弱い
@@ -394,7 +483,14 @@
                       blind: 7, curse: 0, instantDeath: 9 },
       maxLevel: 50,
       // 守りとHPが伸び、足は止まったまま。ヒビイワ（構造体の在来種）の上位版という形
-      growthRate: { hp: 0.17, attack: 0.14, defense: 0.19, speed: 0.07, pp: 0.10 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.35 }, { from: 40, rate: 0.65 }],
+        attack:  [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.45 }, { from: 40, rate: 0.55 }],
+        defense: [{ from: 1, rate: 0.19 }, { from: 25, rate: 0.65 }, { from: 40, rate: 0.75 }],
+        speed:   [{ from: 1, rate: 0.07 }, { from: 25, rate: 0.31 }, { from: 40, rate: 0.26 }],
+        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.33 }, { from: 40, rate: 0.55 }]
+      },
       description: "地属性。探索者の間では坑道の主と呼ばれている。苔に覆われた石の巨人で、坑道の奥で長く眠っていたらしい。一撃が重い。光に弱い。",
       // 基礎値は「仲間にしたとき」の強さ。在来種の最強格（ヒビイワ 28/8/11/3）と
       // 並ぶ程度に抑えてある。主として立ちはだかるときの強さは
@@ -411,7 +507,6 @@
         { level: 1, skill: "tackle" },
         { level: 5, skill: "rockThrow" }
       ],
-      evolvesTo: null,
       abilities: ["thickSkin"],
       expReward: 90,
       goldReward: 55,
@@ -430,6 +525,15 @@
     magmaBeast: {
       id: "magmaBeast",
       name: "マグマウルフ",
+      records: {
+        used:  "たてがみの炎は、怒ると強まり、眠ると熾火のように小さくなる。",
+        trust: "撫でるには手袋が要る。それでも頭を差し出してくる。",
+        bond:  "焦げ跡の残る道を、もう避けなくなった。その先にいるのが分かっているから。"
+      },
+      bondReward: { effects: [
+        { type: "resistBonus", element: "water", value: 5 },
+        { type: "resistBonus", element: "wind", value: 2 }
+      ] },
       family: "beastKind",
       element: "fire",
       // 火は完全に無効（data/battle.js の immuneAt が10）。水は最大の弱点のまま
@@ -440,7 +544,14 @@
                       blind: 9, curse: 0, instantDeath: 9 },
       maxLevel: 50,
       // 攻めと速さが伸び、守りが置いていかれる。育てるほど「殴られる前に殴る」形になる
-      growthRate: { hp: 0.16, attack: 0.19, defense: 0.11, speed: 0.17, pp: 0.13 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.31 }, { from: 35, rate: 0.25 }, { from: 40, rate: 0.19 }],
+        attack:  [{ from: 1, rate: 0.19 }, { from: 25, rate: 0.40 }, { from: 40, rate: 0.30 }],
+        defense: [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.25 }],
+        speed:   [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.65 }, { from: 40, rate: 0.50 }],
+        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.50 }, { from: 45, rate: 1.25 }]
+      },
       description: "火属性。探索者の間では亀裂の主と呼ばれている。たてがみが燃えていて、通った跡はすべて焦げている。近づくだけで肌が焼ける。火の息には注意。水に弱い。",
       // 基礎値は「仲間にしたとき」の強さ。在来種より少し上、という程度に抑えてある。
       // 主として立ちはだかるときの強さは data/bosses.js の statMultiplier で足す
@@ -462,7 +573,6 @@
         // この獣だけが使う範囲技。仲間にすると、育てて初めて手に入る
         { level: 10, skill: "fireBreath" }
       ],
-      evolvesTo: null,
       abilities: ["fireSoul"],
       expReward: 115,
       goldReward: 80,
@@ -479,6 +589,12 @@
     kingSlime: {
       id: "kingSlime",
       name: "キングスライム",
+      records: {
+        used:  "冠は体に沈んだまま落ちない。どこで手に入れたのかは分からない。",
+        trust: "ほかのスライムが近くにいると、体を少し大きくする。",
+        bond:  "王は王でも、甘えるときは普通のスライムと変わらない。"
+      },
+      bondReward: { skill: "kingsCommand" },
       family: "slimeKind",
       element: "water",
       resistances: { water: 9, thunder: -3, dark: -1 },
@@ -490,7 +606,14 @@
       maxLevel: 85,
       // 王らしくHPと守りに寄せ、足は捨てる。
       // 立ちはだかるときの強さは data/bosses.js の statMultiplier で足す
-      growthRate: { hp: 0.19, attack: 0.15, defense: 0.17, speed: 0.07, pp: 0.13 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.19 }, { from: 25, rate: 0.25 }, { from: 45, rate: 0.37 }, { from: 55, rate: 0.60 }, { from: 61, rate: 0.15 }, { from: 80, rate: 1.05 }],
+        attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.20 }, { from: 30, rate: 0.35 }, { from: 55, rate: 0.65 }, { from: 61, rate: 0.30 }],
+        defense: [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 50, rate: 0.63 }, { from: 65, rate: 0.40 }],
+        speed:   [{ from: 1, rate: 0.07 }, { from: 25, rate: 0.15 }, { from: 50, rate: 0.30 }],
+        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.40 }, { from: 50, rate: 0.55 }, { from: 61, rate: 0.35 }]
+      },
       basePp: 7,
       description: "水属性。探索者の間では深層の主と呼ばれている。スライムたちの王で、頭に冠を載せている。体が大きく、体重を生かしたボディプレスは強力。闇に弱い。",
       // 基礎値は「仲間にしたとき」の強さ。在来種の目安（HP30/攻10/防12/速12）内に収めてある。
@@ -510,7 +633,6 @@
         // 水の王なので水も使う。ローテーションで撃つので、必ず覚えている必要がある
         { level: 8, skill: "aqua" }
       ],
-      evolvesTo: null,
       abilities: ["kingsDignity"],
       expReward: 80,
       goldReward: 50,
@@ -529,6 +651,15 @@
     ashWing: {
       id: "ashWing",
       name: "ハイバネ",
+      records: {
+        used:  "熱い風の上でしか長く飛べない。冷えた場所では、羽をたたんで歩く。",
+        trust: "羽の灰を払ってやると喜ぶ。ほかの誰にもさせないらしい。",
+        bond:  "軽く脆い体で、いつも一番に飛び込んでいく。帰ってくる場所は、ここだ。"
+      },
+      bondReward: { effects: [
+        { type: "resistBonus", element: "water", value: 3 },
+        { type: "statMultiplier", stat: "speed", value: 1.18 }
+      ] },
       family: "birdKind",
       element: "wind",
       // 空を行くので地の技が届きにくい。熱の中で暮らすぶん火にも強いが、
@@ -540,7 +671,14 @@
                       blind: 10, curse: 0, instantDeath: 0 },
       maxLevel: 70,
       // 素早さだけ突出させる。そのぶん打たれ弱い
-      growthRate: { hp: 0.12, attack: 0.18, defense: 0.11, speed: 0.20, pp: 0.13 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.40 }, { from: 65, rate: 0.55 }],
+        attack:  [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.45 }, { from: 40, rate: 0.55 }, { from: 50, rate: 0.75 }],
+        defense: [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.50 }, { from: 61, rate: 0.25 }],
+        speed:   [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.45 }, { from: 40, rate: 0.55 }, { from: 50, rate: 0.60 }, { from: 61, rate: 0.85 }],
+        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.41 }, { from: 40, rate: 0.50 }, { from: 50, rate: 0.60 }, { from: 61, rate: 0.25 }]
+      },
       description: "風属性。灰をまとって舞う鳥。亀裂の熱に乗って、上から来る。体は軽く脆い。水に弱い。",
       baseHp: 14,
       baseAttack: 7,
@@ -558,7 +696,6 @@
         // プレイヤーがこの場所で初めて風の技に出会う
         { level: 4, skill: "gust" }
       ],
-      evolvesTo: null,
       abilities: ["windFlow"],
       expReward: 15,
       goldReward: 8,
@@ -576,6 +713,12 @@
     crackRock: {
       id: "crackRock",
       name: "ヒビイワ",
+      records: {
+        used:  "ひびの奥は今も熱を持つ。冷えるとひびが広がるので、火の近くを好む。",
+        trust: "石をぶつけられるのを嫌う……当然だ。",
+        bond:  "ひびは塞がらない。それでも、崩れずに隣にいる。"
+      },
+      bondReward: { effects: [ { type: "resistBonus", element: "earth", value: 7 } ] },
       family: "constructKind",
       element: "earth",
       // 熱で焼かれてひびだらけ。火は効きにくいが、石を打ちつけられると砕ける。
@@ -586,7 +729,14 @@
       statusResist: { poison: 10, paralysis: 0, sleep: 0, seal: 5,
                       blind: 0, curse: 0, instantDeath: 0 },
       maxLevel: 60,
-      growthRate: { hp: 0.16, attack: 0.15, defense: 0.18, speed: 0.08, pp: 0.10 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.40 }],
+        attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.30 }, { from: 50, rate: 0.55 }],
+        defense: [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.45 }, { from: 40, rate: 0.50 }, { from: 50, rate: 0.75 }],
+        speed:   [{ from: 1, rate: 0.08 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.20 }],
+        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.21 }, { from: 40, rate: 0.26 }, { from: 50, rate: 0.31 }]
+      },
       description: "地属性。熱でひび割れた岩のモンスター。守りは固いが、同じ石をぶつけると割れる。地に弱い。",
       baseHp: 25,
       baseAttack: 8,
@@ -600,7 +750,6 @@
         { level: 1, skill: "tackle" },
         { level: 5, skill: "rockThrow" }
       ],
-      evolvesTo: null,
       abilities: ["brittleShell"],
       // 硬くて時間がかかるぶんゴールドは多いが、経験値は控えめ。
       // 「稼ぎ相手ではあるが、育成相手ではない」位置づけ
@@ -618,6 +767,15 @@
     magmaCrab: {
       id: "magmaCrab",
       name: "マグマガニ",
+      records: {
+        used:  "殻を固める前に、必ず一度だけハサミを鳴らす。",
+        trust: "動かないのは、怖がりだからだ。殻の中で様子をうかがっている。",
+        bond:  "背を向けても、もう平気だ。その殻は、守るために固まっている。"
+      },
+      bondReward: { effects: [
+        { type: "resistBonus", element: "water", value: 3 },
+        { type: "statMultiplier", stat: "defense", value: 1.2 }
+      ] },
       family: "insectKind",
       element: "fire",
       // マグマの中で暮らすので火はほとんど効かない。水をかけられると固まる
@@ -627,15 +785,24 @@
       statusResist: { poison: 0, paralysis: 5, sleep: 5, seal: 0,
                       blind: 0, curse: 0, instantDeath: 0 },
       maxLevel: 65,
-      growthRate: { hp: 0.18, attack: 0.16, defense: 0.15, speed: 0.10, pp: 0.12 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.30 }, { from: 61, rate: 0.40 }],
+        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.40 }, { from: 50, rate: 0.35 }, { from: 63, rate: 1.35 }],
+        // 防御は Lv50 から 1.25・Lv61 から 1.35 だったが、こうか・絆・加護が重なると 854 になり
+        // ほぼ無敵だったので下げた（2026-09-29 作者）
+        defense: [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.50 }, { from: 50, rate: 0.75 }, { from: 61, rate: 1.00 }],
+        speed:   [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.16 }, { from: 40, rate: 0.26 }, { from: 50, rate: 0.40 }, { from: 61, rate: 0.80 }],
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.21 }, { from: 40, rate: 1.00 }, { from: 50, rate: 0.50 }, { from: 61, rate: 0.40 }]
+      },
       description: "火属性。マグマの中で暮らす中型のモンスター。殻を固めてじっと動かない。動かないからといって、背を向けないこと。水に弱い。",
       baseHp: 22,
       baseAttack: 10,
       baseDefense: 10,
       baseSpeed: 4,
       basePp: 5,
-      // 硬い爪で挟む
-      attackEffect: "shards",
+      // ハサミで挟む（α-10 で破片から斬撃へ）
+      attackEffect: "slash",
       scoutRate: 0.22,
       spawnRate: 0.5,
       learnset: [
@@ -644,7 +811,6 @@
         { level: 4, skill: "harden" },
         { level: 7, skill: "ember" }
       ],
-      evolvesTo: null,
       abilities: ["hardShell"],
       // 硬くて時間がかかるわりに実入りは薄い。稼ぎ相手はヒビイワのほう
       expReward: 20,
@@ -663,6 +829,15 @@
     cinderling: {
       id: "cinderling",
       name: "スミビ",
+      records: {
+        used:  "燃え尽きる前に、次の炭へ火を移して群れを保っている。",
+        trust: "たき火に入りたがる。止めないと、ずっと入っている。",
+        bond:  "小さな熾火だが、夜の冷えはこれで十分しのげる。"
+      },
+      bondReward: { effects: [
+        { type: "statMultiplier", stat: "hp", value: 1.2 },
+        { type: "statMultiplier", stat: "attack", value: 1.05 }
+      ] },
       // ゲーム中で初めての魔族系（炭に火が宿ったもの）
       family: "demonKind",
       element: "fire",
@@ -673,7 +848,14 @@
       statusResist: { poison: 0, paralysis: 0, sleep: 0, seal: 0,
                       blind: 0, curse: 2, instantDeath: 0 },
       maxLevel: 50,
-      growthRate: { hp: 0.13, attack: 0.16, defense: 0.14, speed: 0.16, pp: 0.11 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.36 }, { from: 40, rate: 0.30 }, { from: 45, rate: 0.23 }],
+        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.35 }, { from: 45, rate: 1.50 }],
+        defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.59 }, { from: 40, rate: 0.50 }],
+        speed:   [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.54 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.33 }],
+        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.32 }, { from: 40, rate: 0.27 }, { from: 50, rate: 0.20 }]
+      },
       description: "火属性。燃えさしの炭が起き上がったもの。一体ずつは弱いが、群れで湧く。水に弱い。",
       baseHp: 15,
       baseAttack: 7,
@@ -689,7 +871,6 @@
         { level: 1, skill: "tackle" },
         { level: 3, skill: "ember" }
       ],
-      evolvesTo: null,
       abilities: ["firstStrike"],
       expReward: 12,
       goldReward: 6,
@@ -706,6 +887,12 @@
     flamin: {
       id: "flamin",
       name: "フレイミン",
+      records: {
+        used:  "炎の色で機嫌が分かる。赤いときは、近づかないほうがいい。",
+        trust: "牙をむくのは、知らない相手にだけだった。",
+        bond:  "炎の色は、ずっと穏やかな橙のままだ。"
+      },
+      bondReward: { skill: "blazeFang" },
       family: "beastKind",
       element: "fire",
       resistances: { fire: 8, water: -3 },
@@ -715,7 +902,14 @@
                       blind: 5, curse: 0, instantDeath: 5 },
       // 上限99の3種のうちの1体。序盤で捕まえても最後まで通用する
       maxLevel: 99,
-      growthRate: { hp: 0.14, attack: 0.18, defense: 0.15, speed: 0.15, pp: 0.12 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.40 }, { from: 50, rate: 0.45 }, { from: 71, rate: 0.40 }],
+        attack:  [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.40 }, { from: 40, rate: 0.65 }, { from: 50, rate: 1.10 }, { from: 61, rate: 0.70 }],
+        defense: [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.50 }, { from: 50, rate: 0.67 }, { from: 95, rate: 1.30 }],
+        speed:   [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.40 }, { from: 50, rate: 0.60 }, { from: 61, rate: 0.47 }],
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.65 }, { from: 40, rate: 0.50 }, { from: 50, rate: 0.70 }, { from: 85, rate: 0.60 }]
+      },
       description: "火属性。体に炎をまとう獣。気性が荒く近づくと牙をむく。水に弱い。",
       baseHp: 19,
       baseAttack: 8,
@@ -730,7 +924,6 @@
         { level: 1, skill: "tackle" },
         { level: 3, skill: "ember" }
       ],
-      evolvesTo: null,
       abilities: ["fireSoul"],
       expReward: 15,
       goldReward: 8,
@@ -748,6 +941,16 @@
     murkling: {
       id: "murkling",
       name: "ヨドミ",
+      records: {
+        used:  "光の届かない場所に、少しずつ闇が溜まって生まれるらしい。",
+        trust: "ひとつ目で、じっと見つめてくる。何を考えているのかは分からない。",
+        bond:  "底に溜まった闇にも、居場所はあるのだと思う。"
+      },
+      bondReward: { effects: [
+        { type: "resistBonus", element: "light", value: 3 },
+        { type: "resistBonus", status: "blind", value: 7 },
+        { type: "resistBonus", status: "curse", value: 5 }
+      ] },
       family: "demonKind",
       element: "dark",
       // 闇そのものなので光に灼かれる。
@@ -758,7 +961,14 @@
       statusResist: { poison: 0, paralysis: 0, sleep: 2, seal: 0,
                       blind: 0, curse: 4, instantDeath: 0 },
       maxLevel: 60,
-      growthRate: { hp: 0.15, attack: 0.15, defense: 0.13, speed: 0.13, pp: 0.11 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.20 }],
+        attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.32 }, { from: 40, rate: 0.30 }],
+        defense: [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.40 }, { from: 40, rate: 0.33 }, { from: 50, rate: 0.25 }],
+        speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.41 }, { from: 40, rate: 0.40 }, { from: 50, rate: 0.30 }],
+        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.38 }, { from: 40, rate: 0.32 }, { from: 50, rate: 0.24 }]
+      },
       description: "闇属性。底に溜まった闇が形を持ったもの。一体では頼りないが、群れで湧く。光に弱い。",
       baseHp: 18,
       baseAttack: 8,
@@ -772,7 +982,6 @@
         { level: 1, skill: "tackle" },
         { level: 5, skill: "darkSpore" }
       ],
-      evolvesTo: null,
       abilities: ["soulDrain"],
       expReward: 17,
       goldReward: 5,
@@ -793,8 +1002,20 @@
     kageZuta: {
       id: "kageZuta",
       name: "カゲヅタ",
+      records: {
+        used:  "裂け目の奥に根があり、蔦だけをこちらへ伸ばしている。",
+        trust: "力を吸うのは、弱っている相手からだけだ。",
+        bond:  "絡みついてくる蔦、今は手首に軽く巻きつくだけだ。"
+      },
+      bondReward: { effects: [
+        { type: "resistBonus", element: "fire", value: 4 },
+        { type: "statMultiplier", stat: "hp", value: 1.05 },
+        { type: "statMultiplier", stat: "attack", value: 1.05 }
+      ] },
       family: "plantKind",
       element: "dark",
+      // 蔦で打ちつける
+      attackEffect: "slash",
       // 植物なので火に灼かれる。ここまでに火のモンスターを育てていれば刺さる
       resistances: { dark: 5, earth: 3, fire: -4, light: -2, thunder: -1 },
       immunities: [],
@@ -802,7 +1023,14 @@
       statusResist: { poison: 0, paralysis: 0, sleep: 10, seal: 0,
                       blind: 7, curse: 0, instantDeath: 0 },
       maxLevel: 60,
-      growthRate: { hp: 0.17, attack: 0.12, defense: 0.16, speed: 0.11, pp: 0.13 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.60 }],
+        attack:  [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.60 }],
+        defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.50 }, { from: 50, rate: 0.75 }],
+        speed:   [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.15 }, { from: 40, rate: 0.25 }, { from: 50, rate: 0.35 }],
+        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.35 }, { from: 40, rate: 0.55 }, { from: 50, rate: 0.80 }]
+      },
       description: "闇属性。闇の底で根を張る蔦。絡みつかれると、少しずつ力を吸われる。足元に注意すること。火に弱い。",
       baseHp: 23,
       baseAttack: 5,
@@ -819,7 +1047,6 @@
         { level: 3, skill: "sapStrength" },
         { level: 8, skill: "darkSpore" }
       ],
-      evolvesTo: null,
       abilities: ["regen"],
       expReward: 22,
       goldReward: 9,
@@ -842,6 +1069,15 @@
     boltBug: {
       id: "boltBug",
       name: "ビリムシ",
+      records: {
+        used:  "雨の前は電気が強くなる。天気を知るのにちょうどいい。",
+        trust: "触れると弾けるのは、驚いたときだけらしい。",
+        bond:  "素手で触れても、もう弾けない。"
+      },
+      bondReward: { effects: [
+        { type: "statMultiplier", stat: "pp", value: 1.2 },
+        { type: "damageDealt", value: 1.25, element: "thunder" }
+      ] },
       family: "insectKind",
       element: "thunder",
       // 雷を身に宿しているので雷には強い。地に落とされると電気が抜ける
@@ -854,7 +1090,14 @@
                       blind: 0, curse: 0, instantDeath: 0 },
       // 仲間にする価値を持たせたいので、上限は高めにしてある
       maxLevel: 70,
-      growthRate: { hp: 0.12, attack: 0.17, defense: 0.12, speed: 0.16, pp: 0.14 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.25 }, { from: 35, rate: 0.50 }, { from: 45, rate: 0.63 }, { from: 61, rate: 0.25 }],
+        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.30 }, { from: 45, rate: 0.65 }, { from: 61, rate: 0.30 }],
+        defense: [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.25 }, { from: 30, rate: 0.45 }, { from: 65, rate: 0.25 }],
+        speed:   [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.27 }, { from: 40, rate: 0.34 }, { from: 50, rate: 0.41 }, { from: 61, rate: 0.25 }],
+        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.75 }, { from: 40, rate: 0.90 }, { from: 50, rate: 1.11 }, { from: 61, rate: 0.65 }]
+      },
       description: "雷属性。小さな体に電気をためこんだ虫。触れると弾ける。素手で触らないこと。地に弱い。",
       baseHp: 16,
       baseAttack: 8,
@@ -869,7 +1112,6 @@
         { level: 1, skill: "tackle" },
         { level: 6, skill: "thunderBolt" }
       ],
-      evolvesTo: null,
       abilities: ["discharge"],
       expReward: 25,
       goldReward: 14,
@@ -889,6 +1131,12 @@
     puddling: {
       id: "puddling",
       name: "ミズダマリ",
+      records: {
+        used:  "底の水が集まるほど重く、強くなる。乾くと小さくしぼむ。",
+        trust: "水たまりのふりをして、踏まれるのを待つ遊びが好きだ。",
+        bond:  "重い水の腕は、今は仲間を守るために振り上げられる。"
+      },
+      bondReward: { effects: [ { type: "statMultiplier", stat: "attack", value: 1.2 } ] },
       family: "slimeKind",
       element: "water",
       // 水そのものなので火は通らない。電気を流されるといちばん効く
@@ -901,7 +1149,14 @@
       statusResist: { poison: 3, paralysis: 10, sleep: 0, seal: 0,
                       blind: 0, curse: 0, instantDeath: 0 },
       maxLevel: 70,
-      growthRate: { hp: 0.18, attack: 0.16, defense: 0.14, speed: 0.08, pp: 0.14 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.50 }, { from: 61, rate: 0.45 }],
+        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.30 }, { from: 50, rate: 0.55 }, { from: 61, rate: 0.40 }],
+        defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.31 }, { from: 40, rate: 0.45 }, { from: 55, rate: 0.55 }, { from: 63, rate: 0.99 }],
+        speed:   [{ from: 1, rate: 0.08 }, { from: 25, rate: 0.15 }, { from: 40, rate: 0.20 }, { from: 55, rate: 0.30 }, { from: 61, rate: 0.45 }],
+        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.27 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.55 }, { from: 61, rate: 0.50 }]
+      },
       description: "水属性。底の水が集まって形を取ったもの。重い水の塊で叩き潰してくる。水たまりに見えても踏まないこと。雷に弱い。",
       // 攻撃特化。壁役ではないので、HP・防御・PPは低く抑えてある。
       // 速さも捨ててあるので「先に殴られてから殴り返す」形になる
@@ -918,7 +1173,6 @@
         { level: 1, skill: "tackle" },
         { level: 9, skill: "aqua" }
       ],
-      evolvesTo: null,
       abilities: ["waterHeart"],
       expReward: 20,
       goldReward: 10,
@@ -946,6 +1200,16 @@
     abyssDragon: {
       id: "abyssDragon",
       name: "ヨミリュウ",
+      records: {
+        used:  "揺籃の穴にいた理由は、まだ分からない。協会の記録にも残っていない。",
+        trust: "息は仲間のいる方へは決して吐かない。",
+        bond:  "勝てる相手とは思えなかった。今は隣にいる。"
+      },
+      bondReward: { effects: [
+        { type: "resistBonus", element: "light", value: 3 },
+        { type: "statMultiplier", stat: "hp", value: 1.15 },
+        { type: "statMultiplier", stat: "defense", value: 1.1 }
+      ] },
       family: "dragonKind",
       element: "dark",
       // 闇+10 は battle.js の immuneAt に達するので、闇の技は完全に効かない。
@@ -963,7 +1227,14 @@
       // 上限99の3種より低いのは、そちらが「長く付き合う枠」で格とは別軸だから
       maxLevel: 75,
       // 基礎値は在来種の目安内に収め、格は成長率の配分と耐性で出している
-      growthRate: { hp: 0.16, attack: 0.17, defense: 0.16, speed: 0.12, pp: 0.14 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.25 }, { from: 35, rate: 0.35 }, { from: 50, rate: 0.50 }, { from: 61, rate: 0.30 }],
+        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.35 }, { from: 61, rate: 0.35 }, { from: 74, rate: 1.30 }],
+        defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.50 }, { from: 45, rate: 0.35 }, { from: 61, rate: 0.20 }, { from: 74, rate: 1.00 }],
+        speed:   [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.30 }, { from: 50, rate: 0.35 }, { from: 61, rate: 0.19 }],
+        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.30 }, { from: 50, rate: 0.45 }, { from: 61, rate: 0.30 }]
+      },
       description: "闇属性。揺籃の穴にいるはずのない竜。鱗は光を通さず吐く息は闇そのもの。勝てる相手とは思えない。見かけたら逃げること。光に弱い。",
       baseHp: 26,
       baseAttack: 12,
@@ -981,7 +1252,6 @@
         // 出現下限がLv10なので、出会う個体は必ず持っている
         { level: 10, skill: "abyssBreath" }
       ],
-      evolvesTo: null,
       abilities: ["duskborn"],
       expReward: 40,
       goldReward: 30,
@@ -1030,15 +1300,33 @@
     venomBee: {
       id: "venomBee",
       name: "ドクバチ",
+      records: {
+        used:  "群れは、沼の匂いでまとまっているらしい。",
+        trust: "針をしまったまま、頭の上を回るのが好きだ。",
+        bond:  "毒の針を今はこちらに向けない。"
+      },
+      bondReward: { effects: [
+        { type: "statMultiplier", stat: "attack", value: 1.07 },
+        { type: "statMultiplier", stat: "speed", value: 1.13 }
+      ] },
       family: "insectKind",
       element: "dark",
+      // 針で刺す
+      attackEffect: "slash",
       resistances: { dark: 5, wind: 2, fire: -1, light: -2 },
       immunities: [],
       // 自分が毒を使う側なので毒は完全に効かない。羽音で眠らないが、体は脆い
       statusResist: { poison: 10, paralysis: 0, sleep: 0, seal: 2,
                       blind: 2, curse: 6, instantDeath: 0 },
       maxLevel: 65,
-      growthRate: { hp: 0.13, attack: 0.18, defense: 0.11, speed: 0.17, pp: 0.12 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.40 }, { from: 61, rate: 0.20 }],
+        attack:  [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.40 }, { from: 40, rate: 0.50 }, { from: 55, rate: 0.40 }],
+        defense: [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.35 }, { from: 55, rate: 0.55 }, { from: 61, rate: 0.25 }],
+        speed:   [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.28 }, { from: 40, rate: 0.36 }, { from: 50, rate: 0.40 }, { from: 61, rate: 0.20 }],
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.40 }, { from: 61, rate: 0.25 }]
+      },
       description: "闇属性。毒沼の上を群れで飛ぶ蜂。刺された傷より、あとに残る毒のほうが長く効く。解毒草を持って入ること。光に弱い。",
       baseHp: 17,
       baseAttack: 8,
@@ -1055,7 +1343,6 @@
         { level: 4, skill: "venomSting" },
         { level: 12, skill: "bite" }
       ],
-      evolvesTo: null,
       abilities: ["poisonThorn"],
       expReward: 28,
       goldReward: 10,
@@ -1073,6 +1360,15 @@
     mudTurtle: {
       id: "mudTurtle",
       name: "ドロガメ",
+      records: {
+        used:  "甲羅の泥を落とすと、毒の息も弱まる。泥が毒の元らしい。",
+        trust: "甲羅に登られても怒らない。気がつくと居眠りしている。",
+        bond:  "風下に立っても、もう平気だ。"
+      },
+      bondReward: { effects: [
+        { type: "resistBonus", element: "thunder", value: 3 },
+        { type: "statMultiplier", stat: "defense", value: 1.3 }
+      ] },
       family: "beastKind",
       element: "earth",
       resistances: { earth: 7, water: 2, thunder: -2 },
@@ -1081,7 +1377,14 @@
       statusResist: { poison: 8, paralysis: 0, sleep: 0, seal: 5,
                       blind: 5, curse: 0, instantDeath: 0 },
       maxLevel: 65,
-      growthRate: { hp: 0.18, attack: 0.13, defense: 0.17, speed: 0.08, pp: 0.12 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.45 }, { from: 61, rate: 0.35 }],
+        attack:  [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.35 }],
+        defense: [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.50 }, { from: 40, rate: 0.60 }, { from: 55, rate: 0.70 }, { from: 61, rate: 0.43 }],
+        speed:   [{ from: 1, rate: 0.08 }, { from: 25, rate: 0.20 }, { from: 61, rate: 0.15 }],
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.55 }, { from: 50, rate: 0.30 }, { from: 61, rate: 0.25 }]
+      },
       description: "地属性。沼底の泥をかぶった亀。甲羅に溜めた泥から、たえず毒の息を漏らしている。風下に立たないこと。雷に弱い。",
       baseHp: 25,
       baseAttack: 6,
@@ -1095,7 +1398,6 @@
         { level: 1, skill: "tackle" },
         { level: 10, skill: "venomBreath" }
       ],
-      evolvesTo: null,
       abilities: ["hardShell"],
       expReward: 32,
       goldReward: 14,
@@ -1114,6 +1416,12 @@
     marshBone: {
       id: "marshBone",
       name: "ヌマボネ",
+      records: {
+        used:  "骨は沼の泥をまとって形を保っている。乾くと、ばらばらになるらしい。",
+        trust: "眼窩の青い光は、嬉しいときに少しだけ明るくなる。",
+        bond:  "長く見ていたいものではない、と書いた。訂正する。"
+      },
+      bondReward: { skill: "blueGlare" },
       family: "demonKind",
       element: "dark",
       resistances: { dark: 7, earth: 2, fire: -1, light: -2 },
@@ -1123,7 +1431,14 @@
       statusResist: { poison: 8, paralysis: 0, sleep: 0, seal: 0,
                       blind: 0, curse: 5, instantDeath: 10 },
       maxLevel: 70,
-      growthRate: { hp: 0.16, attack: 0.15, defense: 0.13, speed: 0.13, pp: 0.15 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.30 }, { from: 55, rate: 0.40 }, { from: 65, rate: 0.30 }],
+        attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.20 }, { from: 54, rate: 0.88 }, { from: 61, rate: 0.35 }],
+        defense: [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.33 }, { from: 44, rate: 0.44 }, { from: 50, rate: 0.50 }],
+        speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.15 }, { from: 40, rate: 0.30 }, { from: 50, rate: 0.40 }, { from: 61, rate: 0.35 }],
+        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.50 }, { from: 50, rate: 0.75 }, { from: 61, rate: 0.60 }]
+      },
       description: "闇属性。沼に沈んだ骨が、泥に浮いたまま動いている。眼窩の奥だけが青く光る。長く見ていたいものではない。光に弱い。",
       baseHp: 20,
       baseAttack: 11,
@@ -1137,7 +1452,6 @@
         { level: 6, skill: "sapStrength" },
         { level: 12, skill: "darkSpore" }
       ],
-      evolvesTo: null,
       abilities: ["undeadSoul"],
       expReward: 36,
       goldReward: 17,
@@ -1160,6 +1474,15 @@
     marshLord: {
       id: "marshLord",
       name: "ヌシガエル",
+      records: {
+        used:  "口を開けたまま何日も待てる。待つことが、狩りそのものらしい。",
+        trust: "食べ物を分けると、丸ごと呑んでから嬉しそうに鳴く。",
+        bond:  "沼の主は、呑み込まずに待っていてくれる。"
+      },
+      bondReward: { effects: [
+        { type: "statMultiplier", stat: "attack", value: 1.08 },
+        { type: "statMultiplier", stat: "defense", value: 1.18 }
+      ] },
       family: "beastKind",
       element: "water",
       resistances: { water: 5, earth: 3, dark: 3, light: -2, thunder: -3 },
@@ -1169,7 +1492,14 @@
       statusResist: { poison: 10, paralysis: 0, sleep: 0, seal: 10,
                       blind: 0, curse: 0, instantDeath: 9 },
       maxLevel: 80,
-      growthRate: { hp: 0.18, attack: 0.17, defense: 0.14, speed: 0.08, pp: 0.13 },
+      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.35 }, { from: 55, rate: 0.46 }, { from: 65, rate: 0.30 }],
+        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 35, rate: 0.40 }, { from: 45, rate: 0.55 }, { from: 55, rate: 0.30 }],
+        defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.25 }, { from: 50, rate: 0.45 }, { from: 61, rate: 0.35 }],
+        speed:   [{ from: 1, rate: 0.08 }, { from: 25, rate: 0.25 }, { from: 50, rate: 0.40 }, { from: 61, rate: 0.20 }],
+        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.30 }, { from: 50, rate: 0.45 }, { from: 61, rate: 0.25 }, { from: 75, rate: 0.75 }]
+      },
       description: "水属性。探索者の間では沼の主と呼ばれている。動かずに口だけを開けて待ち、近づいたものを丸ごと呑む。間合いを測ってから近づくこと。雷に弱い。",
       baseHp: 30,
       baseAttack: 11,
@@ -1186,7 +1516,6 @@
         { level: 8, skill: "venomBreath" },
         { level: 14, skill: "bite" }
       ],
-      evolvesTo: null,
       abilities: ["thickSkin"],
       expReward: 140,
       goldReward: 95,

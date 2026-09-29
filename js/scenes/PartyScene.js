@@ -443,7 +443,7 @@
     if (result.type !== "confirm") return;
 
     switch (result.value) {
-      case "inspect": this.mode = "inspect"; break;
+      case "inspect": this.mode = "inspect"; this.inspectPage = "stats"; break;
       case "deposit": this._depositToStorage(); this.mode = "list"; break;
       case "take":    this._takeFromStorage();  this.mode = "list"; break;
       case "reorder": this._beginReorder(); break;
@@ -471,6 +471,20 @@
     if (size > 0) {
       if (input.isPressed("up")) this.index = (this.index - 1 + size) % size;
       if (input.isPressed("down")) this.index = (this.index + 1) % size;
+    }
+
+    // ←→ でページを切り替える（ステータス ⇔ モンスター説明）。上部の札を押しても切り替わる
+    if (input.isPressed("left") || input.isPressed("right")) {
+      this.inspectPage = (this.inspectPage === "notes") ? "stats" : "notes";
+    }
+    var tabPointer = input.getPointer ? input.getPointer() : null;
+    if (tabPointer && tabPointer.clicked && this._inspectTabRects) {
+      for (var p = 0; p < this._inspectTabRects.length; p++) {
+        if (NS.Panel.containsPoint(this._inspectTabRects[p].rect, tabPointer)) {
+          this.inspectPage = this._inspectTabRects[p].page;
+          return;
+        }
+      }
     }
 
     // 愛情度の欄を押す（または決定）と、愛情度の詳細を開く
@@ -1132,8 +1146,7 @@
       x, y, { color: t.subTextColor, font: t.smallFont });
     y += lh;
 
-    var needed = monster.getExpToNextLevel() - monster.exp;
-    this.panel.drawText((this.texts.expLabel || "next") + " " + needed,
+    this.panel.drawText(this._nextExpText(monster),
       x, y, { color: t.subTextColor, font: t.smallFont });
     y += lh + 4;
 
@@ -1317,14 +1330,28 @@
     this.panel.drawText(monster.getName(), sp.x, (L.name || {}).y || 268,
       { align: "center", font: t.largeFont });
 
+    // 「Lv45/99　勇敢」。/ の後ろはレベル上限（どこまで育つか）
     var nature = monster.getNature();
-    this.panel.drawText("Lv" + monster.level + "　" + (nature ? nature.name : "-"),
+    var levelText = fill(this.texts.levelWithMax || "Lv{level}/{max}", {
+      level: monster.level,
+      max: monster.getMaxLevel ? monster.getMaxLevel() : monster.level
+    });
+    this.panel.drawText(levelText + "　" + (nature ? nature.name : "-"),
       sp.x, ((L.name || {}).y || 268) + 24,
       { align: "center", font: t.smallFont, color: t.subTextColor });
     this._renderAffection(monster, sp.x, ((L.name || {}).y || 268) + 42);
 
     // 左の下：技と特性（中央をステータスと装備に空けるため、こちらへ）
     this._renderInspectSkills(monster, L.left || { x: 64, y: 316, lineHeight: 20 });
+
+    // 左上：ページの札（ステータス ／ モンスター説明）
+    this._renderInspectTabs(rect, L.tabs || {});
+
+    // モンスター説明のページ：右側に図鑑と同じ説明と、愛情度の記録を出す
+    if (this.inspectPage === "notes") {
+      this._renderInspectNotes(monster, rect, L.notes || {});
+      return;
+    }
 
     // --- 中央：ステータス・装備・装備の効果 ---
     var mid = L.stats || { x: 268, y: 96, lineHeight: 22 };
@@ -1348,6 +1375,111 @@
       maxX: rect.x + rect.w - (t.padding || 10)
     });
   };
+
+  /**
+   * 様子を見る：左上のページの札。いまのページは明るく、もう一方は薄く出す。
+   * 押すとそのページへ移る（当たり判定は _inspectTabRects に残す）
+   */
+  PartyScene.prototype._renderInspectTabs = function (box, T) {
+    var t = this.theme;
+    var ctx = this.panel.ctx;
+    var pages = [
+      { page: "stats", label: this.texts.inspectPageStats || "stats" },
+      { page: "notes", label: this.texts.inspectPageNotes || "notes" }
+    ];
+    var x = box.x + (T.x === undefined ? 16 : T.x);
+    var y = box.y + (T.y === undefined ? 22 : T.y);
+    var gap = T.gap === undefined ? 18 : T.gap;
+    var font = T.font || t.font;
+
+    this._inspectTabRects = [];
+    for (var i = 0; i < pages.length; i++) {
+      var active = ((this.inspectPage || "stats") === pages[i].page);
+      ctx.font = font;
+      var w = ctx.measureText(pages[i].label).width;
+      this.panel.drawText(pages[i].label, x, y,
+        { font: font, color: active ? t.cursorColor : t.hintColor });
+      if (active) {
+        ctx.save();
+        ctx.fillStyle = t.cursorColor || "#ffd75e";
+        ctx.fillRect(x, y + 4, w, 2);   // いまのページに下線
+        ctx.restore();
+      }
+      this._inspectTabRects.push({ page: pages[i].page, rect: { x: x - 4, y: y - 16, w: w + 8, h: 24 } });
+      x += w + gap;
+    }
+  };
+
+  /**
+   * 様子を見る：モンスター説明のページ。
+   * 図鑑と同じ説明文と、その種族で読めるようになった愛情度の記録（DexScene.recordEntries）
+   */
+  PartyScene.prototype._renderInspectNotes = function (monster, box, N) {
+    var t = this.theme;
+    var x = N.x || 268;
+    var y = N.y || 104;
+    var lh = N.lineHeight || 22;
+    var font = N.font || t.font;
+    var maxWidth = (box.x + box.w - (t.padding || 10) * 2) - x;
+
+    var species = monster.getSpecies ? monster.getSpecies() : null;
+    var paragraphs = [{ text: (species && species.description) || "", color: t.textColor }];
+    var entries = NS.DexScene ? NS.DexScene.recordEntries(this.game, monster.speciesId) : [];
+    for (var i = 0; i < entries.length; i++) {
+      paragraphs.push({ text: "", color: null });
+      paragraphs.push({ text: entries[i].label, color: t.cursorColor });
+      paragraphs.push({ text: entries[i].text, color: t.textColor });
+    }
+    // まだ記録が1つも無いときは、深まれば書き足されることだけ知らせる
+    if (entries.length === 0 && this.texts.notesNoRecords) {
+      paragraphs.push({ text: "", color: null });
+      paragraphs.push({ text: this.texts.notesNoRecords, color: t.hintColor });
+    }
+
+    var ctx = this.panel.ctx;
+    for (var p = 0; p < paragraphs.length; p++) {
+      if (!paragraphs[p].text) { y += Math.round(lh / 2); continue; }
+      var lines = wrapByWidth(ctx, paragraphs[p].text, maxWidth, font);
+      for (var l = 0; l < lines.length; l++) {
+        this.panel.drawText(lines[l], x, y, { font: font, color: paragraphs[p].color || t.textColor });
+        y += lh;
+      }
+    }
+  };
+
+  /** 幅に収まるよう、1文字ずつ測って折り返す（日本語は単語の区切りが無いため） */
+  /** 「次のLvまで 123」。レベル上限に届いていたら「レベル上限」 */
+  PartyScene.prototype._nextExpText = function (monster) {
+    if (monster.getMaxLevel && monster.level >= monster.getMaxLevel()) {
+      return this.texts.expMaxLevel || "MAX";
+    }
+    var needed = Math.max(0, monster.getExpToNextLevel() - monster.exp);
+    return (this.texts.expLabel || "next") + " " + formatNumber(needed);
+  };
+
+  /** 3桁ごとに「,」を入れる（累計経験値は100万を超える） */
+  function formatNumber(n) {
+    return String(Math.floor(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  function wrapByWidth(ctx, text, maxWidth, font) {
+    ctx.save();
+    ctx.font = font;
+    var lines = [];
+    var line = "";
+    for (var i = 0; i < text.length; i++) {
+      var next = line + text.charAt(i);
+      if (line && ctx.measureText(next).width > maxWidth) {
+        lines.push(line);
+        line = text.charAt(i);
+      } else {
+        line = next;
+      }
+    }
+    if (line) lines.push(line);
+    ctx.restore();
+    return lines;
+  }
 
   /**
    * 様子を見る：名前の下の愛情度。「愛情度 慣れ（32/60）」の形で、次の段階までの数を出す。
@@ -1569,7 +1701,10 @@
     statLine((this.texts.attackLabel || "攻撃") + " " + monster.getAttack(), monster.getAttack(), bare.attack);
     statLine((this.texts.defenseLabel || "防御") + " " + monster.getDefense(), monster.getDefense(), bare.defense);
     statLine((this.texts.speedLabel || "素早さ") + " " + monster.getSpeed(), monster.getSpeed(), bare.speed);
-    this.panel.drawText((this.texts.expLabel || "次まで") + " " + (monster.getExpToNextLevel() - monster.exp),
+    this.panel.drawText(this._nextExpText(monster), x, y, { font: font, color: t.subTextColor });
+    y += lh;
+    // これまでに得た経験値の合計。レベル上限まで育てたあとも増え続ける
+    this.panel.drawText((this.texts.totalExpLabel || "累計") + " " + formatNumber(monster.getTotalExp()),
       x, y, { font: font, color: t.subTextColor });
     y += lh + 6;
 

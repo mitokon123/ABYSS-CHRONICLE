@@ -100,10 +100,6 @@
     for (var id in scenes) this.seen[scenes[id].id] = true;
   };
 
-  StorySystem.prototype.hasSeen = function (id) {
-    return !!this.seen[id];
-  };
-
   // --- セーブ ---
 
   StorySystem.prototype.toSaveData = function () {

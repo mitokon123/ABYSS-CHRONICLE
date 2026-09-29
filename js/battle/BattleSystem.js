@@ -175,10 +175,15 @@
     // 加護の「先手」は全員に掛かるので、1体ずつ名乗らせず、ターンの頭に1行でまとめて知らせる
     this._announcePartyFirstStrike(order, events);
 
+    // 「立ち塞がる」（cover を持つ技）は、防御と同じく素早さに関係なくターンの頭で済ませる
+    this._applyCovers(order, events);
+
     for (var i = 0; i < order.length; i++) {
       var step = order[i];
       // 先に倒された者、盤面から取り除かれた者（スカウトされた等）は行動しない
       if (step.actor.isFainted() || step.actor._removed) continue;
+      // ターンの頭で済ませた行動（立ち塞がる）
+      if (step._done) continue;
 
       // 特性「先手」で先に動いた者は、そうと分かるように名乗る（加護のぶんは上でまとめて出した）
       if (typeof step.firstStrike === "string" && step.firstStrikeKind !== "blessing") {
@@ -188,6 +193,9 @@
       this._performAction(step, events);
       if (this._checkFinish(events)) return events;
     }
+
+    // 立ち塞がるのは、そのターンのあいだだけ
+    this._clearCovers();
 
     // 亡者の魂で踏みとどまっていた者は、ここで倒れる
     this._expireUndying(events);
@@ -674,6 +682,11 @@
       : this._resolveTarget(step, action, skill);
     if (!target) return;
 
+    // 向かい側を狙う技は、立ち塞がっている者がいればそちらへ向く（自分・味方にかける技は変えない）
+    if (!skill || (skill.target !== "self" && skill.target !== "ally")) {
+      target = this._coverFor(target, step.side);
+    }
+
     this._performSkill(step.actor, target, action.skillId, step.side, events);
   };
 
@@ -716,6 +729,8 @@
    * ★ 通常攻撃（data/battle.js の normalAttackSkill）は止めない。
    *   「攻撃」はコマンドであって覚えた技ではないので、
    *   これも封じると何もできない相手になってしまう。
+   * ★ blocksSkillKinds を書いた状態異常は、その種類の技だけを止める
+   *   （封印は共鳴だけ。斬撃・体技などは封印中も出せる）
    *
    * @returns {boolean} 止められたか
    */
@@ -723,10 +738,16 @@
     var actor = step.actor;
     var normalId = (this.data.battle || {}).normalAttackSkill;
     if (action.skillId === normalId) return false;
+    var skill = this.data.getSkill(action.skillId);
 
     var defs = actor.getStatusDefs ? actor.getStatusDefs() : [];
     for (var i = 0; i < defs.length; i++) {
-      if (!defs[i].blocksSkills) continue;
+      var kinds = defs[i].blocksSkillKinds;
+      if (kinds) {
+        if (!skill || kinds.indexOf(skill.kind) < 0) continue;
+      } else if (!defs[i].blocksSkills) {
+        continue;
+      }
 
       events.push({
         type: "statusBlocked", targetSide: step.side,
@@ -749,6 +770,8 @@
     for (var i = 0; i < defs.length; i++) {
       if (typeof defs[i].accuracyMul === "number") total *= defs[i].accuracyMul;
     }
+    // 弱体・装備などの命中の倍率（朧羽など。盲目とは別に掛け合わさる）
+    if (this.effects && actor) total *= this.effects.getAccuracyMultiplier(actor);
     return total;
   };
 
@@ -877,7 +900,7 @@
     var def = this.data.getStatus ? this.data.getStatus(spec.id) : null;
     if (!def) return;
 
-    var targetSide = (target === actor) ? side : opposite(side);
+    var targetSide = (target === actor || skill.target === "ally") ? side : opposite(side);
 
     // 完全に無効な相手（主の即死耐性など）
     if (target.isImmuneToStatus && target.isImmuneToStatus(spec.id)) {
@@ -958,13 +981,16 @@
 
     events.push({
       type: "modifier", side: side,
-      // 自分にかける技では対象が行動した側と同じになるので、対象の側も渡す
-      targetSide: (target === actor) ? side : opposite(side),
+      // 自分・味方にかける技では対象が行動した側と同じになるので、対象の側も渡す
+      // （味方にかける強化で「敵の ○○」と出ないように。導きの光など）
+      targetSide: (target === actor || skill.target === "ally") ? side : opposite(side),
       targetName: target.getName(), target: target,
       skillId: skill.id, skillName: skill.name,
       // 画面が印を出すのに使う（実際の効果より遅れて出すので、中身も渡しておく）
       effects: skill.modifier.effects || [],
       message: skill.modifier.message || null,
+      // 画面上部の札に出す言葉（書いていなければ画面が能力から作る）
+      popup: skill.modifier.popup || null,
       // 同じものが既に掛かっていた場合は「かけ直した」と分かるようにする
       renewed: applied.renewed,
       // 上がったのか下がったのかは、画面側が印の色を決めるのに使う
@@ -986,6 +1012,7 @@
       if (e.type === "statBonus" && e.value > 0) return true;
       if (e.type === "damageDealt" && e.value > 1) return true;
       if (e.type === "damageTaken" && e.value < 1) return true;
+      if (e.type === "accuracyMultiplier" && e.value > 1) return true;
     }
     return false;
   }
@@ -1014,9 +1041,11 @@
     }
 
     for (var i = 0; i < targets.length; i++) {
+      // 立ち塞がっている者がいれば、1体ずつそちらへ向く（全員ぶんを1体で受ける）
+      var target = this._coverFor(targets[i], side);
       // この技で先に倒れた相手は飛ばす
-      if (targets[i].isFainted() || targets[i]._removed) continue;
-      this._resolveHit(actor, targets[i], skill, side, events);
+      if (target.isFainted() || target._removed) continue;
+      this._resolveHit(actor, target, skill, side, events);
     }
   };
 
@@ -1302,6 +1331,59 @@
   BattleSystem.prototype._clearUndying = function () {
     var everyone = (this.allies || []).concat(this.enemies || []);
     for (var i = 0; i < everyone.length; i++) everyone[i]._undying = false;
+    this._clearCovers();
+  };
+
+  // --- 立ち塞がる（data/skills.js の cover） ---
+
+  /**
+   * cover を持つ技（スライムの「立ち塞がる」）を、ターンの頭で先に済ませる。
+   *
+   * 防御と同じく、素早さに関係なく最初に効く。そうしないと、先に動いた敵の攻撃を受け止められない。
+   * 技そのもの（PPの支払い・自分への modifier＝受けるダメージの軽減）はここで出し、
+   * 本人には _covering の印を付ける。その印があるあいだ、向かい側からの攻撃は本人へ向く（_coverFor）。
+   * 麻痺・眠りで動けないとき、封印で技が出せないときは立ち塞がれない。PPが足りなければ、ふだんの手番で通常攻撃になる
+   */
+  BattleSystem.prototype._applyCovers = function (order, events) {
+    for (var i = 0; i < order.length; i++) {
+      var step = order[i];
+      var action = step.action;
+      if (!action || action.type !== "skill") continue;
+      var skill = this.data.getSkill(action.skillId);
+      if (!skill || !skill.cover) continue;
+      if (step.actor.isFainted() || step.actor._removed) continue;
+      if (!this._canUseSkill(step.actor, action.skillId)) continue;
+
+      step._done = true;
+      if (this._blockedByStatus(step, events)) continue;
+      if (this._sealedFrom(step, action, events)) continue;
+
+      this._performSkill(step.actor, step.actor, action.skillId, step.side, events);
+      step.actor._covering = true;
+    }
+  };
+
+  /**
+   * 攻撃の的を、立ち塞がっている仲間へ差し替える。
+   * 向かい側（守る側）に _covering の者がいて、まだ立っていれば、その者が受ける。
+   * 範囲全体の技も1体ずつこれを通すので、「全員ぶん」を1体で受けることになる。
+   * 立ち塞がっていた者が倒れたら、残りはふつうに当たる
+   * @param {object} target 本来の的
+   * @param {string} attackerSide 攻撃する側
+   */
+  BattleSystem.prototype._coverFor = function (target, attackerSide) {
+    if (!target) return target;
+    var group = (attackerSide === "ally") ? this.getFieldEnemies() : this.getFieldAllies();
+    for (var i = 0; i < group.length; i++) {
+      var m = group[i];
+      if (m._covering && m !== target && !m.isFainted() && !m._removed) return m;
+    }
+    return target;
+  };
+
+  BattleSystem.prototype._clearCovers = function () {
+    var everyone = (this.allies || []).concat(this.enemies || []);
+    for (var i = 0; i < everyone.length; i++) everyone[i]._covering = false;
   };
 
   /**
@@ -1392,7 +1474,7 @@
    * ダメージを計算する。式・数値は data/battle.js。
    *
    *   技      基礎 = 攻撃力×skill.attackFactor + 技威力×skill.powerFactor - 防御力×defenseFactor
-   *   通常攻撃 基礎 = 攻撃力×normal.attackFactor                          - 防御力×defenseFactor
+   *   通常攻撃 基礎 = 攻撃力×normal.attackFactor + normal.power           - 防御力×defenseFactor
    *   ダメージ = floor( max(0, 基礎) × 属性倍率 × クリティカル倍率 × 防御 × 特性装備 × 乱数 )
    *
    * 「通常攻撃」は normalAttackSkill の技だけ。体当たりなどの無属性技は技の式。
@@ -1409,17 +1491,26 @@
     }
 
     var isNormal = (skill.id === this.getNormalAttackId());
-    var factors = (isNormal ? config.normal : config.skill) || {};
+    // 技は種類ごとの係数（data/battle.js の damage.byKind）。無ければ共通の skill
+    var factors = isNormal
+      ? config.normal
+      : (((config.byKind || {})[skill.kind]) || config.skill);
+    factors = factors || {};
     var attackFactor = numberOr(factors.attackFactor, 1);
     var powerFactor = numberOr(factors.powerFactor, 1);
-    var defenseFactor = numberOr(config.defenseFactor, 0);
+    // 防御の引き方も種類ごとに変えられる（共鳴・ブレスは半分など）。無ければ共通の値
+    var defenseFactor = numberOr(factors.defenseFactor, numberOr(config.defenseFactor, 0));
     var randomMin = numberOr(config.randomMin, 1);
     var randomMax = numberOr(config.randomMax, 1);
     var minDamage = numberOr(config.minDamage, 1);
 
+    // 通常攻撃は技の威力ではなく、data/battle.js の normal.power（小さな上乗せ）を使う。
+    // 最序盤に攻撃力だけだと2〜3しか出ず、威力を持つ技との差が開きすぎるため
+    var power = isNormal ? numberOr(factors.power, 0) : (skill.power || 0);
+
     // 防御で0を下回っても、そこから先はマイナスにしない
     var base = attacker.getAttack() * attackFactor
-             + (skill.power || 0) * powerFactor
+             + power * powerFactor
              - defender.getDefense() * defenseFactor;
     base = Math.max(0, base);
 
@@ -1462,12 +1553,13 @@
    *
    * 自分や味方にかける技はかわしようがなく、
    * data/skills.js に evadable: false と書いた技もかわせない。
+   * 種類で決まっている技（ブレス）も同じ（data/categories.js の skillKind の rules）。
    */
   BattleSystem.prototype._isEvaded = function (actor, target, skill) {
     if (target === actor) return false;
     // 味方にかける技（回復など）を、素早い仲間がよけてしまわないように
     if (skill.target === "ally") return false;
-    if (skill.evadable === false) return false;
+    if (this.data.getSkillRule(skill, "evadable") === false) return false;
     if (!target.getEvasion) return false;
 
     var evasion = target.getEvasion();
@@ -1478,8 +1570,8 @@
 
   /** クリティカルが出たか。確率は 共通値 + 技の criticalBonus */
   BattleSystem.prototype._rollCritical = function (skill) {
-    // クリティカルを出さない技（範囲全体の技など）
-    if (skill.canCritical === false) return false;
+    // クリティカルを出さない技（範囲全体の技・ブレスなど）
+    if (this.data.getSkillRule(skill, "canCritical") === false) return false;
 
     var config = (this.data.battle || {}).critical || {};
     var rate = numberOr(config.baseRate, 0) + numberOr(skill.criticalBonus, 0);
@@ -1558,6 +1650,10 @@
     if (this.finished) return;
     this.finished = true;
 
+    // 掛かっている強化・弱体は持ち帰らせない。
+    // 経験値より先に外すのは、レベルアップの結果（能力値の前後）に強化の分を混ぜないため
+    this.clearAllModifiers();
+
     if (!firstAlive(this.enemies)) {
       this.result = "win";
       this._awardExp(events);
@@ -1565,8 +1661,6 @@
     } else {
       this.result = "lose";
     }
-    // 掛かっている強化・弱体は持ち帰らせない
-    this.clearAllModifiers();
     this._clearUndying();
     events.push({ type: "battleEnd", result: this.result });
   };
@@ -1624,13 +1718,22 @@
       if (ally.isFainted() || !ally.gainExp) continue;
 
       var before = ally.level;
+      var statsBefore = statSnapshot(ally);
       var gained = ally.gainExp(total);
       if (gained.levels > 0) {
+        var learnedNames = [];
+        for (var n = 0; n < gained.learned.length; n++) {
+          var learnedSkill = this.data.getSkill(gained.learned[n]);
+          learnedNames.push(learnedSkill ? learnedSkill.name : gained.learned[n]);
+        }
         events.push({
           type: "levelUp", actorName: ally.getName(),
           fromLevel: before, toLevel: ally.level,
           // 画面側が喜ぶ動きを付けられるよう、本人も渡す
-          actor: ally
+          actor: ally,
+          // レベルアップの結果（画面中央の窓）に出す、能力値の前後と覚えた技
+          statsBefore: statsBefore, statsAfter: statSnapshot(ally),
+          learnedNames: learnedNames
         });
         for (var k = 0; k < gained.learned.length; k++) {
           var skill = this.data.getSkill(gained.learned[k]);
@@ -1679,6 +1782,17 @@
   };
 
   // --- 内部ヘルパ ---
+
+  /** レベルアップの前後を比べるための能力値（最大HP・攻撃・防御・素早さ・最大PP） */
+  function statSnapshot(monster) {
+    return {
+      hp: monster.getMaxHp ? monster.getMaxHp() : 0,
+      attack: monster.getAttack ? monster.getAttack() : 0,
+      defense: monster.getDefense ? monster.getDefense() : 0,
+      speed: monster.getSpeed ? monster.getSpeed() : 0,
+      pp: monster.getMaxPp ? monster.getMaxPp() : 0
+    };
+  }
 
   /** 戦闘可能な者を先頭から最大 limit 体まで集める */
   function aliveMembers(list, limit) {

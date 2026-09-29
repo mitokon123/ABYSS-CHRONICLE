@@ -2,6 +2,11 @@
  * skills.js
  * スキル（技）の定義。数値はすべてここで管理する。
  *
+ * kind          : 技の種類（data/categories.js の skillKind）
+ *                   resonance 共鳴 / breath ブレス / body 体技 / slash 斬撃 / dance 踊り
+ *                 通常攻撃だけは書かない（どの種類にも入らない）。
+ *                 種類で決まるもの：計算の係数（battle.js の damage.byKind）・
+ *                 ブレスの「よけられない・クリティカルなし」（skillKind の rules）・封印で止まるか（共鳴だけ）
  * power         : 威力（0 なら通常攻撃と同じ計算になる）
  *                 ★ ただし heal / modifier / status のどれかを持つ技は、威力0だと
  *                   「掛けるだけでダメージを与えない技」になる。
@@ -11,9 +16,9 @@
  * criticalBonus : クリティカル率への上乗せ（書かなければ 0）
  * canCritical   : false と書くとクリティカルが出なくなる。
  *                 範囲全体の技はこれを付ける方針（1体ずつ判定すると、
- *                 運だけで一気に崩れる回ができてしまうため）
+ *                 運だけで一気に崩れる回ができてしまうため）。ブレスは書かなくても false
  * evadable      : false と書くと、相手の回避率（monsters.js の evasion）で
- *                 かわされなくなる。省略すると かわされる
+ *                 かわされなくなる。省略すると かわされる（ブレスは書かなくても false）
  * target        : 対象。次の3つが書ける
  *     "enemy"      … 相手を1体選ぶ
  *     "self"       … 自分。相手を選ばずに出せる
@@ -31,6 +36,11 @@
  *     effects  : 掛かる効果。書き方は data/abilities.js の特性とまったく同じ
  *                （statMultiplier / statBonus / damageDealt / damageTaken）
  *     message  : かかったときの文（省略時は messages.js の modifierUp / modifierDown）
+ *     popup    : 画面上部の札に出す言葉（省略時は「防御力上昇」のように、変わる能力から作る）
+ *     effects には accuracyMultiplier（命中の倍率。盲目とは別）も書ける
+ * cover         : true なら「立ち塞がる」。ターンの頭で（素早さに関係なく）出し、そのターン
+ *                 向かい側からの攻撃をすべて自分が受ける（範囲全体の技も全員ぶん）。
+ *                 受けるダメージを減らしたいときは modifier で damageTaken を掛ける（BattleSystem._applyCovers）
  *   威力（power）を持たない技は、掛けるだけでダメージを与えない。
  *   同じ技を重ねがけしても効果は重ならず、残りターン数が建て直されるだけ。
  *   戦闘が終わると全部消える。
@@ -82,7 +92,9 @@
     tackle: {
       id: "tackle",
       name: "体当たり",
-      power: 10,
+      kind: "body",
+      // α-10 で 10 → 7。最序盤に通常攻撃の7倍出ていたため（通常攻撃にも威力3を足した。data/battle.js）
+      power: 7,
       pp: 1,
       accuracy: 1.0,
       target: "enemy",
@@ -94,6 +106,7 @@
     bite: {
       id: "bite",
       name: "噛みつく",
+      kind: "slash",
       power: 15,
       pp: 2,
       accuracy: 0.9,
@@ -108,6 +121,7 @@
     ember: {
       id: "ember",
       name: "ファイア",
+      kind: "resonance",
       power: 15,
       pp: 2,
       accuracy: 1.0,
@@ -121,6 +135,7 @@
     rockThrow: {
       id: "rockThrow",
       name: "ストーン",
+      kind: "resonance",
       power: 15,
       pp: 2,
       accuracy: 1.0,
@@ -134,6 +149,7 @@
     glimmer: {
       id: "glimmer",
       name: "フラッシュ",
+      kind: "resonance",
       power: 15,
       pp: 2,
       accuracy: 1.0,
@@ -147,6 +163,7 @@
     darkSpore: {
       id: "darkSpore",
       name: "シャドウ",
+      kind: "resonance",
       power: 15,
       pp: 2,
       accuracy: 1.0,
@@ -160,6 +177,7 @@
     aqua: {
       id: "aqua",
       name: "アクア",
+      kind: "resonance",
       power: 15,
       pp: 2,
       accuracy: 1.0,
@@ -173,6 +191,7 @@
     gust: {
       id: "gust",
       name: "ウィンド",
+      kind: "resonance",
       power: 15,
       pp: 2,
       accuracy: 1.0,
@@ -194,6 +213,10 @@
     fireBreath: {
       id: "fireBreath",
       name: "火の息",
+      // ブレスは種類の決まりで「よけられない・クリティカルなし」（data/categories.js の skillKind）。
+      // 息は広がるのでよけようがなく、範囲全体の技は3体それぞれでクリティカルを判定すると
+      // 運だけで一気に崩れる回ができてしまうため
+      kind: "breath",
       power: 15,
       pp: 3,
       accuracy: 1.0,
@@ -203,11 +226,6 @@
       effect: "flameBreath",
       effectAt: "center",
       se: "fireBreath",
-      // 息は広がるのでよけようがない。回避率を持つ相手にも必ず当たる
-      evadable: false,
-      // 範囲全体の技はクリティカルを出さない。
-      // 3体それぞれでクリティカルを判定すると、運だけで一気に崩れる回ができてしまう
-      canCritical: false,
       description: "熱い息を吐き、相手全体を焼く。1体ずつへの威力は低いが、よけられない。"
     },
 
@@ -215,6 +233,7 @@
     bodyPress: {
       id: "bodyPress",
       name: "ボディプレス",
+      kind: "body",
       power: 20,
       pp: 4,
       accuracy: 1.0,
@@ -230,6 +249,7 @@
     drainBite: {
       id: "drainBite",
       name: "吸血",
+      kind: "slash",
       power: 5,
       pp: 2,
       accuracy: 1.0,
@@ -245,6 +265,7 @@
     abyssBreath: {
       id: "abyssBreath",
       name: "奈落の息",
+      kind: "breath",
       power: 15,
       pp: 3,
       accuracy: 1.0,
@@ -254,8 +275,6 @@
       effect: "abyssBreath",
       effectAt: "center",
       se: "darkBreath",
-      evadable: false,
-      canCritical: false,
       description: "底なしの闇を吐き出し、相手全体を呑み込む。よけることはできない。"
     },
 
@@ -264,6 +283,7 @@
     cure: {
       id: "cure",
       name: "キュア",
+      kind: "resonance",
       power: 0,
       pp: 2,
       accuracy: 1.0,
@@ -279,6 +299,7 @@
     harden: {
       id: "harden",
       name: "こうか",
+      kind: "body",
       power: 0,
       pp: 2,
       accuracy: 1.0,
@@ -289,12 +310,11 @@
         duration: 3,
         // この技だけの言い回し。書かなければ messages.js の modifierUp が使われる
         message: "{target} の 守りが 高まった!",
-        // 防御の倍率だけでは効かない。ダメージ式が「防御 × 0.25」を引くだけなので、
-        // ×1.5 にしても2ダメージしか減らず、逆に上げすぎると引き算が勝って無敵になる。
-        // 防御コマンドと同じ damageTaken を混ぜて、効き目を素直にしてある
+        // 防御 ×1.5 だけ。α-9 までは受けるダメージ ×0.8 も混ぜていたが、
+        // 序盤から効きすぎ、成長率の段階で防御が伸びる後半はほぼ無敵になったので外した
+        // （2026-09-29 作者の判断。防御の高い種族が使うほど効く、素直な技にしてある）
         effects: [
-          { type: "statMultiplier", stat: "defense", value: 1.5 },
-          { type: "damageTaken", value: 0.8 }
+          { type: "statMultiplier", stat: "defense", value: 1.5 }
         ]
       },
       description: "体を硬くして、しばらく守りを上げる。相手を選ばずに出せる。"
@@ -305,6 +325,7 @@
     sapStrength: {
       id: "sapStrength",
       name: "ちからぬき",
+      kind: "body",
       power: 0,
       pp: 2,
       accuracy: 1.0,
@@ -342,6 +363,7 @@
     venomSting: {
       id: "venomSting",
       name: "どくばり",
+      kind: "slash",
       power: 8,
       pp: 2,
       accuracy: 1.0,
@@ -358,6 +380,7 @@
     venomBreath: {
       id: "venomBreath",
       name: "どくのいき",
+      kind: "breath",
       power: 0,
       pp: 3,
       accuracy: 1.0,
@@ -367,9 +390,6 @@
       effect: "miasma",
       effectAt: "center",
       se: "venomBreath",
-      // 息は広がるのでよけようがない（範囲技の方針）
-      evadable: false,
-      canCritical: false,
       // 1体ずつ判定するので、避ける子・かかる子が分かれる。
       // 単体（60%）より低いのは、3体に届くぶんの釣り合い
       status: { id: "poison", chance: 0.35 },
@@ -391,6 +411,7 @@
     bubble: {
       id: "bubble",
       name: "あわ",
+      kind: "breath",
       power: 12,
       pp: 3,
       accuracy: 1.0,
@@ -400,9 +421,6 @@
       effect: "bubbleBreath",
       effectAt: "center",
       se: "bubble",
-      // 泡は広がって割れるのでよけようがない（範囲技の方針）
-      evadable: false,
-      canCritical: false,
       description: "毒を含んだ泡を吐き散らし、相手全体を包む。よけることはできない。"
     },
 
@@ -413,6 +431,7 @@
     shine: {
       id: "shine",
       name: "シャイン",
+      kind: "resonance",
       power: 32,
       pp: 5,
       accuracy: 1.0,
@@ -431,6 +450,7 @@
     thunderBolt: {
       id: "thunderBolt",
       name: "サンダー",
+      kind: "resonance",
       power: 20,
       pp: 3,
       accuracy: 1.0,
@@ -439,6 +459,147 @@
       effect: "flash",
       se: "thunder",
       description: "強い電気を落とす。威力は高いが、消費するPPも大きい。"
+    },
+
+    /**
+     * --- 専用技（愛情度が「絆」に届くと覚える。data/monsters.js の bondReward） ---
+     * 効果・数値は作者が決めたもの（早見表/絆と記録.txt）。
+     * その種族らしい働きで個性を出す。どれも覚えるのはその種族だけ（learnset には書かない）
+     */
+
+    // スライム。最初の相棒が仲間の盾になる。
+    // cover … ターンの頭で（素早さに関係なく）立ち塞がり、そのターン向かい側からの攻撃を
+    //         すべて自分が受ける（範囲全体の技も全員ぶん）。受けるダメージは modifier で軽くする
+    standGuard: {
+      id: "standGuard",
+      name: "立ち塞がる",
+      kind: "body",
+      power: 0,
+      pp: 5,
+      accuracy: 1.0,
+      target: "self",
+      element: "none",
+      effect: "aura",
+      cover: true,
+      modifier: {
+        duration: 1,
+        message: "{target} は 仲間の前に立ち塞がった!",
+        popup: "立ち塞がる",
+        effects: [ { type: "damageTaken", value: 0.75 } ]
+      },
+      description: "このターン、仲間への攻撃をすべて引き受ける（全体技も全員ぶん）。受けるダメージは少し減る。"
+    },
+
+    // コウモリ。羽ばたきで相手の目を眩ませる。盲目（状態異常）とは別の弱体で、両方掛かれば重なる
+    hazyWing: {
+      id: "hazyWing",
+      name: "朧羽",
+      // 踊りの第1号。羽ばたいて惑わす
+      kind: "dance",
+      power: 0,
+      pp: 8,
+      accuracy: 1.0,
+      target: "allEnemies",
+      element: "dark",
+      effect: "aura",
+      evadable: false,
+      canCritical: false,
+      modifier: {
+        duration: 2,
+        message: "{target} は 朧な羽ばたきに 目を奪われた",
+        effects: [ { type: "accuracyMultiplier", value: 0.8 } ]
+      },
+      description: "朧な羽ばたきで、相手全体の命中を2ターン下げる（盲目とは別に効く）。よけられない。"
+    },
+
+    // ヒカリムシ。味方を先へ導く光
+    guidingLight: {
+      id: "guidingLight",
+      name: "導きの光",
+      kind: "resonance",
+      power: 0,
+      pp: 6,
+      accuracy: 1.0,
+      target: "ally",
+      element: "light",
+      effect: "aura",
+      modifier: {
+        duration: 3,
+        message: "{target} は 光に導かれ、足が軽くなった!",
+        effects: [ { type: "statMultiplier", stat: "speed", value: 2.0 } ]
+      },
+      description: "味方1体を光で導き、3ターンのあいだ素早さを大きく上げる。"
+    },
+
+    // キノコン。味方が使える初めての眠りの技
+    sleepSpore: {
+      id: "sleepSpore",
+      name: "眠りの胞子",
+      // 胞子を撒くのでブレス（よけられない・クリティカルなし は種類の決まり）
+      kind: "breath",
+      power: 0,
+      pp: 8,
+      accuracy: 1.0,
+      target: "allEnemies",
+      element: "none",
+      effect: "sporeCloud",
+      effectAt: "center",
+      status: { id: "sleep", chance: 0.5 },
+      description: "眠りを誘う胞子を撒き、相手全体を眠らせることがある。ダメージは与えないが、よけられない。"
+    },
+
+    // キングスライム。王として自らを奮い立たせる。特性「王の威厳」と重なる
+    kingsCommand: {
+      id: "kingsCommand",
+      name: "王の号令",
+      kind: "body",
+      power: 0,
+      pp: 10,
+      accuracy: 1.0,
+      target: "self",
+      element: "none",
+      effect: "aura",
+      modifier: {
+        duration: 3,
+        message: "{target} は 王の号令を上げた!",
+        effects: [
+          { type: "statMultiplier", stat: "attack", value: 1.5 },
+          { type: "statMultiplier", stat: "defense", value: 1.5 }
+        ]
+      },
+      description: "王の号令を上げ、3ターンのあいだ自分の攻撃と防御を大きく上げる。"
+    },
+
+    // フレイミン。燃える牙の一撃
+    blazeFang: {
+      id: "blazeFang",
+      name: "焔牙",
+      kind: "slash",
+      power: 50,
+      pp: 6,
+      accuracy: 1.0,
+      criticalBonus: 0.4,
+      target: "enemy",
+      element: "fire",
+      effect: "slash",
+      se: "fire",
+      description: "燃える牙で食らいつく。威力が高く、クリティカルがとても出やすい。"
+    },
+
+    // ヌマボネ。眼窩の青い光で呪う。味方が使える初めての呪いの技
+    blueGlare: {
+      id: "blueGlare",
+      name: "青い眼光",
+      kind: "resonance",
+      power: 0,
+      pp: 7,
+      accuracy: 1.0,
+      target: "enemy",
+      element: "dark",
+      effect: "flash",
+      se: "dark",
+      status: { id: "curse", chance: 0.75 },
+      description: "眼窩の青い光で見つめ、相手を呪うことがある。ダメージは与えない。"
     }
   };
 })(window.MyGame);

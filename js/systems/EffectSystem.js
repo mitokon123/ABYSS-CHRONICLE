@@ -20,6 +20,7 @@
  *   { type:"damageDealt",    value:1.25, element:"fire" }
  *   { type:"damageTaken",    value:0.9 }
  *   { type:"resistBonus",    element:"fire", value:3 }  … 耐性の数値そのものを上げる
+ *   { type:"accuracyMultiplier", value:0.8 }  … 命中率に倍率（盲目とは別）
  *   戦闘中に働くもの（regen / counterStatus / drain / firstStrike / undying）は
  *   ここでは集めるだけで、働かせるのは BattleSystem（_findEffects で拾う）
  *
@@ -225,6 +226,19 @@
     });
   };
 
+  /**
+   * 命中率に掛かる倍率（何も無ければ 1）。{ type:"accuracyMultiplier", value:0.8 }
+   * 盲目（状態異常）とは別の仕組みで、両方掛かっていれば掛け合わさる。朧羽などの弱体で使う
+   */
+  EffectSystem.prototype.getAccuracyMultiplier = function (monster) {
+    var self = this;
+    return this._multiply(monster, function (effect) {
+      if (effect.type !== "accuracyMultiplier") return null;
+      if (!self._matchCondition(monster, effect.condition)) return null;
+      return effect.value;
+    });
+  };
+
   /** 自分が受けるダメージに掛かる倍率 */
   EffectSystem.prototype.getDamageTakenMultiplier = function (monster, elementId) {
     var self = this;
@@ -329,6 +343,8 @@
     } else if (effect.type === "drain") {
       text = fillText(effect.normalAttackOnly ? party.effectDrainNormal : party.effectDrain,
         { percent: percentOf(effect.value) });
+    } else if (effect.type === "accuracyMultiplier") {
+      text = (party.accuracyLabel || "命中") + " ×" + effect.value;
     } else if (effect.type === "firstStrike") {
       text = party.effectFirstStrike || "";
     } else if (effect.type === "undying") {

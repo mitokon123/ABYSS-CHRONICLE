@@ -230,6 +230,27 @@
       },
 
       /**
+       * 眠りの胞子（キノコン）。眠りの印と同じ淡い紫の煙に、白い泡がゆっくり昇る。
+       * ほかの息より遅く、低く広がる（眠気が漂う感じ）
+       */
+      sporeCloud: {
+        shape: "miasma",
+        duration: 1200,
+        glow: 12,
+        color: "#a88ce0",
+        accentColor: "#e0d6ff",
+        particleColor: "#f2eeff",
+        particle: "bubble",
+        spread: 250,
+        height: 60,
+        lift: 6,
+        count: 22,
+        minSize: 16,
+        maxSize: 30,
+        bubbles: 14
+      },
+
+      /**
        * あわ。色は水の属性色（青）。
        * 3つに1つの煙を淡い水色にし、大きめの泡の輪（particleScale）をたくさん昇らせる。
        * 泡は軽いので少しだけ浮く

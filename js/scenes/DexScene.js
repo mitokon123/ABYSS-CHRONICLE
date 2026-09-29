@@ -211,9 +211,11 @@
     for (var id in monsters) {
       if (!Object.prototype.hasOwnProperty.call(monsters, id)) continue;
       var level = learnLevel(monsters[id], skillId);
-      if (level === null) continue;
+      // 絆の報酬で覚える技（専用技など）は、レベルではなく「絆」で覚える
+      var bond = ((monsters[id].bondReward || {}).skill === skillId);
+      if (level === null && !bond) continue;
       if (caughtOnly && !discovery.isMonsterCaught(id)) continue;
-      result.push({ monster: monsters[id], level: level });
+      result.push({ monster: monsters[id], level: level, bond: bond && level === null });
     }
     return result;
   };
@@ -645,6 +647,12 @@
                sizeScale: monster.sizeScale || 1, lines: lines };
     }
 
+    // レベル上限（どこまで育つか）。仲間にした種族だけ見せる
+    var growth = data.growth || {};
+    var maxLevel = monster.maxLevel || growth.defaultMaxLevel || 50;
+    if (growth.levelCap) maxLevel = Math.min(maxLevel, growth.levelCap);
+    lines.push({ text: (this.texts.maxLevelLabel || "") + " " + maxLevel });
+
     lines.push({ text: (this.texts.scoutLabel || "") + " " +
                        Math.round((monster.scoutRate || 0) * 100) + "%" });
 
@@ -677,19 +685,36 @@
    * どこまで読めるかは、その種族でいちばん深まった段階（Discovery.getAffectionStage）
    */
   DexScene.prototype._pushAffectionRecords = function (lines, monster, speciesId) {
-    var records = monster.records || {};
-    var stages = (this.game.data.affection || {}).stages || [];
-    var reached = this.game.discovery.getAffectionStage
-      ? this.game.discovery.getAffectionStage(speciesId) : 0;
+    var entries = DexScene.recordEntries(this.game, speciesId);
+    for (var i = 0; i < entries.length; i++) {
+      lines.push({ text: "" });
+      lines.push({ text: entries[i].label, color: this.theme.cursorColor });
+      this._pushWrapped(lines, entries[i].text);
+    }
+  };
 
+  /**
+   * いま読める愛情度の記録を [{ label, text }] で返す（label は「― 慣れ ―」の見出し）。
+   * 図鑑と、仲間の「様子を見る」（モンスター説明のページ）の両方で使う。
+   * どこまで読めるかは、その種族でいちばん深まった段階（Discovery.getAffectionStage）
+   * @param {MyGame.Game} game
+   * @param {string} speciesId
+   */
+  DexScene.recordEntries = function (game, speciesId) {
+    var species = game.data.getMonsterData ? game.data.getMonsterData(speciesId) : null;
+    var records = (species && species.records) || {};
+    var stages = (game.data.affection || {}).stages || [];
+    var reached = (game.discovery && game.discovery.getAffectionStage)
+      ? game.discovery.getAffectionStage(speciesId) : 0;
+    var label = ((game.data.messages || {}).dex || {}).recordLabel || "― {stage} ―";
+
+    var result = [];
     for (var i = 1; i <= reached && i < stages.length; i++) {
       var text = records[stages[i].id];
       if (!text) continue;
-      lines.push({ text: "" });
-      lines.push({ text: (this.texts.recordLabel || "― {stage} ―").replace("{stage}", stages[i].name),
-                   color: this.theme.cursorColor });
-      this._pushWrapped(lines, text);
+      result.push({ label: label.replace("{stage}", stages[i].name), text: text });
     }
+    return result;
   };
 
   /**
@@ -930,6 +955,12 @@
     var element = (data.elements || {})[skill.element];
     lines.push({ text: (this.texts.elementLabel || "") + " " + (element ? element.name : "-"),
                  color: element ? element.color : null });
+    // 技の種類（共鳴・ブレスなど）。種類の決まり（note）があれば次の行に添える
+    var kind = data.getSkillKind(skill);
+    if (kind) {
+      lines.push({ text: (this.texts.skillKindLabel || "") + " " + kind.name, color: kind.color });
+      if (kind.note) this._pushWrapped(lines, kind.note);
+    }
 
     // ダメージを与えない技（回復・バフ／デバフ・状態異常だけの技）は、威力の行ごと出さない。
     //   キュアやどくのいきに「威力」と並ぶと、殴る技のように見えてしまうため。
@@ -996,7 +1027,8 @@
       lines.push({ text: "" });
       lines.push({ text: this.texts.learnerLabel || "", color: t.cursorColor });
       for (var i = 0; i < learners.length; i++) {
-        lines.push({ text: "・" + learners[i].monster.name + " Lv" + learners[i].level });
+        lines.push({ text: "・" + learners[i].monster.name + " " +
+          (learners[i].bond ? (this.texts.learnByBond || "絆") : "Lv" + learners[i].level) });
       }
     }
 

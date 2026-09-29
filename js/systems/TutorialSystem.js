@@ -76,11 +76,6 @@
     for (var id in steps) this.seen[steps[id].id] = true;
   };
 
-  TutorialSystem.prototype.countSeen = function () {
-    var n = 0;
-    for (var id in this.seen) if (this.seen[id]) n++;
-    return n;
-  };
 
   // --- セーブ ---
 

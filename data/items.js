@@ -889,17 +889,6 @@
       price: 80,
       effect: null,
       usableIn: []
-    },
-
-    oldKey: {
-      id: "oldKey",
-      name: "古びた鍵",
-      category: "key",
-      description: "どこかの扉を開ける鍵らしい。使い道はまだ分からない。",
-      maxStack: 1,
-      price: 0,        // 0 なら売れない（重要アイテム）
-      effect: null,
-      usableIn: []
     }
   };
 })(window.MyGame);

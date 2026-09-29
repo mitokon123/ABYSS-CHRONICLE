@@ -47,7 +47,7 @@
  *     hpAbove : 自分のHP割合がこの値以上のときだけ効く
  *
  * ★ 新しいアビリティの追加は、このファイルに1エントリ足すだけでよい。
- *   新しい「効果の種類」を足すときは js/systems/AbilitySystem.js に処理を追加する。
+ *   新しい「効果の種類」を足すときは js/systems/EffectSystem.js に処理を追加する。
  */
 (function (NS) {
   "use strict";

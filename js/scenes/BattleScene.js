@@ -118,6 +118,10 @@
     // 実際の効果（monster.modifiers）より遅れて増減する（_shownModifiersFor を参照）
     this.shownModifiers = [];
 
+    // レベルアップの結果の窓（画面中央）。出ているあいだは再生を止める。
+    // 何体も上がったら、先頭から1体ずつ出す（_queueLevelResult）
+    this.levelResults = [];
+
     // 初めての場面で出る説明（出ているあいだは行動を決められない）
     this.tutorial = new NS.TutorialBox(this.panel, game);
     // 「この項目です」と矢印で指せるように、コマンド欄の位置を教える係を渡す。
@@ -347,8 +351,9 @@
     for (var i = 0; i < reserves.length; i++) {
       rows.push({
         type: "entry",
-        label: reserves[i].getName() + "  Lv" + reserves[i].level,
-        right: "HP" + reserves[i].currentHp + "/" + reserves[i].getMaxHp(),
+        // レベルは右側にまとめる（名前が長いと「…」で縮むので、レベルが隠れないように）
+        label: reserves[i].getName(),
+        right: "Lv" + reserves[i].level + "  HP" + reserves[i].currentHp + "/" + reserves[i].getMaxHp(),
         // 番号ではなく個体そのものを覚える（並びが変わっても選んだ相手と交代できる）
         value: reserves[i]
       });
@@ -398,6 +403,12 @@
     // 演出だけは上で進めてあるので、読み終われば続きから動く
     if (this.tutorial.isActive()) {
       this.tutorial.handleInput(input);
+      return;
+    }
+
+    // レベルアップの結果を見せている間も止める（説明が先。読み終わってから出る）
+    if (this.levelResults.length > 0) {
+      this._updateLevelResult(input);
       return;
     }
 
@@ -614,6 +625,8 @@
         if (this.game.tutorial) {
           this.tutorial.show(this.game.tutorial.take("levelUp"));
         }
+        // 上がった能力と覚えた技を、画面中央の窓で見せる（成長の実感）
+        this._queueLevelResult(event);
         break;
       // 勝ったら戦闘曲をやめて、勝利の曲を流す（繰り返さない。data/audio.js）。
       // 探索へ戻ると探索曲に置き換わる
@@ -665,10 +678,9 @@
     var text = null;
     var kind = null;
     if (event.type === "modifier") {
-      var mark = NS.StatusMarks.summarizeModifier({ effects: event.effects || [] });
-      var labels = t.popupStats || {};
-      var stat = labels[mark.stat] || labels.other || "";
-      text = fill(event.raised ? t.popupStatUp : t.popupStatDown, { stat: stat });
+      // 技に札の言葉が書いてあればそれ（立ち塞がる）。無ければ変わる能力を並べる（「攻撃力・防御力上昇」）
+      text = event.popup || fill(event.raised ? t.popupStatUp : t.popupStatDown,
+                                 { stat: this._popupStatNames(event.effects || []) });
       kind = event.raised ? "buff" : "debuff";
     } else if (event.type === "ability" || event.type === "undying" || event.type === "partyFirstStrike" ||
                ((event.type === "regen" || event.type === "drain") && event.abilityName)) {
@@ -692,6 +704,23 @@
     }
     this.effectPopups.unshift({ text: text, owner: owner || "", kind: kind, start: this.game.clock });
     if (this.effectPopups.length > (P.max || 3)) this.effectPopups.length = P.max || 3;
+  };
+
+  /**
+   * 強化・弱体で変わる能力の名前を「・」でつなぐ（「攻撃力・防御力」）。
+   * 能力の倍率・加算と命中を拾い、受ける／与えるダメージだけの効果は「能力」とする
+   */
+  BattleScene.prototype._popupStatNames = function (effects) {
+    var labels = this.texts.popupStats || {};
+    var names = [];
+    for (var i = 0; i < effects.length; i++) {
+      var e = effects[i];
+      var key = (e.type === "statMultiplier" || e.type === "statBonus") ? e.stat
+              : (e.type === "accuracyMultiplier") ? "accuracy" : null;
+      var name = key ? labels[key] : null;
+      if (name && names.indexOf(name) < 0) names.push(name);
+    }
+    return names.length > 0 ? names.join("・") : (labels.other || "");
   };
 
   /** 札に出す持ち主の名前。敵なら「敵の」を付ける（文と同じ見分け方） */
@@ -972,7 +1001,9 @@
       return;
     }
 
-    if (!isHitEvent(event.type) || !event.target) return;
+    // ダメージの無い状態異常の技（青い眼光など）は damage が来ないので、状態異常の出来事も合図にする
+    var statusOnly = isStatusResultEvent(event.type) && !NS.BattleSystem.dealsDamage(this._currentSkill);
+    if ((!isHitEvent(event.type) && !statusOnly) || !event.target) return;
 
     var effectId = this._effectIdFor(this._currentSkill, this._currentSkillActor);
     if (!effectId) return;
@@ -1303,8 +1334,8 @@
     for (var i = 0; i < members.length; i++) {
       rows.push({
         type: "entry",
-        label: members[i].getName() + "  Lv" + members[i].level,
-        right: "HP" + members[i].currentHp + "/" + members[i].getMaxHp(),
+        label: members[i].getName(),
+        right: "Lv" + members[i].level + "  HP" + members[i].currentHp + "/" + members[i].getMaxHp(),
         // 番号ではなく個体そのものを覚える（並びがずれても選んだ相手を預けられる）
         value: members[i]
       });
@@ -2168,8 +2199,100 @@
     // 発光は画面全体に重ねる
     this.screenEffects.renderOverlay(ctx, w, h);
 
+    // レベルアップの結果（画面中央）。説明より下
+    this._renderLevelResult(ctx, w, h);
+
     // 説明はすべての上。読んでいる間は他を触れない
     this.tutorial.render();
+  };
+
+  // --- レベルアップの結果（画面中央の窓） ---
+
+  /** 能力の並び（data/messages.js の battleUi.popupStats の名前で出す） */
+  var LEVEL_RESULT_STATS = ["hp", "attack", "defense", "speed", "pp"];
+
+  /** levelUp の出来事から、窓に出す中身を作って並べる */
+  BattleScene.prototype._queueLevelResult = function (event) {
+    if (!event.statsBefore || !event.statsAfter) return;
+    this.levelResults.push({
+      name: event.actorName, from: event.fromLevel, to: event.toLevel,
+      before: event.statsBefore, after: event.statsAfter,
+      learned: event.learnedNames || []
+    });
+  };
+
+  /** 決定・Esc・クリックで閉じる。次の仲間の結果があれば続けて出す */
+  BattleScene.prototype._updateLevelResult = function (input) {
+    if (input.isPressed("confirm") || input.isPressed("cancel") || this._clickedScreen(input)) {
+      this.levelResults.shift();
+    }
+  };
+
+  BattleScene.prototype._renderLevelResult = function (ctx, w, h) {
+    var result = this.levelResults[0];
+    if (!result) return;
+
+    var L = this.layout.levelResult || {};
+    var t = this.theme;
+    var lh = L.lineHeight || 24;
+    var pad = L.padding || 16;
+    var labels = this.texts.popupStats || {};
+
+    // 行数：見出し・空き・能力5つ・（空き・覚えた技の見出し・技の数）・空き・ヒント
+    var rows = 2 + LEVEL_RESULT_STATS.length + 2;
+    if (result.learned.length > 0) rows += 2 + result.learned.length;
+    var boxW = L.w || 360;
+    var rect = { x: Math.round((w - boxW) / 2), y: L.y || 100, w: boxW, h: pad * 2 + rows * lh };
+
+    // 後ろを少し暗くして、窓に目を向けさせる
+    if (L.dim) {
+      ctx.fillStyle = L.dim;
+      ctx.fillRect(0, 0, w, h);
+    }
+    if (L.background) {
+      ctx.fillStyle = L.background;
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    }
+    this.panel.drawBox(rect);
+
+    var x = rect.x + pad;
+    var y = rect.y + pad + lh - 6;
+
+    this.panel.drawText(fill(this.texts.levelResultTitle, {
+      name: result.name, from: result.from, to: result.to
+    }), x, y, { font: t.font, color: t.cursorColor });
+    y += lh * 2;
+
+    for (var i = 0; i < LEVEL_RESULT_STATS.length; i++) {
+      var key = LEVEL_RESULT_STATS[i];
+      var before = result.before[key] || 0;
+      var after = result.after[key] || 0;
+      var diff = after - before;
+      var color = diff > 0 ? t.textColor : (L.sameColor || t.subTextColor);
+
+      this.panel.drawText(labels[key] || key, x, y, { color: color });
+      this.panel.drawText(fill(this.texts.levelResultStat, { before: before, after: after }),
+        x + (L.labelWidth || 96), y, { color: color });
+      if (diff > 0) {
+        this.panel.drawText(fill(this.texts.levelResultUp, { n: diff }),
+          x + (L.labelWidth || 96) + (L.numberWidth || 150), y, { color: L.upColor || t.textColor });
+      }
+      y += lh;
+    }
+
+    if (result.learned.length > 0) {
+      y += lh;
+      this.panel.drawText(this.texts.levelResultLearned || "", x, y, { color: t.subTextColor });
+      y += lh;
+      for (var s = 0; s < result.learned.length; s++) {
+        this.panel.drawText("・" + result.learned[s], x + 12, y, { color: L.skillColor || t.textColor });
+        y += lh;
+      }
+    }
+
+    y += lh;
+    this.panel.drawText(this.texts.levelResultHint || "", rect.x + rect.w - pad, y,
+      { font: t.smallFont, color: t.hintColor, align: "right" });
   };
 
   /**
@@ -2719,6 +2842,13 @@
       this.panel.drawText("[" + element.name + "]",
         origin.x + (info.elementOffsetX || 110), y,
         { font: t.smallFont, color: element.color });
+    }
+    // 技の種類（共鳴・ブレスなど。data/categories.js の skillKind）
+    var kind = this.game.data.getSkillKind(skill);
+    if (kind) {
+      this.panel.drawText("[" + kind.name + "]",
+        origin.x + (info.kindOffsetX || 150), y,
+        { font: t.smallFont, color: kind.color });
     }
     y += lh;
 

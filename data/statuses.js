@@ -24,6 +24,8 @@
  *   persists    : true なら戦闘が終わっても残る（毒だけ）
  *   curable     : 道具で治せるか
  *   blocksTurn  : "always"（必ず行動できない）／ 数値（その確率で行動できない）
+ *   blocksSkills: true なら技を出せない（通常攻撃はできる）
+ *   blocksSkillKinds : 出せなくする技の種類の一覧（["resonance"] なら共鳴だけ）
  *   wakeOnDamage: ダメージを受けたときに解ける確率
  *   turnDamage  : 戦闘中、ターン終了時のダメージ
  *   walkDamage  : ダンジョンを歩いているときのダメージ
@@ -130,7 +132,9 @@
     },
 
     /**
-     * 封印。技が使えなくなる（通常攻撃はできる）。
+     * 封印。共鳴の技が使えなくなる（通常攻撃・ほかの種類の技はできる）。
+     * α-10 で「技すべて」から「共鳴だけ」に変えた（技の種類.md）。
+     * 封印を掛ける技は、まだ敵にも味方にも無い。
      *
      * ★ いまは効きが弱い。「攻撃」コマンドは技とは別で、
      *   normalAttack は PP0・威力0 だが、序盤の技は威力10〜15しかない。
@@ -146,9 +150,10 @@
       se: "statusSeal",
       duration: { min: 2, max: 5 },
       curable: false,
-      blocksSkills: true,
-      message: "{name} は技をだせなくなった",
-      blockMessage: "{name} は技が使えない",
+      // 止める技の種類（data/categories.js の skillKind）。blocksSkills: true なら技すべて
+      blocksSkillKinds: ["resonance"],
+      message: "{name} は共鳴の技をだせなくなった",
+      blockMessage: "{name} は共鳴の技が使えない",
       cureMessage: "{name} の封印が解けた。"
     },
 

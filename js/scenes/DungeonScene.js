@@ -102,14 +102,6 @@
     return result;
   }
 
-  /** テンプレートの {key} を values の値で置き換える（他の画面と同じ書き方） */
-  function fill(template, values) {
-    if (!template) return "";
-    return template.replace(/\{(\w+)\}/g, function (match, key) {
-      return (values[key] !== undefined) ? values[key] : match;
-    });
-  }
-
   /** そのマスが一覧に含まれているか */
   function occupied(list, col, row) {
     for (var i = 0; i < (list || []).length; i++) {
@@ -1117,10 +1109,11 @@
     this.renderer.rect(x0, y0, boxW, pad * 2 + rowHeight * members.length,
       style.bg || "rgba(0,0,0,0.6)");
 
-    // HPの数値を右端に置くので、名前と印はその手前までしか使えない
+    // HPの数値を右端に置くので、名前と印はその手前までしか使えない。
+    // 能力値は 9999 まで（data/growth.js の statCap）なので、4桁ぶんの幅を空けておく
     ctx.font = font;
     var hpRight = x0 + boxW - pad;
-    var nameLimit = hpRight - ctx.measureText("000/000").width - 8;
+    var nameLimit = hpRight - ctx.measureText("0000/0000").width - 8;
 
     for (var i = 0; i < members.length; i++) {
       var m = members[i];

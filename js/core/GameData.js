@@ -62,11 +62,24 @@
   GameData.prototype.getSkill       = function (id) { return this.skills[id]   || null; };
   GameData.prototype.getStatus      = function (id) { return this.statuses[id] || null; };
   GameData.prototype.getItem        = function (id) { return this.items[id]    || null; };
-  GameData.prototype.getAbility     = function (id) { return this.abilities[id]|| null; };
   GameData.prototype.getNature      = function (id) { return this.natures[id]  || null; };
-  GameData.prototype.getElement     = function (id) { return this.elements[id] || null; };
-  GameData.prototype.getBoss        = function (id) { return this.bosses[id]   || null; };
-  GameData.prototype.getSprite      = function (id) { return this.sprites[id]  || null; };
+
+  /** 技の種類（data/categories.js の skillKind）。種類を持たない技（通常攻撃）は null */
+  GameData.prototype.getSkillKind = function (skill) {
+    if (!skill || !skill.kind) return null;
+    return (this.categories.skillKind || {})[skill.kind] || null;
+  };
+
+  /**
+   * 技の決まり（evadable / canCritical など）を読む。
+   * 技に書いてあればそれを、無ければ種類の rules を使う（ブレスはよけられない、など）。
+   */
+  GameData.prototype.getSkillRule = function (skill, key) {
+    if (!skill) return undefined;
+    if (skill[key] !== undefined) return skill[key];
+    var kind = this.getSkillKind(skill);
+    return (kind && kind.rules) ? kind.rules[key] : undefined;
+  };
 
   NS.GameData = GameData;
 })(window.MyGame);

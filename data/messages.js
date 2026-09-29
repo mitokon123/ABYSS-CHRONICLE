@@ -131,10 +131,18 @@
       // 画面上部の発動の札（強化・弱体・特性・加護が働いたとき）
       popupStatUp:   "{stat}上昇",                              // stat
       popupStatDown: "{stat}低下",                              // stat
-      popupStats:    { hp: "HP", attack: "攻撃力", defense: "防御力", speed: "素早さ", pp: "PP", other: "能力" },
+      popupStats:    { hp: "HP", attack: "攻撃力", defense: "防御力", speed: "素早さ", pp: "PP",
+                       accuracy: "命中", other: "能力" },
       popupPartyAll: "仲間全員",
       popupEnemyAll: "敵全員",
       popupEnemyPrefix: "敵の",   // 札の持ち主が敵のとき、名前の前に付ける
+
+      // レベルアップの結果の窓（能力名は上の popupStats を使う）
+      levelResultTitle:   "{name}　Lv{from} → Lv{to}",   // name, from, to
+      levelResultStat:    "{before} → {after}",           // before, after
+      levelResultUp:      "(+{n})",                       // n
+      levelResultLearned: "新しく覚えた技",
+      levelResultHint:    "決定: 閉じる",
 
       // ターンの頭
       turnPrompt:  "どうする?",
@@ -334,8 +342,6 @@
       confirmResume:        "スロット{n} の続きを再開しますか?",     // n
       confirmResumeBody:    "{place} から再開します",                // place
       confirmResumeNote:    "※ 再開すると中断したところは消えます",
-      // 中断したファイルを「つづきから」で選んだとき（中断のほうが新しいので、そこから）
-      resumeNote:           "中断したところから再開します",
       yes: "はい",
       no:  "いいえ",
 
@@ -373,7 +379,6 @@
       copied:  "コピーしました",
       moved:   "移しました",
       deleted: "削除しました",
-      empty2:  "",
       sameSlot:"同じファイルは選べません",
       error:   "うまくいきませんでした",
 
@@ -582,8 +587,11 @@
       unknownSkill: "まだ見たことがない技。",
       ownerLabel:   "持っているモンスター",
       learnerLabel: "覚えるモンスター",
+      // 絆の報酬で覚える技（専用技）は、レベルの代わりにこう出す
+      learnByBond:  "絆で覚える",
       powerLabel:   "威力",
       powerNormal:  "通常攻撃と同じ",
+      skillKindLabel: "種類",
       modifierLabel:"効果",
       durationLabel:"{n}ターン",       // n
       selfTarget:   "（自分にかける）",
@@ -603,6 +611,7 @@
       familyLabel:  "分類",
       elementLabel: "属性",
       scoutLabel:   "スカウト率",
+      maxLevelLabel:"レベル上限",   // 仲間にした種族だけ出す
       resistanceLabel: "耐性",
       // アイテムの出どころ（落とすモンスター・宝箱）。会っていない相手は名前と確率を伏せる
       sourceLabel:  "手に入る場所",
@@ -834,12 +843,19 @@
       hintReorder: "↑↓: 移動先を選ぶ    決定: そこへ入れ替え    Esc: やめる",
       hintStorageEmpty: "預けている仲間はいない    ←→: パーティへ",
       hintEquip:   "↑↓: 選択   決定: 着ける / 外す   Esc: 戻る",
-      hintInspect: "↑↓: 別の仲間を見る    決定・愛情度を押す: 愛情度の詳細    Esc: 一覧へ戻る",
+      hintInspect: "↑↓: 別の仲間    ←→: ページ切替    決定・愛情度を押す: 愛情度の詳細    Esc: 戻る",
+      // 様子を見るのページ（左上の札）。モンスター説明は図鑑と同じ説明と、愛情度の記録
+      inspectPageStats: "ステータス",
+      inspectPageNotes: "モンスター説明",
+      notesNoRecords:   "（関係が深まると、記録が書き足されていく）",
       natureLabel: "性格",
       attackLabel: "攻撃",
       defenseLabel:"防御",
       speedLabel:  "素早さ",
       expLabel:    "次のLvまで",
+      expMaxLevel: "レベル上限",          // 上限に届いて、もう上がらないとき（「次のLvまで」の代わり）
+      levelWithMax: "Lv{level}/{max}",    // 「様子を見る」の名前の下。max はレベル上限（level, max）
+      totalExpLabel: "累計経験値",        // 「様子を見る」のステータスのページ
       skillLabel:  "技",
       abilityLabel:"特性",
       // 愛情度（「様子を見る」の名前の下）。count は「いま/次の段階に要る数」

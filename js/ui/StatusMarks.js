@@ -126,6 +126,7 @@
       // 与ダメージ・被ダメージは、上がり下がりの向きが逆になることに注意
       if (e.type === "damageDealt")    return { stat: "other", up: e.value > 1 };
       if (e.type === "damageTaken")    return { stat: "other", up: e.value < 1 };
+      if (e.type === "accuracyMultiplier") return { stat: "accuracy", up: e.value > 1 };
     }
     return { stat: null, up: false };
   };

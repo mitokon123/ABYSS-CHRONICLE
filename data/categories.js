@@ -4,6 +4,7 @@
  *
  * item     : アイテムの分類（回復・素材など）
  * monster  : モンスターの分類（系統。属性とは別の軸）
+ * skillKind: 技の種類（共鳴・ブレス・体技・斬撃・踊り）
  *
  * 共通の項目
  *   id    : 識別子
@@ -54,6 +55,30 @@
       damage: { id: "damage", name: "ダメージ", order: 2, color: "#e8542a" },
       // 戦闘中に何かを起こす特性（再生・放電・先手など）
       special: { id: "special", name: "特殊", order: 3, color: "#b48ce0" }
+    },
+
+    /**
+     * 技の種類（skills.js の kind）。通常攻撃はどれにも入らない。
+     *   rules : その種類の技すべてに付く決まり。技の側に同じ項目を書けば、そちらが優先
+     *           evadable: false … よけられない / canCritical: false … クリティカルが出ない
+     *   note  : 図鑑の技の「種類」の下に添える一言（15文字で折り返す）。rules や封印を変えたら直すこと
+     * 計算の係数は data/battle.js の damage.byKind、封印で止まる種類は data/statuses.js の seal。
+     * 特徴は 技の種類.md。
+     */
+    skillKind: {
+      // 技の威力に頼る。元の威力が高く、追加効果を持つものが多い。封印で止まるのはこの種類だけ
+      resonance: { id: "resonance", name: "共鳴", order: 1, color: "#b48ce0",
+                   note: "封印されると使えない" },
+      // 威力に頼る。PPが少なめ。状態異常や全体へのダメージ
+      breath:    { id: "breath",    name: "ブレス", order: 2, color: "#7fd9e8",
+                   rules: { evadable: false, canCritical: false },
+                   note: "よけられない・クリティカルなし" },
+      // 攻撃力も大きく関わる。属性技・強化／弱体の技がそろう
+      body:      { id: "body",      name: "体技", order: 3, color: "#e8a86a" },
+      // 攻撃力に大きく頼る。属性技や全体技もある
+      slash:     { id: "slash",     name: "斬撃", order: 4, color: "#e8542a" },
+      // 特殊効果が多く、攻め方もいろいろ
+      dance:     { id: "dance",     name: "踊り", order: 5, color: "#ffd75e" }
     }
   };
 })(window.MyGame);

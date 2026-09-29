@@ -428,7 +428,16 @@
       var selected = (i === this.index);
       if (selected) this._drawCursor(origin.x + 6, y, cursorAlpha, t.cursorColor);
 
-      this.panel.drawText(row.label, origin.x + 24, y,
+      // 右端の補助表示があるときは、名前がそこへ重ならないよう「…」で縮める
+      // （仲間の名前は8文字まで付けられ、HPは4桁まであるため）
+      var label = row.label;
+      if (row.right) {
+        ctx.font = t.smallFont || t.font || "14px monospace";
+        var rightWidth = ctx.measureText(row.right).width;
+        ctx.font = t.font || "14px monospace";
+        label = clipToWidth(ctx, label, textRight - rightWidth - 10 - (origin.x + 24));
+      }
+      this.panel.drawText(label, origin.x + 24, y,
         { color: selected ? t.cursorColor : (row.color || t.textColor) });
 
       // 右端の補助表示（所持数や状態など）。行ごとに色を変えられる
@@ -486,6 +495,17 @@
   };
 
   /** カーソルの濃さ。時計が無い、または設定が無ければ明滅しない */
+  /** 幅に収まらない文字列を切り詰めて「…」を付ける（呼ぶ前に ctx.font を合わせておく） */
+  function clipToWidth(ctx, text, maxWidth) {
+    text = String(text || "");
+    if (maxWidth <= 0 || ctx.measureText(text).width <= maxWidth) return text;
+    for (var len = text.length - 1; len > 0; len--) {
+      var cut = text.slice(0, len) + "…";
+      if (ctx.measureText(cut).width <= maxWidth) return cut;
+    }
+    return "…";
+  }
+
   function cursorAlphaFor(theme, clock) {
     var pulse = theme.cursorPulse;
     if (clock === undefined || clock === null || !pulse || !NS.Motion) return 1;

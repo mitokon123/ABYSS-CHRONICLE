@@ -191,19 +191,6 @@
       bubble:      { file: "se_awa.wav",          volume: 0.45 },   // あわ
       bodyPress:   { file: "se_bodypress.wav",    volume: 0.45 },   // ボディプレス
       venomSting:  { file: "se_dokubari.wav",     volume: 0.45 },   // どくばり
-      // 火の合成音（波形から作る見本）。file を外して synth を残せばこの音に戻る。
-      // 中身：膨らむ「ゴォッ」（帯域を上へ動かす風）＋ 低いうなり ＋ 弾ける「パチッ」を数回 ＋ 余韻の「シャー」
-      fireSynth: { file: null, volume: 0.45, synth: [
-        { kind: "noise", filterType: "bandpass", filterFrom: 500, filterTo: 2600, attack: 0.10, hold: 0.12, duration: 0.50, gain: 0.55 },
-        { kind: "noise", filterFrom: 260, filterTo: 110, attack: 0.05, hold: 0.20, duration: 0.55, gain: 0.6 },
-        { kind: "tone", wave: "sawtooth", from: 95, to: 55, attack: 0.04, hold: 0.15, duration: 0.50, gain: 0.12 },
-        { kind: "noise", filterType: "highpass", filterFrom: 3500, start: 0.06, duration: 0.025, gain: 0.3 },
-        { kind: "noise", filterType: "highpass", filterFrom: 3000, start: 0.13, duration: 0.03,  gain: 0.28 },
-        { kind: "noise", filterType: "highpass", filterFrom: 3800, start: 0.19, duration: 0.02,  gain: 0.3 },
-        { kind: "noise", filterType: "highpass", filterFrom: 3200, start: 0.27, duration: 0.03,  gain: 0.25 },
-        { kind: "noise", filterType: "highpass", filterFrom: 3600, start: 0.34, duration: 0.02,  gain: 0.22 },
-        { kind: "noise", filterType: "highpass", filterFrom: 2500, start: 0.30, duration: 0.28,  gain: 0.18 }
-      ] },
 
       // 状態異常。data/statuses.js の se から指す（掛かった瞬間と毒のダメージで鳴る）。
       // ★ 即死は、この音が「倒れる」音を兼ねる（直後の faint は鳴らさない。BattleScene）

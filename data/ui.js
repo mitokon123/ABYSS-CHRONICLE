@@ -241,6 +241,22 @@
         }
       },
 
+      /**
+       * レベルアップの結果（画面中央の窓）。上がった能力を「攻撃力 50 → 55 (+5)」の形で並べ、
+       * 覚えた技があれば下に出す。決定・Esc・クリックで閉じる。複数が上がったら1体ずつ順に出す。
+       * 高さは行数から決まる（y は上端）
+       */
+      levelResult: {
+        w: 380, y: 96, padding: 18, lineHeight: 24,
+        labelWidth: 96,     // 「攻撃力」など能力名の欄の幅
+        numberWidth: 150,   // 「50 → 55」の欄の幅（そのあとに「(+5)」）
+        dim: "rgba(0,0,0,0.45)",
+        background: "#0a0f1c",  // 窓の中を塗りつぶす色（後ろのHPバーが透けないように）
+        upColor: "#5fd18c",     // 上がった数（+5）
+        sameColor: "#6b7590",   // 上がらなかった能力
+        skillColor: "#ffd75e"   // 覚えた技の名前
+      },
+
       // メッセージ欄
       message: { x: 20, y: 428, w: 760, h: 152 },
       messageLines: 6,  // 一度に表示する行数（超えると送り待ちになる）
@@ -249,7 +265,8 @@
       // 技・道具の一覧
       subMenu: { x: 280, y: 428, w: 250, h: 152, visibleRows: 5, rowHeight: 26 },
       // 選んでいる技・道具の内容（メッセージ欄の左側に出す）
-      skillInfo: { charsPerLine: 16, elementOffsetX: 110 },
+      //   kindOffsetX … 技の種類（[共鳴] など）を出す位置。属性の札の右
+      skillInfo: { charsPerLine: 16, elementOffsetX: 110, kindOffsetX: 150 },
 
       /**
        * 「状態を見る」の欄（メッセージ欄に重ねて出す）。
@@ -409,7 +426,7 @@
       title:    { x: 48, y: 62, font: "26px monospace", color: "#e6ecff" },
       subtitle: { x: 48, y: 88, font: "13px monospace", color: "#7f8db8" },
 
-      list:   { x: 48, y: 122, w: 400, h: 372, rowHeight: 26, headerHeight: 26, visibleRows: 12 },
+      list:   { x: 48, y: 122, w: 400, h: 372, rowHeight: 26, visibleRows: 12 },
       detail: { x: 470, y: 122, w: 290, h: 372 },
 
       notice: { x: 400, y: 526 },
@@ -672,7 +689,7 @@
       // タブは6つ（モンスター／アイテム／特性／技／性格／加護）
       // 幅は 48 + 112×6 + 6×5 = 750 で、右端に余白が残るようにしてある
       tabs:   { x: 48, y: 108, w: 112, h: 30, gap: 6 },
-      list:   { x: 48, y: 152, w: 400, h: 342, rowHeight: 26, headerHeight: 26, visibleRows: 11 },
+      list:   { x: 48, y: 152, w: 400, h: 342, rowHeight: 26, visibleRows: 11 },
       // 右の詳細欄。入りきらない説明は決定キーでスクロールして読む
       //   charsPerLine … 説明文を折り返す文字数
       detail: { x: 470, y: 152, w: 290, h: 342, spriteSize: 72, charsPerLine: 18 },
@@ -883,7 +900,8 @@
       // 左上のパーティ表示（名前・状態異常の印・HP）。
       //   高さは書かない。仲間の人数から決まる（DungeonScene._renderPartyStatus）
       //   width … 枠の横幅。名前が長いときは「…」で切り詰める
-      partyStatus: { x: 0, y: 0, width: 196, padding: 8, rowHeight: 16,
+      // width は、名前8文字と HP「9999/9999」（4桁。data/growth.js の statCap）が並んで入る幅
+      partyStatus: { x: 0, y: 0, width: 212, padding: 8, rowHeight: 16,
                      bg: "rgba(0,0,0,0.6)", color: "#c8d0e8", font: "12px monospace" },
       infoBar:   { height: 24, bg: "rgba(0,0,0,0.7)", color: "#c8d0e8", font: "13px monospace" },
       notice:    { height: 40, bg: "rgba(8,10,20,0.92)", color: "#ffd75e", font: "15px monospace" },
@@ -965,6 +983,10 @@
        */
       inspect: {
         box:    { x: 32, y: 48, w: 736, h: 470 },
+        // 左上のページの札（ステータス ／ モンスター説明）。枠の左上からのずれ
+        tabs:   { x: 16, y: 24, gap: 20, font: "14px monospace" },
+        // モンスター説明のページ。絵と名前の右に、図鑑の説明と愛情度の記録を出す
+        notes:  { x: 268, y: 104, lineHeight: 22, font: "14px monospace" },
         sprite: { x: 150, y: 160, size: 128 },
         name:   { y: 246 },
         left:   { x: 64, y: 316, lineHeight: 20 },
