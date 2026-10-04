@@ -112,6 +112,9 @@
  *   min / max : 落とす個数の範囲（省略時は1個）
  * sprite      : スプライトid（data/sprites_〇〇.js を参照）
  * motion      : ふだんの絵の動かし方（data/motions.js のid）。省略すると動かない
+ * poses       : 姿の名前 → 絵のid（RC-1）。動きの poses がこの名前で絵を切り替える
+ *   例 poses: { squash: "slimeSquash", stretch: "slimeStretch", sleep: "slimeSleep" }
+ *   sleep を書くと、眠っている間その絵になる（書かない種族はふつうの絵のまま脱力する）
  * motions     : 場面ごとの動き（data/motions.js のid）。書いた場面だけ動く
  *     attack  … 技を出すとき      hit     … 攻撃を受けたとき
  *     faint   … 倒れるとき        heal    … 回復したとき
@@ -168,7 +171,12 @@
         { level: 8, skill: "aqua" },
         // 最初の1体が、育てると回復役にもなる。
         // 深層（推奨Lv16）に入るより手前で覚えるので、潜る前に頼れる
-        { level: 11, skill: "cure" }
+        { level: 11, skill: "cure" },
+        // 属性技の2段目（RC-1）。2段目はどの種族も Lv18 前後にそろえてある（data/skills.js の tier2）
+        { level: 18, skill: "wave" },
+        // 回復役としての伸び（RC-1・作者の指定）。毒沼に入るころに毒を治せる
+        { level: 18, skill: "cleanse" },
+        { level: 26, skill: "greaterCure" }
       ],
       abilities: ["tough"],
       expReward: 8,
@@ -179,14 +187,24 @@
       // コマ絵の見本。ふつうの姿を使い回すので、描き足したのは2枚だけ
       sprite: ["slimeStretch", "slime", "slimeStretch", "slimeSquash"],
       motion: "slimeIdle",
-      // 場面ごとの動き（見本）。書かない種族はその場面で動かない
+      // 姿（RC-1）。動き（data/motions.js）の poses が名前で指す絵。
+      //   squash 潰れた姿 ／ stretch 伸びた姿 ／ sleep 目を閉じて脱力した姿（眠り）
+      poses: { squash: "slimeSquash", stretch: "slimeStretch", sleep: "slimeSleep" },
+      // 場面ごとの動き（RC-1 でスライム専用に作った。姿を切り替えながら動く）
       motions: {
-        attack:  "lunge",
-        hit:     "recoil",
-        faint:   "fall",
-        heal:    "recover",
-        guard:   "guard",
-        levelUp: "cheerHop"
+        attack:    "slimeTackle",
+        resonance: "slimeResonate",
+        breath:    "slimeBreath",
+        technique: "slimeTechnique",
+        buff:      "slimeBuff",
+        hit:       "slimeHit",
+        dodge:     "slimeDodge",
+        faint:     "fall",
+        heal:      "recover",
+        guard:     "guard",
+        levelUp:   "slimeCheer",
+        // 眠っている間（data/statuses.js の sleep.idleMotion を種族ごとに差し替える）
+        sleeping:  "slimeSleeping"
       }
     },
     batty: {
@@ -237,10 +255,26 @@
       expReward: 8,
       goldReward: 5,
       drops: [],
-      sprite: "batty",
+      // 羽ばたきのコマ絵（RC-1）。振り上げ → 水平 → 振り下ろし → 水平
+      sprite: ["battyUp", "batty", "battyDown", "batty"],
       motion: "batFlutter",
-      // 飛んでいるので、喜ぶときは跳ねずに一回転し、倒れるときは傾いて落ちる
-      motions: { faint: "tumble", levelUp: "cheerSpin" }
+      // 姿（RC-1）。up 翼を振り上げ ／ down 振り下ろし ／ sleep 目を閉じた姿
+      poses: { up: "battyUp", down: "battyDown", sleep: "battySleep" },
+      // 場面ごとの動き（RC-1 でコウモリ専用に作った）。
+      // 飛んでいるので跳ねない。喜ぶときは羽ばたきながら一回転し、倒れるときは傾いて落ちる。
+      // 眠るときは天井から下がるように逆さになる
+      motions: {
+        attack:    "batBite",
+        resonance: "batResonate",
+        breath:    "batBreath",
+        technique: "batTechnique",
+        buff:      "batBuff",
+        hit:       "batHit",
+        dodge:     "batDodge",
+        faint:     "tumble",
+        levelUp:   "batCheer",
+        sleeping:  "batSleeping"
+      }
     },
     // --- 苔むす坑道のモンスター ---
 
@@ -284,7 +318,9 @@
       spawnRate: 0.9,
       learnset: [
         { level: 1, skill: "tackle" },
-        { level: 4, skill: "bite" }
+        { level: 4, skill: "bite" },
+        // RC-1・作者の指定。坑道の敵は Lv4 までなので、野生のコケネズミは使ってこない
+        { level: 14, skill: "cure" }
       ],
       abilities: ["guts"],
       expReward: 11,
@@ -294,7 +330,12 @@
       ],
       sprite: "mossRat",
       motion: "ratHop",
-      motions: { faint: "fall" }
+      poses: { crouch: "mossRatCrouch", stretch: "mossRatStretch", sleep: "mossRatSleep" },
+      motions: {
+        attack: "ratBite", resonance: "ratResonate", breath: "ratBreath",
+        technique: "ratTechnique", buff: "ratBuff", hit: "ratHit", dodge: "ratDodge",
+        faint: "fall", levelUp: "ratCheer", sleeping: "ratSleeping"
+      }
     },
 
     rocky: {
@@ -334,7 +375,8 @@
       spawnRate: 0.6,
       learnset: [
         { level: 1, skill: "tackle" },
-        { level: 5, skill: "rockThrow" }
+        { level: 5, skill: "rockThrow" },
+        { level: 18, skill: "rockSpike" }
       ],
       abilities: ["earthPower"],
       expReward: 12,
@@ -347,8 +389,14 @@
       ],
       sprite: "rocky",
       motion: "rockIdle",
-      // 岩なので、倒れるというより崩れる
-      motions: { faint: "crumble" }
+      // 目だけを変えた姿（RC-1）。細目＝力を溜める顔、閉じた目＝眠り・被弾
+      poses: { narrow: "rockyNarrow", wince: "rockySleep", sleep: "rockySleep" },
+      // 岩なので潰れも伸びもしない。転がる・揺れる・重く跳ねる（RC-1）。倒れるというより崩れる
+      motions: {
+        attack: "rockTackle", resonance: "rockResonate", breath: "rockBreath",
+        technique: "rockTechnique", buff: "rockBuff", hit: "rockHit", dodge: "rockDodge",
+        faint: "crumble", levelUp: "rockCheer", sleeping: "rockSleeping"
+      }
     },
 
     glowBug: {
@@ -402,10 +450,17 @@
       drops: [
         { item: "glowDust", rate: 0.25, min: 1, max: 1 }
       ],
-      sprite: "glowBug",
+      // ふだんは翅のコマ絵で羽ばたく（RC-1）。上げ → 水平 → 下げ → 水平
+      sprite: ["glowBugUp", "glowBug", "glowBugDown", "glowBug"],
       motion: "bugGlow",
+      // 姿（RC-1）。翅の上げ下げ・尾が明るく光る・目を閉じて光が弱まる（眠り）
+      poses: { up: "glowBugUp", down: "glowBugDown", bright: "glowBugBright", sleep: "glowBugSleep" },
       // 飛んでいるので落ちる
-      motions: { faint: "tumble" }
+      motions: {
+        attack: "bugDive", resonance: "bugResonate", breath: "bugBreath",
+        technique: "bugTechnique", buff: "bugBuff", hit: "bugHit", dodge: "bugDodge",
+        faint: "tumble", levelUp: "bugCheer", sleeping: "bugSleeping"
+      }
     },
 
     sporin: {
@@ -443,7 +498,8 @@
       spawnRate: 0.6,
       learnset: [
         { level: 1, skill: "tackle" },
-        { level: 5, skill: "darkSpore" }
+        { level: 5, skill: "darkSpore" },
+        { level: 18, skill: "darkNebula" }
       ],
       abilities: ["wildInstinct"],
       expReward: 16,
@@ -453,8 +509,14 @@
       ],
       sprite: "sporin",
       motion: "sporeSway",
-      // きのこなので、しぼむように崩れる
-      motions: { faint: "crumble" }
+      // 姿（RC-1）。柄の行を抜き差しした 縮む・伸びる と、縮んで目を閉じた眠り
+      poses: { squash: "sporinSquash", stretch: "sporinStretch", sleep: "sporinSleep" },
+      // 根が生えているので大きくは動かない。胞子の技はくしゃみで撒く。きのこなので、しぼむように崩れる
+      motions: {
+        attack: "shroomBonk", resonance: "shroomResonate", breath: "shroomSneeze",
+        technique: "shroomTechnique", buff: "shroomBuff", hit: "shroomHit", dodge: "shroomDodge",
+        faint: "crumble", levelUp: "shroomCheer", sleeping: "shroomSleeping"
+      }
     },
 
     // ボス用の種族。通常のモンスターと同じ形式なので、
@@ -505,7 +567,8 @@
       spawnRate: 0,      // 通常のエンカウントでは出ない
       learnset: [
         { level: 1, skill: "tackle" },
-        { level: 5, skill: "rockThrow" }
+        { level: 5, skill: "rockThrow" },
+        { level: 18, skill: "rockSpike" }
       ],
       abilities: ["thickSkin"],
       expReward: 90,
@@ -518,7 +581,14 @@
       // （坑道1.15 → 亀裂1.25 → 深層1.4）。表示だけで、ステータスには効かない
       sizeScale: 1.15,
       motion: "golemBreathe",
-      motions: { faint: "crumble" }
+      // 目だけを変えた姿（RC-1）。細目＝溜める・被弾、眠り＝目の光が消える
+      poses: { narrow: "mossGolemNarrow", sleep: "mossGolemSleep" },
+      // 石の巨人なので、溜めが長く、ゆっくり重い。飛び跳ねない（RC-1）
+      motions: {
+        attack: "golemSlam", resonance: "golemResonate", breath: "golemBreath",
+        technique: "golemTechnique", buff: "golemBuff", hit: "golemHit", dodge: "golemDodge",
+        faint: "crumble", levelUp: "golemCheer", sleeping: "golemSleeping"
+      }
     },
 
     // 灼熱の亀裂の主。フレイミンが雑魚として出るので、専用の種族を用意した
@@ -571,7 +641,8 @@
         { level: 4, skill: "bite" },
         { level: 8, skill: "ember" },
         // この獣だけが使う範囲技。仲間にすると、育てて初めて手に入る
-        { level: 10, skill: "fireBreath" }
+        { level: 10, skill: "fireBreath" },
+        { level: 18, skill: "flame" }
       ],
       abilities: ["fireSoul"],
       expReward: 115,
@@ -579,11 +650,22 @@
       drops: [
         { item: "blazingFang", rate: 1.0, min: 1, max: 1 }
       ],
-      sprite: "magmaBeast",
+      // 待機は [元, IdleA, 元, IdleB]：尻尾の炎が傾く・伸びる、たてがみの先がなびく（RC-1）
+      sprite: ["magmaBeast", "magmaBeastIdleA", "magmaBeast", "magmaBeastIdleB"],
       sizeScale: 1.25,
       motion: "beastBreathe",
-      // 炎なので、燃え尽きるように崩れる
-      motions: { faint: "crumble" }
+      // 頭・あご・脚・尻尾を動かした姿（RC-1 の作り直し）。rage・blaze は色だけの姿（今は使っていない）
+      poses: { rage: "magmaBeastRage", blaze: "magmaBeastBlaze", sleep: "magmaBeastSleep",
+               idleA: "magmaBeastIdleA", idleB: "magmaBeastIdleB",
+               crouch: "magmaBeastCrouch", leap: "magmaBeastLeap", bite: "magmaBeastBite",
+               runA: "magmaBeastRunA", runB: "magmaBeastRunB",
+               howl: "magmaBeastHowl", breath: "magmaBeastBreath", flinch: "magmaBeastFlinch" },
+      // 捕食者なので溜めは短く、飛びかかりは大きい（RC-1）。炎なので、燃え尽きるように崩れる
+      motions: {
+        attack: "wolfPounce", resonance: "wolfResonate", breath: "wolfBreath",
+        technique: "wolfTechnique", buff: "wolfBuff", hit: "wolfHit", dodge: "wolfDodge",
+        faint: "crumble", levelUp: "wolfCheer", sleeping: "wolfSleeping"
+      }
     },
 
     kingSlime: {
@@ -631,7 +713,9 @@
         { level: 2, skill: "bodyPress" },
         { level: 6, skill: "bite" },
         // 水の王なので水も使う。ローテーションで撃つので、必ず覚えている必要がある
-        { level: 8, skill: "aqua" }
+        { level: 8, skill: "aqua" },
+        // 主としてのローテーション（data/bosses.js）には入れていない。仲間にして育てると覚える
+        { level: 18, skill: "wave" }
       ],
       abilities: ["kingsDignity"],
       expReward: 80,
@@ -640,11 +724,21 @@
       drops: [
         { item: "crownShard", rate: 1.0, min: 1, max: 1 }
       ],
-      sprite: "kingSlime",
+      // 待機は [元, LeanL, 元, LeanR]：体が左右に揺れ、王冠が傾く（RC-1）
+      sprite: ["kingSlime", "kingSlimeLeanL", "kingSlime", "kingSlimeLeanR"],
       // 最後の主なので、ヨミリュウ（1.35）より大きい
       sizeScale: 1.4,
       motion: "kingWobble",
-      motions: { faint: "fall" }
+      // 姿（RC-1 の作り直し）。王冠・目・口・ゼリーの体を動かした絵。縦に伸びるのは scaleY で足す（王冠が枠の上まであるため）
+      poses: { squash: "kingSlimeSquash", sleep: "kingSlimeSleep",
+               stretch: "kingSlimeStretch", pop: "kingSlimePop", roar: "kingSlimeRoar",
+               leanL: "kingSlimeLeanL", leanR: "kingSlimeLeanR",
+               ouch: "kingSlimeOuch", calm: "kingSlimeCalm", happy: "kingSlimeHappy" },
+      motions: {
+        attack: "kingTackle", resonance: "kingResonate", breath: "kingBreath",
+        technique: "kingTechnique", buff: "kingBuff", hit: "kingHit", dodge: "kingDodge",
+        faint: "fall", levelUp: "kingCheer", sleeping: "kingSleeping"
+      }
     },
     // --- 灼熱の亀裂のモンスター ---
 
@@ -694,7 +788,10 @@
         { level: 1, skill: "tackle" },
         // 出現レベルが4〜8なので、ほとんどの個体がウィンドを持って出てくる。
         // プレイヤーがこの場所で初めて風の技に出会う
-        { level: 4, skill: "gust" }
+        { level: 4, skill: "gust" },
+        // RC-1・作者の指定。亀裂の敵は Lv10 までなので、野生のハイバネは使ってこない
+        { level: 15, skill: "cure" },
+        { level: 18, skill: "gale" }
       ],
       abilities: ["windFlow"],
       expReward: 15,
@@ -704,10 +801,20 @@
         // 買えない装備。ゲーム中で唯一、風の技が伸びる
         { item: "windCrest", rate: 0.13, min: 1, max: 1 }
       ],
-      sprite: "ashWing",
+      // ふだんは翼のコマ絵で羽ばたく（RC-1 の作り直し）。翼を付け根で回し、
+      // 立てた翼 → 外 → 斜め → 真横 → 振り下ろし → 戻る → 少し振り上げ、を1往復にしている
+      sprite: ["ashWing", "ashWingOut", "ashWingMid", "ashWingFlat", "ashWingDown",
+               "ashWingFlat", "ashWingMid", "ashWingOut", "ashWing", "ashWingUp"],
       // 体がひどく軽いので、羽ばたきは速いが体は熱に乗ってゆっくり漂う
       motion: "ashDrift",
-      motions: { faint: "tumble", levelUp: "cheerSpin" }
+      // 姿（RC-1 の作り直し）。up（振り上げ）・out・mid・flat（真横）・down（振り下ろし）・fold（たたむ）・sleep
+      poses: { up: "ashWingUp", out: "ashWingOut", mid: "ashWingMid", flat: "ashWingFlat", down: "ashWingDown",
+               fold: "ashWingFold", sleep: "ashWingSleep" },
+      motions: {
+        attack: "ashDive", resonance: "ashResonate", breath: "ashBreath",
+        technique: "ashSwoop", buff: "ashBuff", hit: "ashHit", dodge: "ashDodge",
+        faint: "tumble", levelUp: "ashCheer", sleeping: "ashSleeping"
+      }
     },
 
     crackRock: {
@@ -748,7 +855,8 @@
       spawnRate: 0.6,
       learnset: [
         { level: 1, skill: "tackle" },
-        { level: 5, skill: "rockThrow" }
+        { level: 5, skill: "rockThrow" },
+        { level: 18, skill: "rockSpike" }
       ],
       abilities: ["brittleShell"],
       // 硬くて時間がかかるぶんゴールドは多いが、経験値は控えめ。
@@ -760,8 +868,14 @@
       ],
       sprite: "crackRock",
       motion: "crackPulse",
-      // 岩なので、倒れるというより崩れる
-      motions: { faint: "crumble" }
+      // 色だけを塗り替えた姿（RC-1）。細目・ひびの熱が噴き出す・目を閉じてひびが冷える（眠り）
+      poses: { narrow: "crackRockNarrow", hot: "crackRockHot", sleep: "crackRockSleep" },
+      // 岩なので潰れも伸びもしない。力を込めるとひびが燃える（RC-1）。倒れるというより崩れる
+      motions: {
+        attack: "crackTackle", resonance: "crackResonate", breath: "crackBreath",
+        technique: "crackTechnique", buff: "crackBuff", hit: "crackHit", dodge: "crackDodge",
+        faint: "crumble", levelUp: "crackCheer", sleeping: "crackSleeping"
+      }
     },
 
     magmaCrab: {
@@ -809,7 +923,8 @@
         { level: 1, skill: "tackle" },
         // この場所で初めて「守りを固める敵」に出会う
         { level: 4, skill: "harden" },
-        { level: 7, skill: "ember" }
+        { level: 7, skill: "ember" },
+        { level: 18, skill: "flame" }
       ],
       abilities: ["hardShell"],
       // 硬くて時間がかかるわりに実入りは薄い。稼ぎ相手はヒビイワのほう
@@ -820,10 +935,21 @@
         { item: "scorchedShell", rate: 0.28, min: 1, max: 1 },
         { item: "oreShard", rate: 0.22, min: 1, max: 1 }
       ],
-      sprite: "magmaCrab",
+      // 待機は [元, LegsA, 元, LegsB]：脚が足踏みし、目の柄がきょろきょろする（RC-1）
+      sprite: ["magmaCrab", "magmaCrabLegsA", "magmaCrab", "magmaCrabLegsB"],
       motion: "crabIdle",
-      // 殻なので、倒れるというより砕ける
-      motions: { faint: "crumble" }
+      // 姿（RC-1）。目を引っ込める・ハサミが白熱する・殻が固まる（マグマが冷える。眠り・こうか）・ハサミを開く。
+      // 作り直しで、ハサミを持ち上げる・挟む・横歩き・足踏みを足した
+      poses: { hide: "magmaCrabHide", glow: "magmaCrabGlow", cool: "magmaCrabCool", sleep: "magmaCrabCool",
+               open1: "magmaCrabOpen1", open2: "magmaCrabOpen2",
+               clawUp: "magmaCrabClawUp", snap: "magmaCrabSnap", runA: "magmaCrabRunA", runB: "magmaCrabRunB",
+               legsA: "magmaCrabLegsA", legsB: "magmaCrabLegsB" },
+      // カニなので横歩き。攻めるときはハサミが白熱し、怖がりなので被弾では目を引っ込める（RC-1）。殻なので、砕ける
+      motions: {
+        attack: "crabPinch", resonance: "crabResonate", breath: "crabBreath",
+        technique: "crabScuttle", buff: "crabHarden", hit: "crabHit", dodge: "crabDodge",
+        faint: "crumble", levelUp: "crabCheer", sleeping: "crabSleeping"
+      }
     },
 
     cinderling: {
@@ -869,7 +995,8 @@
       spawnRate: 1.1,
       learnset: [
         { level: 1, skill: "tackle" },
-        { level: 3, skill: "ember" }
+        { level: 3, skill: "ember" },
+        { level: 18, skill: "flame" }
       ],
       abilities: ["firstStrike"],
       expReward: 12,
@@ -881,7 +1008,14 @@
       sprite: "cinderling",
       // 燃えさしの炭なので、火の勢いが安定せず小刻みに揺れる
       motion: "emberIdle",
-      motions: { faint: "crumble" }
+      // 姿（RC-1）。炎が燃え上がる・強まる（攻め）・縮む（被弾）・消えかけて目を閉じる（眠り）
+      poses: { flare: "cinderlingFlare", hot: "cinderlingHot", small: "cinderlingSmall", sleep: "cinderlingSleep" },
+      // 小さくてちょろちょろしている。炭の体は動かさず、炎と目で見せる（RC-1）
+      motions: {
+        attack: "cinderTackle", resonance: "cinderResonate", breath: "cinderBreath",
+        technique: "cinderRoll", buff: "cinderBuff", hit: "cinderHit", dodge: "cinderDodge",
+        faint: "crumble", levelUp: "cinderCheer", sleeping: "cinderSleeping"
+      }
     },
 
     flamin: {
@@ -922,17 +1056,27 @@
       spawnRate: 0.5,
       learnset: [
         { level: 1, skill: "tackle" },
-        { level: 3, skill: "ember" }
+        { level: 3, skill: "ember" },
+        { level: 18, skill: "flame" }
       ],
       abilities: ["fireSoul"],
       expReward: 15,
       goldReward: 8,
       drops: [],
-      sprite: "flamin",
+      // 待機は [元, StepL, 元, StepR]：跳ねるたびに脚を交互に上げて足踏みする（RC-1 の作り直し。スミビと見分けるため）
+      sprite: ["flamin", "flaminStepL", "flamin", "flaminStepR"],
       // 気性が荒いので、落ち着かず細かく跳ねる
       motion: "flameHop",
-      // 炎なので、燃え尽きるようにその場で小さくなる
-      motions: { faint: "crumble" }
+      // 姿（RC-1）。炎が燃え上がる・赤くなる（怒り）・縮む（被弾）・暗い熾火で目を閉じる（眠り）。
+      // 作り直しで、脚を動かす姿（足踏み・身を沈める・脚をたたんで跳ぶ）を足した
+      poses: { flare: "flaminFlare", rage: "flaminRage", small: "flaminSmall", sleep: "flaminSleep",
+               stepL: "flaminStepL", stepR: "flaminStepR", crouch: "flaminCrouch", air: "flaminAir" },
+      // 気性が荒い獣なので、溜めは短く飛びかかりは大きい。攻めるときは炎が赤くなる（RC-1）。炎なので、燃え尽きるようにその場で小さくなる
+      motions: {
+        attack: "flaminBite", resonance: "flaminResonate", breath: "flaminBreath",
+        technique: "flaminPounce", buff: "flaminBuff", hit: "flaminHit", dodge: "flaminDodge",
+        faint: "crumble", levelUp: "flaminCheer", sleeping: "flaminSleeping"
+      }
     },
 
     // --- 静寂の深層の在来種 ---
@@ -980,7 +1124,10 @@
       spawnRate: 1.0,
       learnset: [
         { level: 1, skill: "tackle" },
-        { level: 5, skill: "darkSpore" }
+        { level: 5, skill: "darkSpore" },
+        { level: 18, skill: "darkNebula" },
+        // RC-1・作者の指定。深層の敵は Lv15 までなので、野生のヨドミは使ってこない
+        { level: 19, skill: "cleanse" }
       ],
       abilities: ["soulDrain"],
       expReward: 17,
@@ -993,8 +1140,14 @@
       ],
       sprite: "murkling",
       motion: "murkFloat",
-      // 闇なので、崩れるというより沈んで消える
-      motions: { faint: "fall" }
+      // 姿（RC-1）。目を細める・瞳が光る・闇が明るい紫に輝く・目を閉じて煙が短く暗くなる（眠り）
+      poses: { narrow: "murklingNarrow", glare: "murklingGlare", glow: "murklingGlow", sleep: "murklingSleep" },
+      // 闇そのもので実体が薄い。消える・にじむ動き（RC-1）。崩れるというより沈んで消える
+      motions: {
+        attack: "murkBump", resonance: "murkResonate", breath: "murkBreath",
+        technique: "murkSeep", buff: "murkBuff", hit: "murkHit", dodge: "murkDodge",
+        faint: "fall", levelUp: "murkCheer", sleeping: "murkSleeping"
+      }
     },
 
     // 深層の妨害役。キノコン（坑道の闇・植物系）の深層版にあたる。
@@ -1045,7 +1198,11 @@
       learnset: [
         { level: 1, skill: "tackle" },
         { level: 3, skill: "sapStrength" },
-        { level: 8, skill: "darkSpore" }
+        { level: 8, skill: "darkSpore" },
+        // RC-1・作者の指定。★ 深層の B3F・B4F（Lv13〜15）の野生のカゲヅタは、仲間をキュアで治してくる
+        { level: 13, skill: "cure" },
+        { level: 18, skill: "darkNebula" },
+        { level: 19, skill: "cleanse" }
       ],
       abilities: ["regen"],
       expReward: 22,
@@ -1056,7 +1213,14 @@
       sprite: "kageZuta",
       // 天井の裂け目からぶら下がっているので、蔦が伸び縮みして亜空間へ出入りする
       motion: "riftIdle",
-      motions: { faint: "fall" }
+      // 姿（RC-1）。葉を上げて目を細める・裂け目が輝く・葉が垂れる・葉を垂らして目を閉じ裂け目が暗くなる（眠り）
+      poses: { narrow: "kageZutaNarrow", glow: "kageZutaGlow", droop: "kageZutaDroop", sleep: "kageZutaSleep" },
+      // 天井の裂け目からぶら下がっているので、前後ではなく しなる・揺れる・伸び縮み（anchor: "top"）（RC-1）
+      motions: {
+        attack: "zutaLash", resonance: "zutaResonate", breath: "zutaBreath",
+        technique: "zutaSwing", buff: "zutaBuff", hit: "zutaHit", dodge: "zutaDodge",
+        faint: "fall", levelUp: "zutaCheer", sleeping: "zutaSleeping"
+      }
     },
 
     // ゲーム中で唯一、雷を扱うモンスター。
@@ -1110,7 +1274,9 @@
       spawnRate: 0.5,
       learnset: [
         { level: 1, skill: "tackle" },
-        { level: 6, skill: "thunderBolt" }
+        { level: 6, skill: "thunderBolt" },
+        // 2段目でいちばん重い全体技（麻痺つき）なので、ほかより2つ遅い
+        { level: 20, skill: "volt" }
       ],
       abilities: ["discharge"],
       expReward: 25,
@@ -1120,10 +1286,21 @@
         // 買えない装備。雷を扱えるのはビリムシだけなので、実質この種族専用になる
         { item: "chargedCore", rate: 0.15, min: 1, max: 1 }
       ],
-      sprite: "boltBug",
+      // ふだんは翅のコマ絵で、ごく速く羽ばたく（RC-1）。上げ → 元 → 下げ → 元 を2回。
+      // 2回目は火花が裏返り、触角がぴくっと動く（作り直しで足した）
+      sprite: ["boltBugUp", "boltBug", "boltBugDown", "boltBug",
+               "boltBugUpB", "boltBugBaseB", "boltBugDownB", "boltBugBaseB"],
       motion: "boltFlit",
-      // 飛んでいるので、傾きながら落ちる
-      motions: { faint: "tumble" }
+      // 姿（RC-1）。翅の上げ下げ・帯電して火花が増える・翅を下げて暗くなり目を閉じる（眠り）。
+      // 作り直しで、火花と触角の違うコマ（upB・downB）と、腹の針を突き出す姿（sting・stingDown）を足した
+      poses: { up: "boltBugUp", down: "boltBugDown", upB: "boltBugUpB", downB: "boltBugDownB",
+               charge: "boltBugCharge", sting: "boltBugSting", stingDown: "boltBugStingDown", sleep: "boltBugSleep" },
+      // 飛んでいるので、傾きながら落ちる。いちばん速く、驚くと電気が弾ける（RC-1）
+      motions: {
+        attack: "boltRush", resonance: "boltResonate", breath: "boltBreath",
+        technique: "boltZigzag", buff: "boltBuff", hit: "boltHit", dodge: "boltDodge",
+        faint: "tumble", levelUp: "boltCheer", sleeping: "boltSleeping"
+      }
     },
 
     // 深層の壁役。マグマガニ（亀裂の壁役）にあたる位置づけで、こうかで固めてくる。
@@ -1171,7 +1348,8 @@
       // 硬さはHPと防御だけで表し、崩し方は「雷を通す」に一本化した
       learnset: [
         { level: 1, skill: "tackle" },
-        { level: 9, skill: "aqua" }
+        { level: 9, skill: "aqua" },
+        { level: 18, skill: "wave" }
       ],
       abilities: ["waterHeart"],
       expReward: 20,
@@ -1185,7 +1363,14 @@
       sprite: "puddling",
       // 上が重い水の塊なので、縦横が入れ替わるように波打つ
       motion: "waterWobble",
-      motions: { faint: "fall" }
+      // 姿（RC-1）。潰れる・せり上がる（行を抜き差し）・水が明るく光る・潰れて目を閉じて暗くなる（眠り）
+      poses: { squash: "puddlingSquash", tall: "puddlingTall", glow: "puddlingGlow", sleep: "puddlingSleep" },
+      // 重い水の塊。せり上がって叩きつける・水たまりに化けて忍び寄る（RC-1）
+      motions: {
+        attack: "puddleSlam", resonance: "puddleResonate", breath: "puddleBreath",
+        technique: "puddleAmbush", buff: "puddleBuff", hit: "puddleHit", dodge: "puddleDodge",
+        faint: "fall", levelUp: "puddleCheer", sleeping: "puddleSleeping"
+      }
     },
 
     // ゲーム中で初めての竜系。深層のB3F・B4Fにしか出ない（dungeons.js の minFloor）。
@@ -1271,12 +1456,32 @@
         //   「挑戦（ラン）あたり」で見ること。竜の出現率を通すと3倍以上変わる
         { item: "fangRing", rate: 0.20, min: 1, max: 1 }
       ],
-      sprite: "abyssDragon",
+      // ふだんは翼をゆっくり羽ばたき、尻尾を揺らす（RC-1 の作り直し）。
+      // 元 → 半分上げ → 上げ → 半分上げ → 元 → 半分下げ → 下げ → 半分下げ。尻尾は翼と一緒に上下する
+      sprite: ["abyssDragon", "abyssDragonWingUpMid", "abyssDragonWingUp", "abyssDragonWingUpMid",
+               "abyssDragon", "abyssDragonWingDownMid", "abyssDragonWingDown", "abyssDragonWingDownMid"],
       // 竜なので、他のモンスターより一回り大きく画面に出す
       sizeScale: 1.35,
       // 大きいものほどゆっくり深く息をする。縦と横をずらして、体と翼を別々に動かす
       motion: "dragonBreathe",
-      motions: { faint: "crumble" }
+      // 姿（RC-1）。翼・尻尾・前足を付け根で回した姿と、目を細める・口を開ける・眠り（目を閉じ、翼をたたみ、尻尾を巻く）。
+      // 体・頭・角・脚は動かさない（口のあごと MouthWide の頭だけが、その姿で動く）
+      poses: {
+        rest: "abyssDragon",
+        up: "abyssDragonWingUp", upMid: "abyssDragonWingUpMid",
+        down: "abyssDragonWingDown", downMid: "abyssDragonWingDownMid",
+        glare: "abyssDragonGlare", mouth: "abyssDragonMouth", mouthWide: "abyssDragonMouthWide",
+        breathWide: "abyssDragonBreathWide",
+        hoverUp: "abyssDragonHoverUp", hoverDown: "abyssDragonHoverDown",
+        clawUp: "abyssDragonClawUp", clawSwipe: "abyssDragonClawSwipe",
+        sleep: "abyssDragonSleep"
+      },
+      // 全種でいちばん大きく重いので、どの動きも長くゆっくり。動じず、圧をかける（RC-1）
+      motions: {
+        attack: "dragonClaw", resonance: "dragonResonate", breath: "dragonBreath",
+        technique: "dragonSwoop", buff: "dragonBuff", hit: "dragonHit", dodge: "dragonDodge",
+        faint: "crumble", levelUp: "dragonCheer", sleeping: "dragonSleeping"
+      }
     },
 
     /**
@@ -1349,10 +1554,19 @@
       drops: [
         { item: "venomStinger", rate: 0.30, min: 1, max: 2 }
       ],
-      sprite: "venomBee",
+      // ふだんは翅のコマ絵で速く羽ばたく（RC-1）。2回に1回は腹が縮んで息をし、触角が動く
+      sprite: ["venomBeeUp", "venomBee", "venomBeeDown", "venomBee",
+               "venomBeeUpB", "venomBee", "venomBeeDownB", "venomBee"],
       motion: "beeHover",
-      // 飛んでいるので、傾きながら落ちる
-      motions: { faint: "tumble", levelUp: "cheerSpin" }
+      // 姿（RC-1）。翅の上げ下げ・腹が縮む・腹を引き絞る・針を出す・翅をたたんで眠る
+      poses: { up: "venomBeeUp", down: "venomBeeDown", upB: "venomBeeUpB", downB: "venomBeeDownB",
+               curl: "venomBeeCurl", sting: "venomBeeSting", stingUp: "venomBeeStingUp", sleep: "venomBeeSleep" },
+      // 針で刺す虫なので、攻撃は腹を引き絞ってから針を突き出す（RC-1）。飛んでいるので、傾きながら落ちる
+      motions: {
+        attack: "beeSting", resonance: "beeResonate", breath: "beeBreath",
+        technique: "beeDart", buff: "beeBuff", hit: "beeHit", dodge: "beeDodge",
+        faint: "tumble", levelUp: "beeCheer", sleeping: "beeSleeping"
+      }
     },
 
     // 沼の壁役。カゲヅタ（深層の壁役）の一段上。
@@ -1405,10 +1619,18 @@
         { item: "muddyShell", rate: 0.28, min: 1, max: 1 },
         { item: "oreShard", rate: 0.20, min: 1, max: 1 }
       ],
-      sprite: "mudTurtle",
+      // ふだんは首をゆっくり伸ばして息をし、ときどきまばたきする（RC-1）
+      sprite: ["mudTurtle", "mudTurtleNeckOut", "mudTurtle", "mudTurtleBlink"],
       motion: "turtleBreathe",
-      // 甲羅なので、倒れるというより崩れる
-      motions: { faint: "crumble" }
+      // 姿（RC-1）。頭と前脚を動かした絵。甲羅は変えていない
+      poses: { neckOut: "mudTurtleNeckOut", blink: "mudTurtleBlink", peek: "mudTurtlePeek", hide: "mudTurtleHide",
+               bite: "mudTurtleBite", stompL: "mudTurtleStompL", stompR: "mudTurtleStompR", sleep: "mudTurtleSleep" },
+      // 重く遅い壁役。攻めるときも守るときも甲羅にこもる（RC-1）。甲羅なので、倒れるというより崩れる
+      motions: {
+        attack: "turtleTackle", resonance: "turtleResonate", breath: "turtleBreath",
+        technique: "turtleSpin", buff: "turtleBuff", hit: "turtleHit", dodge: "turtleDodge",
+        faint: "crumble", levelUp: "turtleCheer", sleeping: "turtleSleeping"
+      }
     },
 
     // 沼に沈んだ者の骨。搦め手の役。
@@ -1450,7 +1672,9 @@
       learnset: [
         { level: 1, skill: "tackle" },
         { level: 6, skill: "sapStrength" },
-        { level: 12, skill: "darkSpore" }
+        { level: 12, skill: "darkSpore" },
+        // 毒沼の敵は Lv19 までなので、野生のヌマボネは使ってこない（仲間にして育てると覚える）
+        { level: 20, skill: "darkNebula" }
       ],
       abilities: ["undeadSoul"],
       expReward: 36,
@@ -1463,10 +1687,18 @@
         //     ヌマボネは毒沼の25%を占めるので、同じ率でも他の種族より早く集まる
         { item: "boneCharm", rate: 0.16, min: 1, max: 1 }
       ],
-      sprite: "marshBone",
+      // ふだんは泥の上で揺れながら、頭蓋が首の上でかくりとかしぐ（RC-1）
+      sprite: ["marshBone", "marshBoneTiltL", "marshBone", "marshBoneTiltR"],
       motion: "boneSway",
-      // 骨なので崩れ落ちる
-      motions: { faint: "crumble" }
+      // 姿（RC-1）。頭蓋をかしげる・あごを開ける・眼窩が光る・頭蓋が浮く・泥へ沈む・眠る
+      poses: { tiltL: "marshBoneTiltL", tiltR: "marshBoneTiltR", jaw: "marshBoneJaw", glow: "marshBoneGlow",
+               rattle: "marshBoneRattle", sink: "marshBoneSink", sleep: "marshBoneSleep" },
+      // 跳べないので、かわすときも潜るときも泥へ沈む（RC-1）。骨なので崩れ落ちる
+      motions: {
+        attack: "boneLunge", resonance: "boneResonate", breath: "boneBreath",
+        technique: "boneAmbush", buff: "boneBuff", hit: "boneHit", dodge: "boneDodge",
+        faint: "crumble", levelUp: "boneCheer", sleeping: "boneSleeping"
+      }
     },
 
     // 腐食の毒沼の主（data/bosses.js の swampLord が使う種族）。
@@ -1522,11 +1754,22 @@
       drops: [
         { item: "venomSac", rate: 1.0, min: 1, max: 1 }
       ],
-      sprite: "marshLord",
+      // ふだんはのど袋をふくらませて息をし、目をきょろりと動かし、ときどきまばたきする（RC-1）
+      sprite: ["marshLord", "marshLordPuff", "marshLord", "marshLordLookL", "marshLordBlink",
+               "marshLord", "marshLordPuff", "marshLord", "marshLordLookR", "marshLord"],
       // 横に広い主。他の3体（1.15 / 1.25 / 1.4）の間に置いてある
       sizeScale: 1.3,
       motion: "lordBreathe",
-      motions: { faint: "fall" }
+      // 姿（RC-1）。目・口・舌・のど袋を動かした絵
+      poses: { blink: "marshLordBlink", lookL: "marshLordLookL", lookR: "marshLordLookR",
+               open: "marshLordOpen", gape: "marshLordGape", tongue: "marshLordTongue",
+               puff: "marshLordPuff", happy: "marshLordHappy", sleep: "marshLordSleep" },
+      // 待って丸ごと呑む主。体技は舌で絡め取って呑む（RC-1）
+      motions: {
+        attack: "lordSlam", resonance: "lordResonate", breath: "lordBreath",
+        technique: "lordTongue", buff: "lordBuff", hit: "lordHit", dodge: "lordDodge",
+        faint: "fall", levelUp: "lordCheer", sleeping: "lordSleeping"
+      }
     }
   };
 })(window.MyGame);

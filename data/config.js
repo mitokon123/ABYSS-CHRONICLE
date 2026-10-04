@@ -9,7 +9,9 @@
   NS.rawData.config = {
     gameTitle: "ABYSS CHRONICLE", // ゲーム名
     worldName: "Monstoria",       // 世界名
-    version: "α-10",    // バージョン表記（履歴は data/patchnotes.js）
+    // バージョン表記（履歴は data/patchnotes.js）。RC はリリース前（Release Candidate）の仕上げ版。
+    // α-10 のあと、予定していた α-11 を RC-1 と呼ぶことにした（2026-09-29）。その次が v1.0.0
+    version: "RC-1",
     canvasWidth: 800,   // 画面の横幅（px）
     canvasHeight: 600,  // 画面の縦幅（px）
     tileSize: 32,       // 1タイルの大きさ（px）

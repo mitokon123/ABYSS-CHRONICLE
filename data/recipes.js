@@ -242,6 +242,38 @@
         { item: "abyssFragment", count: 2 }
       ],
       unlockedBy: "silentDepths"
+    },
+
+    /**
+     * --- スライムのかけらで作るもの（RC-1） ---
+     *
+     * かけらは深層で大量に余るので、その使い道として作者が考えた3つ。
+     * 素材はかけらだけで、ほかと同じくお金は要らない。
+     * 解放は深層をクリアしてから（作者の指定）
+     */
+
+    slimeBlade: {
+      id: "slimeBlade",
+      order: 18,
+      result: { item: "slimeBlade", count: 1 },
+      materials: [ { item: "slimeShard", count: 4 } ],
+      unlockedBy: "silentDepths"
+    },
+
+    slimeMail: {
+      id: "slimeMail",
+      order: 19,
+      result: { item: "slimeMail", count: 1 },
+      materials: [ { item: "slimeShard", count: 5 } ],
+      unlockedBy: "silentDepths"
+    },
+
+    slimeNecklace: {
+      id: "slimeNecklace",
+      order: 20,
+      result: { item: "slimeNecklace", count: 1 },
+      materials: [ { item: "slimeShard", count: 5 } ],
+      unlockedBy: "silentDepths"
     }
   };
 })(window.MyGame);

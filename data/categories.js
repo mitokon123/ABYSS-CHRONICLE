@@ -67,8 +67,9 @@
      */
     skillKind: {
       // 技の威力に頼る。元の威力が高く、追加効果を持つものが多い。封印で止まるのはこの種類だけ
+      // casterEffect … 技を出した本人のまわりに出す演出（data/effects.js の型。RC-1）
       resonance: { id: "resonance", name: "共鳴", order: 1, color: "#b48ce0",
-                   note: "封印されると使えない" },
+                   note: "封印されると使えない", casterEffect: "resonance" },
       // 威力に頼る。PPが少なめ。状態異常や全体へのダメージ
       breath:    { id: "breath",    name: "ブレス", order: 2, color: "#7fd9e8",
                    rules: { evadable: false, canCritical: false },

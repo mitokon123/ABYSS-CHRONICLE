@@ -38,7 +38,7 @@
     this.panel = new NS.Panel(game.ctx, this.theme);
     this.renderer = new NS.Renderer(game.ctx);
     this.sprites = new NS.SpriteRenderer(game.ctx, game.assets);
-    this.list = new NS.ScrollList(this.panel, this.layout.list);
+    this.list = new NS.ScrollList(this.panel, this.layout.list, { sprites: this.sprites });
     this.shop = new NS.ShopSystem(game.data);
 
     this.confirmMenu = new NS.CommandMenu(this.panel, this.layout.confirmMenu);
@@ -221,6 +221,7 @@
       rows.push({
         type: "entry",
         label: item.name,
+        icon: item.icon,
         right: stock[i].price + "G",
         color: affordable ? t.textColor : t.hintColor,
         value: { itemId: item.id, price: stock[i].price }
@@ -262,6 +263,7 @@
         entries.push({
           type: "entry",
           label: item.name + " x" + slot.count,
+          icon: item.icon,
           right: price + "G",
           value: { itemId: item.id, price: price }
         });
@@ -855,15 +857,18 @@
     var lh = t.lineHeight || 18;
     var y = origin.y + 20;
 
-    this.panel.drawText(item.name, origin.x, y);
+    // 左上に絵を大きく出し、名前と分類はその右に並べる
+    var indent = NS.StatusMarks.drawItemIcon(this.sprites, item, origin.x, origin.y + 4, t);
+    this.panel.drawText(item.name, origin.x + indent, y);
     y += lh + 4;
 
     var category = ((this.game.data.categories || {}).item || {})[item.category];
     if (category) {
-      this.panel.drawText(category.name, origin.x, y,
+      this.panel.drawText(category.name, origin.x + indent, y,
         { font: t.smallFont, color: category.color });
       y += lh;
     }
+    if (indent > 0) y = Math.max(y, origin.y + 4 + NS.StatusMarks.itemIconSize(t) + 16);
 
     this.panel.drawText(
       fill(this.texts.owned, { count: this.game.inventory.getCount(item.id) }),

@@ -30,7 +30,9 @@
 
     this.panel = new NS.Panel(game.ctx, this.theme);
     this.renderer = new NS.Renderer(game.ctx);
-    this.list = new NS.ScrollList(this.panel, this.layout.list);
+    // アイテムの絵を一覧の名前の左に出す
+    this.sprites = new NS.SpriteRenderer(game.ctx, game.assets);
+    this.list = new NS.ScrollList(this.panel, this.layout.list, { sprites: this.sprites });
     this.confirmMenu = new NS.CommandMenu(this.panel, this.layout.confirmMenu);
     this.backButton = new NS.BackButton(this.panel, game.data);
     this.craftSystem = new NS.CraftSystem(game.data);
@@ -103,6 +105,7 @@
         rows.push({
           type: "entry",
           label: group.entries[e].item.name,
+          icon: group.entries[e].item.icon,
           // 費用が要るレシピだけ右側に金額を出す
           right: (recipe.gold || 0) > 0 ? (recipe.gold + "G") : "",
           // 作れないものは薄く表示する
@@ -267,8 +270,11 @@
     var item = this.game.data.getItem(recipe.result.item);
     var count = recipe.result.count || 1;
 
-    this.panel.drawText(item.name + (count > 1 ? (" ×" + count) : ""), origin.x, y);
+    // 左上に絵を大きく出し、名前はその右に並べる
+    var indent = NS.StatusMarks.drawItemIcon(this.sprites, item, origin.x, origin.y + 4, t);
+    this.panel.drawText(item.name + (count > 1 ? (" ×" + count) : ""), origin.x + indent, y);
     y += lh + 6;
+    if (indent > 0) y = Math.max(y, origin.y + 4 + NS.StatusMarks.itemIconSize(t) + 16);
 
     // 必要な素材
     this.panel.drawText(this.texts.materialLabel || "", origin.x, y,

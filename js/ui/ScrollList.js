@@ -7,6 +7,8 @@
  *   { type:"entry",  label, value, ... } … 選択できる項目
  *
  * entry には right（右端の補助表示）と rightColor（その色）を付けられる。
+ * icon（絵のid）を付けると、名前の左に小さな絵を出す（options.sprites を渡したときだけ）。
+ * 絵のある行が1つでもあれば、絵のない行も同じだけ字下げして名前の頭をそろえる。
  *
  * ▼ 動かし方
  *   ・上下キー … 選択を1つ動かす。選んだ行が枠の外なら、そこまでスクロールする。
@@ -27,6 +29,10 @@
  *   rect.clipLeft     … 枠の左へはみ出して描いてよい幅（行の左に出すカーソル「▶」の分）
  *   options.renderRow(row, index, y, selected) … 1行を描く関数。y は行の上端。
  *     これを渡すと、文字の行の代わりにこの関数で描く（スクロール・バー・ホイールはそのまま）
+ *
+ * ▼ 読むだけの一覧（パッチノートの内容・設定の操作キー）
+ *   options.readOnly: true … 行を選ばない。ホイールとバーで送り、キーでは scrollByRows で送る
+ *     （上下キーを別の用途に使っている画面があるので、キーは呼び出し側が決める）
  */
 (function (NS) {
   "use strict";
@@ -34,12 +40,15 @@
   /**
    * @param {MyGame.Panel} panel
    * @param {object} rect { x, y, w, h, rowHeight, visibleRows, frame, clipLeft }
-   * @param {object} [options] { renderRow }
+   * @param {object} [options] { renderRow, readOnly, sprites }
+   *   sprites … SpriteRenderer。行の icon を描くのに使う
    */
   function ScrollList(panel, rect, options) {
     this.panel = panel;
     this.rect = rect;
     this.renderRow = (options && options.renderRow) || null;
+    this.readOnly = !!(options && options.readOnly);
+    this.sprites = (options && options.sprites) || null;
     this.rows = [];
     this.index = 0;          // 選択中の行（entry のみ）
     this.scroll = 0;         // いま表示しているずれ（px）
@@ -98,10 +107,25 @@
    */
   ScrollList.prototype.setRows = function (rows) {
     this.rows = rows || [];
-    this.index = this._firstSelectable();
+    this.index = this.readOnly ? -1 : this._firstSelectable();
     this.scroll = 0;
     this.scrollTarget = 0;
-    this._scrollToIndex();
+    if (!this.readOnly) this._scrollToIndex();
+  };
+
+  /** 行数ぶん送る（読むだけの一覧をキーで送るとき） */
+  ScrollList.prototype.scrollByRows = function (rows) {
+    this.scrollTarget = this._clampScroll(this.scrollTarget + rows * this._rowHeight());
+  };
+
+  /** バーが出ているときに、行の右側から空けておく幅（出ていなければ 0） */
+  ScrollList.prototype.barSpace = function () {
+    return this._scrollbarRect() ? this._barSpace() : 0;
+  };
+
+  /** バーをつまんで動かしている最中か */
+  ScrollList.prototype.isDragging = function () {
+    return this._dragging;
   };
 
   /**
@@ -157,15 +181,25 @@
    * マウスで押した場合は clickedEntry() が true を返すので、
    * 呼び出し側は決定キーと同じ扱いにできる。
    *
+   * @param {object} [opts] { keys: false } … 上下キーを見ない（別の枠を操作中のとき）
    * @returns {boolean} 選択が動いたか
    */
-  ScrollList.prototype.handleInput = function (input) {
+  ScrollList.prototype.handleInput = function (input, opts) {
     this._dragReleased = false;
+
+    // 読むだけの一覧：バーとホイールだけ
+    if (this.readOnly) {
+      this._handleScrollbar(input);
+      this._handleWheel(input);
+      return false;
+    }
+
     if (!this.hasEntries()) return false;
 
     var moved = false;
-    if (input.isPressed("up")) { this._move(-1); moved = true; }
-    if (input.isPressed("down")) { this._move(1); moved = true; }
+    var useKeys = !(opts && opts.keys === false);
+    if (useKeys && input.isPressed("up")) { this._move(-1); moved = true; }
+    if (useKeys && input.isPressed("down")) { this._move(1); moved = true; }
     if (moved) this._scrollToIndex();
 
     // バーをつまむ・溝を押す（行の選択より先に見る。バーの上の行を選ばないように）
@@ -192,7 +226,7 @@
    * @returns {boolean}
    */
   ScrollList.prototype.clickedEntry = function (input) {
-    if (!input.getPointer) return false;
+    if (this.readOnly || !input.getPointer) return false;
     if (this._dragging || this._dragReleased) return false;
 
     var pointer = input.getPointer();
@@ -399,6 +433,8 @@
     var textRight = rect.x + rect.w - (t.padding || 8) - (track ? this._barSpace() : 0);
     var cursorAlpha = cursorAlphaFor(t, clock);
     var range = this._visibleRange();
+    var iconSize = this._iconSize();
+    var labelX = origin.x + 24 + (iconSize > 0 ? iconSize + 4 : 0);
 
     // 枠の中だけに描く（端の行が途中で切れて見えるのは、スクロールの途中だと分かるので良い）
     var clipLeft = rect.clipLeft || 0;
@@ -435,9 +471,10 @@
         ctx.font = t.smallFont || t.font || "14px monospace";
         var rightWidth = ctx.measureText(row.right).width;
         ctx.font = t.font || "14px monospace";
-        label = clipToWidth(ctx, label, textRight - rightWidth - 10 - (origin.x + 24));
+        label = clipToWidth(ctx, label, textRight - rightWidth - 10 - labelX);
       }
-      this.panel.drawText(label, origin.x + 24, y,
+      if (iconSize > 0 && row.icon) NS.StatusMarks.drawIcon(this.sprites, row.icon, origin.x + 24, y, iconSize);
+      this.panel.drawText(label, labelX, y,
         { color: selected ? t.cursorColor : (row.color || t.textColor) });
 
       // 右端の補助表示（所持数や状態など）。行ごとに色を変えられる
@@ -450,6 +487,15 @@
     ctx.restore();
 
     if (track) this._renderScrollbar(track);
+  };
+
+  /** 行の絵の大きさ。絵を描けない、または絵のある行が無ければ 0（字下げしない） */
+  ScrollList.prototype._iconSize = function () {
+    if (!this.sprites || !NS.StatusMarks) return 0;
+    for (var i = 0; i < this.rows.length; i++) {
+      if (this.rows[i].icon) return this.panel.theme.listIconSize || 16;
+    }
+    return 0;
   };
 
   /** 表示のずれを目標へ近づける（つまんでいる間は即座） */

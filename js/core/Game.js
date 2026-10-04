@@ -251,6 +251,8 @@
       clearedDungeons: this.clearedDungeons,
       boughtBlessings: this.boughtBlessings,
       offBlessings: this.offBlessings,
+      // 拠点のメニューの印（新入荷・NEW）を出すために、店と図鑑で何を見たか（HomeScene）
+      homeSeen: this.homeSeen,
       playTime: this.playTime,
       dungeon: dungeonState ? {
         dungeonId: dungeonState.dungeonId || null,
@@ -324,6 +326,7 @@
       clearedDungeons: this.clearedDungeons,
       boughtBlessings: this.boughtBlessings,
       offBlessings: this.offBlessings,
+      homeSeen: this.homeSeen,
       playTime: this.playTime,
       dungeon: {
         dungeonId: dungeonState.dungeonId || null,
@@ -363,6 +366,9 @@
     this.clearedDungeons = state.clearedDungeons || {};
     this.boughtBlessings = state.boughtBlessings || {};
     this.offBlessings = state.offBlessings || {};
+    // 古いセーブには無い。null のままにしておくと、拠点を開いたときに
+    // 「いま並んでいるものは全部見た」として始まる（いきなり印だらけにならないように）
+    this.homeSeen = state.homeSeen || null;
     // 合計プレイ時間は、そのファイルに書いてあった値から続ける（古いセーブには無いので0）
     this.playTime = state.playTime || 0;
     this.run = null;
@@ -804,13 +810,13 @@
    * その技を探索中（戦闘の外）で使えるか。決まりは data/skills.js の fieldUse の説明。
    *   ・威力を持つ技（攻撃の技）は使えない
    *   ・fieldUse: false と書いた技は使えない
-   *   ・HPを回復する技（heal）は、書かなくても使える
+   *   ・HPを回復する技（heal）と、状態異常を治す技（cureStatus。クレンズ）は、書かなくても使える
    *   ・それ以外は fieldUse: true と書いた技だけ
    */
   Game.isFieldSkill = function (skill) {
     if (!skill || skill.power) return false;
     if (skill.fieldUse === false) return false;
-    if (skill.heal) return true;
+    if (skill.heal || skill.cureStatus) return true;
     return skill.fieldUse === true;
   };
 
@@ -825,12 +831,14 @@
   };
 
   /**
-   * 探索中に技を使う（いまはHPの回復だけ）。
+   * 探索中に技を使う（HPの回復と、状態異常を治す技）。
    * 回復量は戦闘と同じく data/skills.js の heal（{ min, max } か { amount }）。PPも戦闘と同じだけ払う。
    *
-   * @returns {{success:boolean, reason?:string, amount?:number}}
+   * @returns {{success:boolean, reason?:string, amount?:number, cured?:string[]}}
    *   reason … "notUsable" / "userFainted"（使う側が倒れている）/ "noPp" /
-   *            "fainted"（相手が倒れている。蘇生は無い）/ "full"（相手が満タン）
+   *            "fainted"（相手が倒れている。蘇生は無い）/ "full"（相手が満タン）/
+   *            "nothingToCure"（治す状態異常が無い）
+   *   cured  … 状態異常を治す技で、治したものの名前
    *   使えなかったときは PP を払わない
    */
   Game.prototype.useFieldSkill = function (user, skillId, target) {
@@ -839,6 +847,15 @@
     if (user.isFainted && user.isFainted()) return { success: false, reason: "userFainted" };
     if (skill.pp && user.canPayPp && !user.canPayPp(skill.pp)) return { success: false, reason: "noPp" };
     if (target.isFainted && target.isFainted()) return { success: false, reason: "fainted" };
+
+    // 状態異常を治す技（クレンズ）。決まりは戦闘と同じ（BattleSystem.cureStatuses）
+    if (skill.cureStatus && !skill.heal) {
+      var cured = NS.BattleSystem.cureStatuses(target, skill.cureStatus);
+      if (cured.length === 0) return { success: false, reason: "nothingToCure" };
+      if (skill.pp && user.payPp) user.payPp(skill.pp);
+      return { success: true, cured: cured.map(function (def) { return def.name; }) };
+    }
+
     if (!skill.heal) return { success: false, reason: "notUsable" };
     if (target.currentHp >= target.getMaxHp()) return { success: false, reason: "full" };
 
@@ -848,6 +865,10 @@
     var max = (typeof spec.max === "number") ? spec.max : min;
     if (max < min) max = min;
     var amount = (max > min) ? new NS.Random().nextInt(min, max) : min;
+    // 使う側の「回復の技」への倍率（戦闘の BattleSystem._applyHeal と同じ）
+    if (NS.EffectSystem) {
+      amount = Math.floor(amount * new NS.EffectSystem(this.data).getHealDealtMultiplier(user));
+    }
 
     var before = target.currentHp;
     target.heal(amount);

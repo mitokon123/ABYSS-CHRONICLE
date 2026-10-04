@@ -63,6 +63,12 @@
     var alpha = (transform.alpha === undefined) ? 1 : transform.alpha;
     if (alpha <= 0) return;
 
+    // 上の数行を動かさない絵（天井の裂け目からぶら下がる蔦など）
+    if (transform.pinTop > 0) {
+      this._drawPinned(id, dx, dy, dw, dh, transform, alpha);
+      return;
+    }
+
     var scale = (transform.scale === undefined) ? 1 : transform.scale;
     var w = dw * scale * axis(transform.scaleX);
     var h = dh * scale * axis(transform.scaleY);
@@ -92,6 +98,53 @@
       this.draw(spriteId, x, y, w, h);
     }
     this.ctx.restore();
+  };
+
+  /**
+   * 上の数行（transform.pinTop 行）を動かさずに、残りだけを動かして描く（RC-1。カゲヅタの裂け目）。
+   *
+   *   動かさない部分 … 位置もそのまま。濃さは、絵全体が薄くなったとき（倒れて消えるとき）だけ一緒に薄くする。
+   *                    被弾の点滅（0.6 まで）では薄くしない
+   *   動く部分       … 上端を、動かさない部分の下端にそろえる（＝裂け目から垂れる蔦）。
+   *                    離れないよう offsetX / offsetY は使わない。伸縮（scaleY）で伸び縮みし、
+   *                    回転（rotate）は上端の中央を軸にする（振り子）
+   */
+  SpriteRenderer.prototype._drawPinned = function (id, dx, dy, dw, dh, transform, alpha) {
+    var img = this.assets ? this.assets.get(pickFrame(id, transform.frame)) : null;
+    if (!img) return;
+    if (img instanceof HTMLImageElement && !img.complete) return;
+
+    var srcW = img.width, srcH = img.height;
+    var pin = Math.min(transform.pinTop, srcH - 1);
+    var pinH = dh * pin / srcH;
+    var ctx = this.ctx;
+
+    // 動かさない部分
+    ctx.save();
+    var stillAlpha = Math.min(1, alpha / 0.6);
+    if (stillAlpha < 1) ctx.globalAlpha = ctx.globalAlpha * stillAlpha;
+    ctx.drawImage(img, 0, 0, srcW, pin, dx, dy, dw, pinH);
+    ctx.restore();
+
+    // 動く部分
+    var scale = (transform.scale === undefined) ? 1 : transform.scale;
+    var w = dw * scale * axis(transform.scaleX);
+    var h = (dh - pinH) * scale * axis(transform.scaleY);
+    if (w <= 0 || h <= 0) return;
+
+    var x = dx + (dw - w) / 2;
+    var y = dy + pinH;
+    ctx.save();
+    if (alpha < 1) ctx.globalAlpha = ctx.globalAlpha * alpha;
+    var rotate = transform.rotate || 0;
+    if (rotate) {
+      ctx.translate(x + w / 2, y);
+      ctx.rotate(rotate * Math.PI * 2);
+      ctx.drawImage(img, 0, pin, srcW, srcH - pin, -w / 2, 0, w, h);
+    } else {
+      ctx.drawImage(img, 0, pin, srcW, srcH - pin, x, y, w, h);
+    }
+    ctx.restore();
   };
 
   /** 縦横それぞれの倍率。書かれていなければ1（＝scale だけが効く） */

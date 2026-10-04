@@ -19,6 +19,8 @@
     // スプライト（コード生成のドット絵など）を用意
     var assets = new NS.AssetLoader();
     assets.build(gameData.sprites);
+    // 自分で作った服の色の絵は、選んだときに作って足す（js/systems/PlayerLook.js）
+    if (NS.PlayerLook) NS.PlayerLook.assets = assets;
 
     // 画面サイズはデータ(config)で管理
     var cfg = gameData.config;

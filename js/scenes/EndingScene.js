@@ -43,6 +43,7 @@
       this.game.clearedDungeons = null;
       this.game.boughtBlessings = null;
       this.game.offBlessings = null;
+      this.game.homeSeen = null;
       this.game.run = null;
       this.game.scenes.change(new NS.TitleScene(this.game));
     }

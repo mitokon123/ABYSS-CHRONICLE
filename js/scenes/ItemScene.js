@@ -36,9 +36,9 @@
     this.panel = new NS.Panel(game.ctx, this.theme);
     this.hpBar = new NS.HpBar(game.ctx, this.theme);
     this.renderer = new NS.Renderer(game.ctx);
-    // 使う相手の状態異常の印（仲間画面・戦闘と同じ絵）を描くのに使う
+    // 使う相手の状態異常の印（仲間画面・戦闘と同じ絵）とアイテムの絵を描くのに使う
     this.sprites = new NS.SpriteRenderer(game.ctx, game.assets);
-    this.list = new NS.ScrollList(this.panel, this.layout.list);
+    this.list = new NS.ScrollList(this.panel, this.layout.list, { sprites: this.sprites });
     this.backButton = new NS.BackButton(this.panel, game.data);
     this.usage = new NS.ItemUsage(game.data);
 
@@ -86,6 +86,7 @@
           rows.push({
             type: "entry",
             label: item ? item.name : slot.itemId,
+            icon: item ? item.icon : null,
             right: "x" + slot.count,
             value: slot.itemId
           });
@@ -293,15 +294,19 @@
     var lh = t.lineHeight || 18;
     var y = origin.y + 16;
 
-    this.panel.drawText(item.name, origin.x, y);
+    // 左上に絵を大きく出し、名前と分類はその右に並べる
+    var indent = NS.StatusMarks.drawItemIcon(this.sprites, item, origin.x, origin.y + 2, t);
+    this.panel.drawText(item.name, origin.x + indent, y);
     y += lh;
 
     var category = ((this.game.data.categories || {}).item || {})[item.category];
     if (category) {
-      this.panel.drawText(category.name, origin.x, y,
+      this.panel.drawText(category.name, origin.x + indent, y,
         { font: t.smallFont, color: category.color });
       y += lh;
     }
+    // 分類の無いアイテムでも、次の行が絵に食い込まないようにする
+    if (indent > 0) y = Math.max(y, origin.y + 2 + NS.StatusMarks.itemIconSize(t) + 16);
 
     this.panel.drawText(
       (this.texts.countLabel || "") + " " + this.game.inventory.getCount(item.id),
@@ -334,6 +339,8 @@
 
     var rowHeight = 54;
     var top = origin.y + 44;
+    // PPを戻す道具（精気の実）を選んでいるときは、HPではなくPPを出す（誰に使うか選べるように）
+    var showPp = this._selectedRestoresPp();
 
     for (var i = 0; i < party.size(); i++) {
       var monster = party.get(i);
@@ -351,10 +358,23 @@
         origin.x + 18 + this.panel.ctx.measureText(heading).width + 8, y,
         { maxX: rect.x + rect.w - (t.padding || 8), sprites: this.sprites, data: this.game.data });
 
-      this.hpBar.draw(origin.x + 18, y + 8, 160, 8, monster.currentHp, monster.getMaxHp());
-      this.panel.drawText(monster.currentHp + "/" + monster.getMaxHp(),
-        origin.x + 18, y + 30, { font: t.smallFont, color: t.subTextColor });
+      if (showPp) {
+        this.hpBar.drawPp(origin.x + 18, y + 8, 160, 8, monster.currentPp, monster.getMaxPp());
+        this.panel.drawText("PP " + monster.currentPp + "/" + monster.getMaxPp(),
+          origin.x + 18, y + 30, { font: t.smallFont, color: t.subTextColor });
+      } else {
+        this.hpBar.draw(origin.x + 18, y + 8, 160, 8, monster.currentHp, monster.getMaxHp());
+        this.panel.drawText(monster.currentHp + "/" + monster.getMaxHp(),
+          origin.x + 18, y + 30, { font: t.smallFont, color: t.subTextColor });
+      }
     }
+  };
+
+  /** いま選んでいる道具が、PPを戻すもの（data/items.js の effect.type "healPp"）か */
+  ItemScene.prototype._selectedRestoresPp = function () {
+    var selected = this.list.getSelected();
+    var item = selected ? this.game.data.getItem(selected.value) : null;
+    return !!(item && item.effect && item.effect.type === "healPp");
   };
 
   ItemScene.prototype._renderNotice = function (ctx) {

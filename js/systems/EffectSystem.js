@@ -21,6 +21,7 @@
  *   { type:"damageTaken",    value:0.9 }
  *   { type:"resistBonus",    element:"fire", value:3 }  … 耐性の数値そのものを上げる
  *   { type:"accuracyMultiplier", value:0.8 }  … 命中率に倍率（盲目とは別）
+ *   { type:"healDealt",      value:1.2 }  … 自分が使う回復の技の回復量に倍率（粘晶のネックレス）
  *   戦闘中に働くもの（regen / counterStatus / drain / firstStrike / undying）は
  *   ここでは集めるだけで、働かせるのは BattleSystem（_findEffects で拾う）
  *
@@ -239,6 +240,20 @@
     });
   };
 
+  /**
+   * 自分が使う回復の技の回復量に掛かる倍率（何も無ければ 1）。{ type:"healDealt", value:1.2 }
+   * 効くのは「使う側」。受ける側の装備は関係しない（道具の回復・再生・吸血にも効かない）。
+   * 戦闘（BattleSystem._applyHeal）と探索中の技（Game.useFieldSkill）の両方が見る
+   */
+  EffectSystem.prototype.getHealDealtMultiplier = function (monster) {
+    var self = this;
+    return this._multiply(monster, function (effect) {
+      if (effect.type !== "healDealt") return null;
+      if (!self._matchCondition(monster, effect.condition)) return null;
+      return effect.value;
+    });
+  };
+
   /** 自分が受けるダメージに掛かる倍率 */
   EffectSystem.prototype.getDamageTakenMultiplier = function (monster, elementId) {
     var self = this;
@@ -345,6 +360,8 @@
         { percent: percentOf(effect.value) });
     } else if (effect.type === "accuracyMultiplier") {
       text = (party.accuracyLabel || "命中") + " ×" + effect.value;
+    } else if (effect.type === "healDealt") {
+      text = (party.healDealtLabel || "回復の技") + " ×" + effect.value;
     } else if (effect.type === "firstStrike") {
       text = party.effectFirstStrike || "";
     } else if (effect.type === "undying") {

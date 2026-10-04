@@ -85,6 +85,31 @@
   };
 
   /**
+   * アイテムの絵を、説明欄の左上に大きく出す（持ち物・店・工房・図鑑）。
+   * 一覧と同じ 16×16（data/items.js の icon）を theme.detailIconSize（32）に広げて描く。
+   * 名前と分類は絵の右に並べるので、呼び出し側は戻り値の幅だけ字下げする。
+   *
+   * ★ 専用のファイルに分けず、ここに置いてある。
+   *   app.html が古いまま残っているブラウザでは新しいファイルが読まれず、
+   *   説明欄を開いた瞬間に止まった（RC-1 で実際に起きた）。
+   *
+   * @param {object} item data/items.js の1件
+   * @param {number} top 絵の上端
+   * @returns {number} 字下げする幅（px）。絵の無いアイテムは何も描かず 0
+   */
+  StatusMarks.drawItemIcon = function (sprites, item, x, top, theme) {
+    if (!sprites || !item || !item.icon) return 0;
+    var size = StatusMarks.itemIconSize(theme);
+    sprites.draw(item.icon, x, top, size, size);
+    return size + 8;
+  };
+
+  /** 説明欄で描くアイテムの絵の大きさ（px） */
+  StatusMarks.itemIconSize = function (theme) {
+    return (theme && theme.detailIconSize) || 32;
+  };
+
+  /**
    * バフ／デバフの印を1つ描く。ステータスの絵に、上がった／下がったの矢印を重ねる。
    *
    * @param {MyGame.Panel} panel

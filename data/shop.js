@@ -21,8 +21,8 @@
  *     item       : アイテムid（data/items.js を参照）
  *     price      : 買値。省略すると items.js の price をそのまま使う
  *     unlockedBy : この品だけが後から並ぶ条件。省略すると最初から並ぶ
- *     from       : その品が手に入るステージ（data/dungeons.js のid）。書くと店の一覧で
- *                  ステージごとに小見出し（「苔むす坑道」など）を挟んで並ぶ。素材に書く
+ *     from       : 書かなくてよい。素材のステージの小見出し（「苔むす坑道」など）は
+ *                  data/items.js の from から出す（図鑑と同じ）。店だけ別にしたいときだけ書く
  *   lines      : 店主の台詞。店主の左にふきだしで出る。場面ごとに何個か書くと、その中から選ばれる
  *     greet   … 店に入ったとき・店を切り替えたとき
  *     buy     … 買ったとき
@@ -48,7 +48,7 @@
  * ▼ 並ぶ順番
  *   stock に書いた順ではなく、画面では次の順に並べ替えて見出しを挟む。
  *     1. 分類（data/categories.js の item.order）… 回復 → 装備 → 素材 → 重要
- *     2. 手に入るステージ（from）の順 … 素材はステージごとにまとまり、小見出しが入る
+ *     2. 手に入るステージ（data/items.js の from）の順 … 素材はステージごとにまとまり、小見出しが入る
  *     3. 値段の安い順 … 手が届くものから目に入る
  *     4. ここに書いた順 … 上が同じときだけ
  *   並びを変えたいときは categories.js の order を入れ替えるのが手軽。
@@ -111,19 +111,21 @@
           // PPの回復。技を使う戦い方を選べるようにするため、早めに置く
           { item: "spiritBerry", unlockedBy: "mossyMine" },
           { item: "stoneBand", unlockedBy: "mossyMine" },
+          // スカウトしやすくする香（RC-1）。坑道をクリアすると並ぶ
+          { item: "scoutIncense", unlockedBy: "mossyMine" },
           { item: "glowLantern", unlockedBy: "mossyMine" },
           // ▼ 素材。どれも「そのステージをクリアしてから」並ぶ。
-          //   from は手に入るステージ。店ではステージごとに小見出しを挟んで並べる。
+          //   店ではステージごとに小見出しを挟んで並べる（ステージは data/items.js の from）。
           //   主のドロップ（坑道の核・灼熱の牙・黄泉竜の鱗・毒嚢など）は並べない ——
           //   主を倒すこと自体に意味を残すため
 
           // 工房で使う素材。坑道をクリアすると取り扱いが始まる
-          { item: "oreShard", unlockedBy: "mossyMine", from: "mossyMine" },
-          { item: "glowDust", unlockedBy: "mossyMine", from: "mossyMine" },
+          { item: "oreShard", unlockedBy: "mossyMine" },
+          { item: "glowDust", unlockedBy: "mossyMine" },
           // 亀裂の素材
-          { item: "emberAsh", unlockedBy: "scorchingFissure", from: "scorchingFissure" },
-          { item: "ashFeather", unlockedBy: "scorchingFissure", from: "scorchingFissure" },
-          { item: "scorchedShell", unlockedBy: "scorchingFissure", from: "scorchingFissure" },
+          { item: "emberAsh", unlockedBy: "scorchingFissure" },
+          { item: "ashFeather", unlockedBy: "scorchingFissure" },
+          { item: "scorchedShell", unlockedBy: "scorchingFissure" },
 
           // 毒を治す薬。深層をクリアすると取り扱いが始まる。
           //   毒が出てくるのはステージ4からなので、それまで並べても使い道が無い
@@ -131,16 +133,16 @@
 
           // 深層の素材。クリアしてから取り扱いが始まる。
           // 黄泉竜の鱗（ヨミリュウのドロップ）は並べない —— 竜を狩ること自体に意味を残すため
-          { item: "slimeShard", unlockedBy: "silentDepths", from: "silentDepths" },
-          { item: "duskDew", unlockedBy: "silentDepths", from: "silentDepths" },
-          { item: "twistedVine", unlockedBy: "silentDepths", from: "silentDepths" },
-          { item: "stormWing", unlockedBy: "silentDepths", from: "silentDepths" },
+          { item: "slimeShard", unlockedBy: "silentDepths" },
+          { item: "duskDew", unlockedBy: "silentDepths" },
+          { item: "twistedVine", unlockedBy: "silentDepths" },
+          { item: "stormWing", unlockedBy: "silentDepths" },
 
           // 毒沼の素材。クリアしてから取り扱いが始まる（α-9 のテストプレイで追加）。
           // 毒嚢（ヌシガエルのドロップ）と骨の護符（買えない装備）は並べない
-          { item: "venomStinger", unlockedBy: "venomMarsh", from: "venomMarsh" },
-          { item: "rustedBone", unlockedBy: "venomMarsh", from: "venomMarsh" },
-          { item: "muddyShell", unlockedBy: "venomMarsh", from: "venomMarsh" },
+          { item: "venomStinger", unlockedBy: "venomMarsh" },
+          { item: "rustedBone", unlockedBy: "venomMarsh" },
+          { item: "muddyShell", unlockedBy: "venomMarsh" },
 
           // 第一章クリア後の装備（お金の使いみち。値段は作者が決めたもの）。
           // 工房で作れるいちばん良い装備は超えない強さ（data/items.js のコメント）

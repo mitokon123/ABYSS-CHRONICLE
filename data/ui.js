@@ -94,6 +94,12 @@
       ppBarBg: "#243048",
       ppBarColor: "#4fb0d1",
 
+      // アイテムの絵（data/sprites_icons.js の iconItem〇〇。どれも 16×16）の大きさ
+      //   listIconSize   … 一覧の名前の左（js/ui/ScrollList.js）
+      //   detailIconSize … 説明欄の左上（js/ui/StatusMarks.js の drawItemIcon）。16 の整数倍にするとドットがそろう
+      listIconSize: 16,
+      detailIconSize: 32,
+
       // マウス用の「戻る」ボタン。全画面で同じ位置に出す
       backButton: { x: 688, y: 552, w: 84, h: 30 },
       buttonHoverBg: "rgba(74,107,168,0.45)",
@@ -242,6 +248,19 @@
       },
 
       /**
+       * 眠っている印（RC-1）。小さな z が絵の右上から、右上へ漂いながら昇って消える。
+       *   fromX / fromY … 出てくる位置（絵の大きさに対する割合）
+       *   rise / driftX … 昇る高さ・右へ流れる量（px）　period … 1つが昇りきるまで（ms）
+       *   count … 同時に出す数（少しずつ遅れて出る）
+       */
+      sleepZzz: {
+        text: "z", count: 3, period: 1800,
+        fromX: 0.72, fromY: 0.22, rise: 24, driftX: 10,
+        minScale: 0.7, alpha: 0.9,
+        font: "bold 13px monospace", color: "#c9b8ff"
+      },
+
+      /**
        * レベルアップの結果（画面中央の窓）。上がった能力を「攻撃力 50 → 55 (+5)」の形で並べ、
        * 覚えた技があれば下に出す。決定・Esc・クリックで閉じる。複数が上がったら1体ずつ順に出す。
        * 高さは行数から決まる（y は上端）
@@ -285,6 +304,9 @@
         // 出来事1つあたりの待ち時間（ms）。
         //   文章を読み切れる長さにしてある。これが戦闘のテンポの基準になる
         eventDelay: 620,
+        // 勝ったとき、勝利の曲が鳴り始めてから経験値・レベルアップを出すまでの間（ms。作者の指定で RC-1 から）。
+        // 戦闘速度の設定は掛かる（ほかの待ち時間と同じ）。決定キーを押していれば quickDelay で飛ばせる
+        victoryPause: 1200,
         quickDelay: 90,         // 決定キーを押している間の待ち時間（ms）
         hpDrainPerSecond: 38,   // HPバーが1秒に動く量。大きいほど速く減る
         hpMinDrainTime: 220,    // 少量のダメージでも最低これだけ時間をかける（ms）
@@ -391,6 +413,26 @@
                     glowPulse: { amplitude: 18, period: 1700 } }
       },
 
+      /**
+       * たき火を囲む仲間（RC-1）。パーティの並び順に seats の席へ座る。
+       *   baseY      … 足もとの高さ（大きい種族は上へ伸びる）
+       *   seats      … 1人目から順の、足もとの中心のx。火（x 664〜716）の左に詰め、2人目だけ右へ
+       *   spriteSize … 絵の大きさ（種族の sizeScale が掛かる）
+       *   cheerEvery … ときどき喜ぶ動きをする間隔（ms。この範囲でばらける）
+       *   dozeChance … 喜ぶ代わりにうたた寝する割合。dozeFor のあいだ眠りの動きになる
+       *   押すと喜ぶ（眠っていれば起きて喜ぶ）
+       */
+      camp: {
+        baseY: 556,
+        seats: [630, 752, 574, 518, 462, 406],
+        spriteSize: 40,
+        shadow: "rgba(0,0,0,0.4)",
+        cheerEvery: [7000, 15000],
+        dozeChance: 0.3,
+        dozeFor: [6000, 11000],
+        zzzColor: "#9fb3ff"
+      },
+
       title:    { x: 48, y: 62, font: "26px monospace", color: "#e6ecff" },
       subtitle: { x: 48, y: 88, font: "13px monospace", color: "#7f8db8" },
       // 所持金（右寄せ）。countSpeed は増減を数字が追いかける速さ（1に近いほど速い）
@@ -400,10 +442,16 @@
       // lineHeight で項目の間隔を広げ、拠点らしい落ち着いた見た目にする
       //   iconSize を書くと、項目の左に絵がつく（0や未指定なら文字だけ）
       menu:   { x: 48, y: 122, w: 280, h: 372, lineHeight: 36, iconSize: 22 },
-      // 右側の手持ち一覧（最大6体）
-      status: { x: 360, y: 122, w: 400, h: 372, rowHeight: 52, spriteSize: 36, hpBarWidth: 190 },
+      // 右側の手持ち一覧（最大6体）。RC-1 で PP・経験値のバー、装備の絵、愛情度の印を足した
+      //   1行目：名前とLv・愛情度の印（affectionIcon）・右端に装備の絵4つ（equipIcon。空きの枠は薄い四角）
+      //   その下：HP（4px）・PP（3px）・次のレベルまでの経験値（3px）の細いバーと、右に小さな数字（barFont）
+      //   rowHeight … 6体 × 56 ＋ 見出し30 で枠（372）に収まる
+      status: { x: 360, y: 122, w: 400, h: 372, rowHeight: 56, spriteSize: 36, hpBarWidth: 150,
+                barFont: "10px monospace", equipIcon: 13, affectionIcon: 13,
+                expBarColor: "#b48ce0" },
 
-      notice: { x: 400, y: 526 },
+      // 知らせ（帰還の結果など）。下の帯にはたき火を囲む仲間がいるので、見出しと枠のあいだに出す
+      notice: { x: 400, y: 112 },
       hint:   { x: 48, y: 570 },
 
       // Esc で出す「タイトルに戻りますか？」の窓。見た目はセーブ画面の確認と同じ
@@ -551,10 +599,28 @@
                  x: 168, y: 250, size: 176, labelY: 392 },
 
       rows:   { x: 310, y: 122, w: 442, h: 62, gap: 12 },
-      // 色見本は「色」の欄（rows の2つ目）の中に置く
+      // 色見本は「色」の欄（rows の2つ目）の中に置く。
+      // 用意した色の右に、もう1つ「じぶんで」の見本が並ぶ（7つ × 46px で欄に収まる）
       swatch: { x: 420, y: 210, size: 34, gap: 12 },
       chip:   { x: 420, w: 48, h: 30, gap: 6, font: "13px monospace" },
       done:   { x: 310, y: 426, w: 442, h: 52 },
+
+      /**
+       * 服の色を自分で作る窓（「じぶんで」の見本で決定を押すと開く）。
+       *   bar     … つまみを動かす横棒。x は窓の左からの位置、y は1本目の上端、gap は棒どうしの間
+       *   swatch  … できた色の見本（色コードを横に出す）
+       *   buttons … 「決める」「やめる」
+       *   step    … 左右を1回押したときに動く量。押し続けると repeatMs ごとに続けて動く
+       */
+      colorEditor: {
+        veil: "rgba(4,6,12,0.72)",
+        box:  { x: 190, y: 140, w: 420, h: 300 },
+        bar:  { x: 130, y: 70, w: 250, h: 14, gap: 44, handleW: 6 },
+        swatch: { x: 30, y: 212, size: 34 },
+        buttons: { y: 250, w: 110, h: 32, gap: 16 },
+        step: { h: 6, s: 4, l: 3 },
+        repeatDelayMs: 320, repeatMs: 45
+      },
 
       hint:   { x: 48, y: 570 }
     },
@@ -876,15 +942,12 @@
 
       // 左：音量などの調整項目。
       // h は最低の高さで、項目が増えたぶんは SettingsScene が自動で伸ばす
-      items: { x: 48, y: 122, w: 340, h: 240, rowHeight: 44, barWidth: 150, barHeight: 8 },
-      // ただし書き。枠が伸びたときは、その下へ自動でずれる。
-      // ※ 項目は7つまでは何もせず収まる。8つ以上にするときは
+      // ※ 項目は7つまでは右の枠と同じ高さに収まる。8つ以上にするときは
       //   rowHeight を詰めるか、右のキー一覧のように送れるようにすること
-      note:  { x: 48, y: 384 },
-      noteGap: 22,
+      items: { x: 48, y: 122, w: 340, h: 240, rowHeight: 44, barWidth: 150, barHeight: 8 },
 
-      // 右：操作キーの一覧。入りきらないぶんはホイールか Q/E で送る
-      //   visibleRows … 一度に出す行数（これを超えると▲▼が出る）
+      // 右：操作キーの一覧。入りきらないぶんはホイール・右端のバー・Q/E で送る
+      //   visibleRows … 一度に出す行数（これを超えるとスクロールバーが出る）
       keys:  { x: 412, y: 122, w: 348, h: 372, rowHeight: 30, visibleRows: 10 },
 
       notice: { x: 400, y: 526 },

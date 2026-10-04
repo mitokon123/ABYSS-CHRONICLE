@@ -58,6 +58,12 @@
     // 画面に出している所持金。実際の額へ向かって少しずつ動かす
     this._shownGold = null;
 
+    // たき火を囲む仲間（data/ui.js の home.camp）。
+    // 1回だけの動き（喜ぶ）は MotionPlayer、次に何かする時刻とうたた寝の終わりは席ごとに持つ
+    this.campMotions = new NS.MotionPlayer(game.data);
+    this._campNext = [];
+    this._dozeUntil = [];
+
     this._ensureParty();
     this._buildMenu();
   }
@@ -78,6 +84,7 @@
     var entries = (this.game.data.home || {}).menu || [];
     var items = [];
     var keep = this.menu.index;   // 組み直しても、選んでいた場所に戻す
+    var badges = this._menuBadges();
 
     for (var i = 0; i < entries.length; i++) {
       var entry = entries[i];
@@ -90,11 +97,118 @@
         locked: locked,
         unlockedBy: entry.unlockedBy,
         icon: entry.icon,
-        color: locked ? this.theme.hintColor : null
+        color: locked ? this.theme.hintColor : null,
+        // まだ使えない項目には札を出さない
+        badge: locked ? null : (badges[entry.value] || null)
       });
     }
     this.menu.setItems(items);
     if (keep > 0 && keep < items.length) this.menu.index = keep;
+  };
+
+  // --- メニューの札（作れる・新入荷・NEW） ---
+
+  /**
+   * メニューの右端に出す札。{ craft: "作れる", shop: "新入荷", dex: "NEW" } のうち、当てはまるものだけ。
+   *
+   * 店と図鑑は「前に開いたときから増えたか」を見るので、何を見たかを game.homeSeen に持つ
+   * （セーブにも入る）。持っていないとき（新しく始めた・古いセーブ）は、
+   * いま並んでいるものを全部見たことにして始める。最初から印だらけにならないように。
+   */
+  HomeScene.prototype._menuBadges = function () {
+    var game = this.game;
+    if (!game.inventory || !game.discovery) return {};
+
+    if (!game.homeSeen) {
+      game.homeSeen = { shop: this._shopKeysSeenNow(), dex: this._dexCount() };
+    }
+
+    var badges = {};
+    if (this._canCraftSomething()) badges.craft = this.texts.badgeCraft || "!";
+
+    var seen = game.homeSeen.shop || {};
+    var keys = this._shopListedKeys();
+    for (var i = 0; i < keys.length; i++) {
+      if (!seen[keys[i]]) { badges.shop = this.texts.badgeShop || "!"; break; }
+    }
+
+    if (this._dexCount() > (game.homeSeen.dex || 0)) badges.dex = this.texts.badgeDex || "!";
+    return badges;
+  };
+
+  /** いまの素材とお金で、工房で作れるものが1つでもあるか */
+  HomeScene.prototype._canCraftSomething = function () {
+    if (!NS.CraftSystem) return false;
+    var craft = new NS.CraftSystem(this.game.data);
+    var recipes = craft.getRecipes(this.game.clearedDungeons);
+    for (var i = 0; i < recipes.length; i++) {
+      if (craft.canCraft(this.game, recipes[i]).ok) return true;
+    }
+    return false;
+  };
+
+  /**
+   * いま開いている店に並んでいるものの一覧（"item:herb" / "blessing:firstStrike" の形）。
+   * 謎の商人（type: "blessing"）は加護を並べるので、加護のid で数える
+   */
+  HomeScene.prototype._shopListedKeys = function () {
+    var data = this.game.data;
+    var cleared = this.game.clearedDungeons;
+    var shops = (data.shop || {}).shops || [];
+    var system = NS.ShopSystem ? new NS.ShopSystem(data) : null;
+    var met = function (condition) {
+      return !condition || !NS.DungeonCatalog || NS.DungeonCatalog.isConditionMet(condition, cleared, data);
+    };
+    var keys = [];
+
+    for (var i = 0; i < shops.length; i++) {
+      var shop = shops[i];
+      if (!met(shop.unlockedBy)) continue;
+
+      if (shop.type === "blessing") {
+        var blessings = data.blessings || {};
+        for (var id in blessings) {
+          if (!Object.prototype.hasOwnProperty.call(blessings, id)) continue;
+          if (blessings[id].locked && met(blessings[id].unlockedBy)) keys.push("blessing:" + id);
+        }
+      } else if (system) {
+        var stock = system.getStock(cleared, shop);
+        for (var s = 0; s < stock.length; s++) keys.push("item:" + stock[s].item.id);
+      }
+    }
+    return keys;
+  };
+
+  /** いま並んでいるものを「見た」として { key: true } にする */
+  HomeScene.prototype._shopKeysSeenNow = function () {
+    var seen = {};
+    var keys = this._shopListedKeys();
+    for (var i = 0; i < keys.length; i++) seen[keys[i]] = true;
+    return seen;
+  };
+
+  /**
+   * 図鑑の記録の数。見た・仲間にした種族、手に入れたアイテム、覚えた技、
+   * 愛情度で書き足された記録（段階の数）を足したもの。増えたら「NEW」
+   */
+  HomeScene.prototype._dexCount = function () {
+    var d = this.game.discovery || {};
+    var count = 0;
+    var groups = [d.monstersSeen, d.monstersCaught, d.itemsObtained, d.skillsLearned];
+    for (var i = 0; i < groups.length; i++) count += Object.keys(groups[i] || {}).length;
+    var stages = d.affectionStages || {};
+    for (var id in stages) {
+      if (Object.prototype.hasOwnProperty.call(stages, id)) count += stages[id] || 0;
+    }
+    return count;
+  };
+
+  /** 店・図鑑を開いたら、いまの分は見たことにする（札が消える） */
+  HomeScene.prototype._markSeen = function (value) {
+    var game = this.game;
+    if (!game.homeSeen) return;
+    if (value === "shop") game.homeSeen.shop = this._shopKeysSeenNow();
+    if (value === "dex") game.homeSeen.dex = this._dexCount();
   };
 
   /** その項目が使えるか。条件の判定はダンジョンや店と同じ仕組みを使う */
@@ -136,6 +250,10 @@
 
     this.notice.update(dt);
 
+    // たき火の仲間は、説明や確認の窓が出ていても動き続ける（押せるのは窓が無いときだけ）
+    var busy = this.tutorial.isActive() || this.confirming;
+    this._updateCamp(busy ? null : this.game.input);
+
     // 説明を出している間はメニューを触らせない
     if (this.tutorial.isActive()) {
       this.tutorial.handleInput(this.game.input);
@@ -156,6 +274,133 @@
       return;
     }
     if (result.type === "confirm") this._select(result.value);
+  };
+
+  // --- たき火を囲む仲間 ---
+
+  /** 範囲 [min, max] の中からばらけた値 */
+  HomeScene.prototype._between = function (range, fallback) {
+    var r = range || fallback;
+    return r[0] + this.random.next() * (r[1] - r[0]);
+  };
+
+  /** その席の当たり判定（押すと喜ぶ） */
+  HomeScene.prototype._seatRect = function (monster, index) {
+    var C = this.layout.camp;
+    var size = Math.round(C.spriteSize * (monster.getSizeScale ? monster.getSizeScale() : 1));
+    return { x: C.seats[index] - size / 2, y: C.baseY - size, w: size, h: size };
+  };
+
+  /**
+   * ときどき喜ぶ・うたた寝する。押されたら喜ぶ（眠っていれば起きてから）。
+   * @param {MyGame.Input|null} input 窓が出ているときは null（押せない）
+   */
+  HomeScene.prototype._updateCamp = function (input) {
+    var C = this.layout.camp;
+    var party = this.game.party;
+    if (!C || !party) return;
+
+    var clock = this.game.clock || 0;
+    this.campMotions.update(clock);
+    var pointer = (input && input.getPointer) ? input.getPointer() : null;
+
+    for (var i = 0; i < party.size() && i < C.seats.length; i++) {
+      var monster = party.get(i);
+
+      // 最初は席ごとにずらして始める（全員が同時に喜ばないように）
+      if (!this._campNext[i]) this._campNext[i] = clock + this._between([1500, (C.cheerEvery || [7000])[0]], [1500, 7000]);
+
+      var clicked = pointer && pointer.clicked && pointer.inside &&
+                    NS.Panel.containsPoint(this._seatRect(monster, i), pointer);
+
+      if (clicked) {
+        this._dozeUntil[i] = 0;
+        this._cheer(monster);
+        this._campNext[i] = clock + this._between(C.cheerEvery, [7000, 15000]);
+        continue;
+      }
+      if (clock < this._campNext[i]) continue;
+
+      if (this._dozeUntil[i] > clock) continue;   // 眠っているあいだは何もしない
+      if (this._dozeUntil[i]) {
+        // 目を覚ましたところ。すぐには喜ばない
+        this._dozeUntil[i] = 0;
+        this._campNext[i] = clock + this._between(C.cheerEvery, [7000, 15000]);
+        continue;
+      }
+
+      if (this.random.next() < (C.dozeChance || 0)) {
+        var doze = this._between(C.dozeFor, [6000, 11000]);
+        this._dozeUntil[i] = clock + doze;
+        this._campNext[i] = clock + doze;
+      } else {
+        this._cheer(monster);
+        this._campNext[i] = clock + this._between(C.cheerEvery, [7000, 15000]);
+      }
+    }
+  };
+
+  /** 喜ぶ動き（その種族の levelUp。スライムなら跳ねる、コウモリなら羽ばたく） */
+  HomeScene.prototype._cheer = function (monster) {
+    var id = monster.getActionMotionId ? monster.getActionMotionId("levelUp") : null;
+    // 向きは戦闘で味方が喜ぶときと同じ（BattleScene の levelUp）
+    if (id) this.campMotions.play(monster, id, this.game.clock, 1);
+  };
+
+  /** 仲間を席に描く。足もとに影を落とし、眠っていれば頭の上に z を昇らせる */
+  HomeScene.prototype._renderCamp = function (ctx) {
+    var C = this.layout.camp;
+    var party = this.game.party;
+    if (!C || !party) return;
+
+    var data = this.game.data;
+    var clock = this.game.clock || 0;
+
+    for (var i = 0; i < party.size() && i < C.seats.length; i++) {
+      var monster = party.get(i);
+      var rect = this._seatRect(monster, i);
+      var dozing = this._dozeUntil[i] > clock;
+
+      ctx.save();
+      ctx.fillStyle = C.shadow || "rgba(0,0,0,0.4)";
+      ctx.beginPath();
+      ctx.ellipse(C.seats[i], C.baseY - 1, rect.w * 0.34, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      var sprite = monster.getSpriteId();
+      var phase = monster.getMotionPhase();
+      // うたた寝は戦闘の眠りと同じ動き（種族が motions.sleeping を持っていればそちら）
+      var idle = dozing
+        ? NS.Motion.of(data, monster.getActionMotionId("sleeping") || "sleeping", clock, phase)
+        : NS.Motion.forSprite(data, sprite, monster.getMotionId(), clock, phase);
+      var combined = NS.Motion.combine(idle, this.campMotions.get(monster, clock));
+
+      var poseSprite = combined.pose ? monster.getPoseSpriteId(combined.pose) : null;
+      if (poseSprite) {
+        sprite = poseSprite;
+        combined.frame = 0;
+      } else if (dozing && Object.prototype.toString.call(sprite) === "[object Array]") {
+        combined.frame = 0;   // 眠りの絵が無い種族は、コマ絵の1枚目で止める
+      }
+      this.sprites.drawMotion(sprite, rect.x, rect.y, rect.w, rect.h, combined);
+
+      if (dozing) this._renderZzz(ctx, rect, clock, i);
+    }
+  };
+
+  /** 眠っている印。小さな z が2つ、ずれて昇って消える */
+  HomeScene.prototype._renderZzz = function (ctx, rect, clock, seed) {
+    var C = this.layout.camp;
+    for (var k = 0; k < 2; k++) {
+      var t = ((clock + seed * 700 + k * 1100) % 2200) / 2200;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - t) * 0.9;
+      ctx.font = (k === 0 ? 10 : 12) + "px monospace";
+      ctx.fillStyle = C.zzzColor || "#9fb3ff";
+      ctx.fillText("z", rect.x + rect.w * 0.75 + t * 8, rect.y + 4 - t * 18);
+      ctx.restore();
+    }
   };
 
   /** 「タイトルに戻りますか？」の操作。Esc と「いいえ」は拠点に残る */
@@ -211,6 +456,7 @@
 
   /** 実装済みの項目を開く */
   HomeScene.prototype._openFeature = function (value) {
+    this._markSeen(value);
     switch (value) {
       case "dungeon":
         // どの場所へ挑むかを選んでもらう
@@ -289,6 +535,7 @@
 
     this._renderBackground(ctx, w, h);
     this._renderScenery(ctx, w, h);
+    this._renderCamp(ctx);
     this.particles.render(ctx);
     this._renderHeading(ctx);
     this._renderGold();
@@ -476,14 +723,97 @@
 
     // 文字の開始位置は元の大きさで決める（大きい相手でも行がずれないように）
     var textX = x + base + 14;
-    this.panel.drawText(monster.getName() + "  Lv" + monster.level, textX, y + 16);
+    var heading = monster.getName() + "  Lv" + monster.level;
+    this.panel.drawText(heading, textX, y + 14);
 
-    this.hpBar.draw(textX, y + 24, S.hpBarWidth, 8, monster.currentHp, monster.getMaxHp());
-    this.panel.drawText(
-      monster.currentHp + "/" + monster.getMaxHp(),
-      textX + S.hpBarWidth + 10, y + 32,
-      { font: t.smallFont, color: t.subTextColor }
-    );
+    // 愛情度の印（慣れ・信頼・絆）。名前の右に出す。出会いの段階には出さない
+    var ctx = this.panel.ctx;
+    ctx.save();
+    ctx.font = t.font || "14px monospace";
+    var headingW = ctx.measureText(heading).width;
+    ctx.restore();
+    var stage = monster.getAffectionStage ? monster.getAffectionStage() : null;
+    if (stage && stage.icon) {
+      var a = S.affectionIcon || 13;
+      this.sprites.draw(stage.icon, textX + headingW + 6, y + 14 - a + 2, a, a);
+    }
+
+    this._renderEquipIcons(monster, y);
+
+    // HP・PP・次のレベルまでの経験値。どれも細くして、右に小さな数字を添える
+    var barW = S.hpBarWidth;
+    var numX = textX + barW + 8;
+    var numFont = S.barFont || t.smallFont;
+    var numColor = t.subTextColor;
+
+    // 数字は10pxずつ下げる（詰めると字の上下が触れて読みにくい）
+    this.hpBar.draw(textX, y + 21, barW, 4, monster.currentHp, monster.getMaxHp());
+    this.panel.drawText("HP " + monster.currentHp + "/" + monster.getMaxHp(), numX, y + 26,
+      { font: numFont, color: numColor });
+
+    this.hpBar.drawPp(textX, y + 31, barW, 3, monster.currentPp, monster.getMaxPp());
+    this.panel.drawText("PP " + monster.currentPp + "/" + monster.getMaxPp(), numX, y + 36,
+      { font: numFont, color: numColor });
+
+    var exp = this._expProgress(monster);
+    this.hpBar.draw(textX, y + 41, barW, 3, exp.ratio, 1,
+      { color: S.expBarColor || "#b48ce0" });
+    this.panel.drawText(exp.label, numX, y + 46, { font: numFont, color: numColor });
+  };
+
+  /**
+   * 次のレベルまでの進み具合。{ ratio: 0〜1, label: "あと 12" }。
+   * レベル上限に届いていれば満タンで「MAX」
+   */
+  HomeScene.prototype._expProgress = function (monster) {
+    var max = monster.getMaxLevel ? monster.getMaxLevel() : 99;
+    if (monster.level >= max) return { ratio: 1, label: this.texts.expMax || "MAX" };
+    var need = monster.getExpToNextLevel ? monster.getExpToNextLevel() : 0;
+    var have = monster.exp || 0;
+    var ratio = need > 0 ? Math.max(0, Math.min(1, have / need)) : 0;
+    var template = this.texts.expLeft || "あと {n}";
+    return { ratio: ratio, label: template.replace("{n}", Math.max(0, need - have)) };
+  };
+
+  /**
+   * 着けている装備を、行の右上に小さな絵で並べる（武器・防具・アクセサリー2つの順。data/config.js の equipSlots）。
+   * 空いている枠は薄い四角だけ出す（あといくつ着けられるかが分かるように）
+   */
+  HomeScene.prototype._renderEquipIcons = function (monster, y) {
+    var S = this.layout.status;
+    var t = this.theme;
+    var data = this.game.data;
+    var size = S.equipIcon || 13;
+    var gap = 2;
+    var slots = (data.config || {}).equipSlots || [];
+    var right = S.x + S.w - (t.padding || 8);
+    var x0 = right - slots.length * (size + gap) + gap;
+
+    // 枠ごとに、着けている装備を前から割り当てる
+    var worn = (monster.equipment || []).slice();
+    var ctx = this.panel.ctx;
+    for (var i = 0; i < slots.length; i++) {
+      var item = null;
+      for (var k = 0; k < worn.length; k++) {
+        var candidate = data.getItem(worn[k]);
+        if (candidate && NS.EffectSystem.slotOf(candidate) === slots[i]) {
+          item = candidate;
+          worn.splice(k, 1);
+          break;
+        }
+      }
+      var x = x0 + i * (size + gap);
+      var top = y + 14 - size + 2;
+      if (item && item.icon) {
+        this.sprites.draw(item.icon, x, top, size, size);
+      } else {
+        ctx.save();
+        ctx.strokeStyle = t.panelBorder || "#3a4560";
+        ctx.globalAlpha = 0.6;
+        ctx.strokeRect(x + 0.5, top + 0.5, size - 1, size - 1);
+        ctx.restore();
+      }
+    }
   };
 
   HomeScene.prototype._renderNotice = function (ctx) {

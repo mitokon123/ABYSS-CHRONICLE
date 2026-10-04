@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>主の勝率 - ABYSS CHRONICLE</title>
+  <!--
+    ▼ このファイルについて（開発用。ゲーム本体ではない）
+
+    主（data/bosses.js）と決めた仲間を何百回も戦わせて、勝率を出すページ。RC-1 で作った。
+    ダメージの式・装備・技を変えたら「主4体の勝率を測り直す」決まりがあるので、そのための道具。
+
+    使い方
+      1. 変える前に「実行」→「この結果を基準にする」
+      2. data/*.js を変えて、このページを読み込み直す
+      3. もう一度「実行」すると、基準と今の勝率が並んで出る
+      ・「試しに変える」に data/battle.js の一部を JSON で書くと、ファイルを触らずに試せる
+        例：{ "critical": { "multiplier": 2.0, "ignoreDefense": false } }
+
+    ★ 勝率の絶対値で難しさを語らないこと。仲間の動きが単純（いちばん痛い技を撃つ・弱った仲間を治す）
+      なので、実際に遊ぶより1段辛く出る。「前と比べてどれだけ動いたか」を見るためのもの。
+
+    戦いの計算はゲームと同じ BattleSystem を使う。主の作り方は DungeonScene._startBossBattle と同じ
+    （倍率・決まった行動の順番・状態異常への耐性）。
+    セーブや設定には一切触れない。このページの設定と基準だけを __balance-sim.* に残す。
+
+    読み込むファイルは app.html の一覧をそのまま使う（js/main.js だけ除く。motion-viewer.html と同じ）。
+    ★ 一覧を読むのに fetch を使うので、サーバー経由（http://〜）で開くこと。
+  -->
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #05070d; color: #c8d0e8; font-family: sans-serif; font-size: 14px; }
+    #wrap { display: flex; gap: 16px; padding: 12px 16px; flex-wrap: wrap; align-items: flex-start; }
+    h1 { font-size: 18px; margin: 0 0 8px; color: #ffd75e; }
+    h2 { font-size: 13px; margin: 14px 0 6px; color: #9aa4c0; }
+    .box { background: #0a0f1c; border: 1px solid #2a3350; padding: 10px 12px; }
+    #setup { flex: 1 1 560px; min-width: 0; }
+    #side { flex: 0 1 320px; min-width: 260px; }
+    table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+    th, td { padding: 4px 6px; border-bottom: 1px solid #1d2742; text-align: left; vertical-align: middle; }
+    th { color: #9aa4c0; font-weight: normal; font-size: 12px; }
+    select, input, textarea, button { background: #141b2e; color: #e8ecf8; border: 1px solid #2a3350;
+                                      border-radius: 4px; font-size: 13px; }
+    select { padding: 3px; max-width: 120px; }
+    input[type=number] { width: 52px; padding: 3px; }
+    textarea { width: 100%; box-sizing: border-box; min-height: 70px; font-family: monospace; padding: 6px; }
+    button { padding: 7px 12px; cursor: pointer; margin: 4px 4px 0 0; }
+    button:hover { background: #1d2742; }
+    button.main { border-color: #ffd75e; color: #ffd75e; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .party { display: flex; gap: 4px; flex-wrap: wrap; }
+    .gear { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+    .num { text-align: right; }
+    .up { color: #7fd99a; }
+    .down { color: #ff9a7a; }
+    .dim { color: #6b7590; }
+    #status { min-height: 1.4em; color: #ffd75e; margin-top: 6px; }
+    #note { font-size: 12px; color: #6b7590; line-height: 1.7; margin-top: 10px; }
+    #error { color: #ff9a7a; font-size: 12px; min-height: 1em; }
+    .scroll { overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="setup">
+      <h1>主の勝率</h1>
+      <div class="box scroll">
+        <table id="bossTable">
+          <thead><tr><th></th><th>主</th><th>仲間（3体・同じLv）と装備（全員に同じもの）</th><th>Lv</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h2>結果</h2>
+      <div class="box scroll">
+        <table id="resultTable">
+          <thead><tr><th>主</th><th class="num">基準</th><th class="num">今</th><th class="num">差</th>
+                     <th class="num">勝ったときの平均ターン</th><th class="num">倒れた仲間（平均）</th></tr></thead>
+          <tbody><tr><td colspan="6" class="dim">まだ実行していない</td></tr></tbody>
+        </table>
+      </div>
+      <div id="status"></div>
+    </div>
+
+    <div id="side">
+      <div class="box">
+        <h2 style="margin-top:0">回数</h2>
+        <div>1体あたり <input type="number" id="runs" min="10" max="5000" value="300"> 戦
+             ／ 乱数の種 <input type="number" id="seed" min="1" value="1"></div>
+
+        <h2>試しに変える（data/battle.js の一部を JSON で）</h2>
+        <textarea id="override" placeholder='例：{ "critical": { "multiplier": 2.0, "ignoreDefense": false } }'></textarea>
+        <div id="error"></div>
+
+        <div>
+          <button id="run" class="main">実行</button>
+          <button id="pin">この結果を基準にする</button>
+          <button id="reset">仲間を初期に戻す</button>
+        </div>
+
+        <div id="note">
+          開発用のページ。セーブには触れない。<br>
+          仲間の動き：弱った仲間（HP4割未満）がいれば回復の技、毒の仲間がいればクレンズ、
+          それ以外は主にいちばん痛い技（PPが無ければ通常攻撃）。道具は使わない。<br>
+          仲間は性格「素直」・個体値0・愛情度0。主はゲームと同じ倍率と行動の順番。<br>
+          ★ 実際に遊ぶより辛く出る。基準と比べて見ること。<br>
+          基準は「同じ仲間・同じ回数・同じ種」のときだけ並べる。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    // 初期の仲間（2026-10-04 にクリティカルの変更で測ったときの組み合わせ）
+    var DEFAULT_PARTIES = {
+      mineKeeper: { lv: 7,  members: ["slime", "batty", "rocky"] },
+      blazeBeast: { lv: 11, members: ["slime", "rocky", "flamin"] },
+      abyssKing:  { lv: 16, members: ["slime", "flamin", "glowBug"] },
+      swampLord:  { lv: 20, members: ["slime", "flamin", "boltBug"] }
+    };
+    var SETTINGS_KEY = "__balance-sim.settings";
+    var BASELINE_KEY = "__balance-sim.baseline";
+    var MAX_TURNS = 60;          // これを超えたら負け扱い（決着がつかない）
+    var HEAL_BELOW = 0.4;        // この割合を切った仲間がいれば回復の技を使う
+
+    // ブラウザの保存は使えないこともある（見本・非公開の窓）ので、すべて try で包む
+    function load(key) { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (e) { return null; } }
+    function save(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* 保存できなくても動く */ } }
+
+    // app.html の読み込み一覧をそのまま使う（js/main.js は起動なので除く）
+    fetch("app.html?n=" + Date.now()).then(function (res) { return res.text(); }).then(function (html) {
+      var files = [];
+      var re = /"((?:js|data)\/[^"]+\.js)"/g, m;
+      while ((m = re.exec(html))) {
+        if (m[1] !== "js/main.js") files.push(m[1]);
+      }
+      loadInOrder(files, 0, start);
+    });
+
+    function loadInOrder(files, index, done) {
+      if (index >= files.length) { done(); return; }
+      var s = document.createElement("script");
+      s.src = files[index] + "?t=" + Date.now();
+      s.onload = function () { loadInOrder(files, index + 1, done); };
+      s.onerror = function () { loadInOrder(files, index + 1, done); };
+      document.head.appendChild(s);
+    }
+
+    function start() {
+      var NS = window.MyGame;
+      var gd = NS.DataLoader.build(NS.rawData);
+      var originalBattle = JSON.parse(JSON.stringify(gd.battle || {}));
+
+      var bosses = gd.bosses || {};
+      var bossIds = Object.keys(bosses);
+      var speciesIds = Object.keys(gd.monsters);
+      var settings = load(SETTINGS_KEY) || {};
+      var lastResults = null;
+
+      // --- 装備の候補（枠ごと） ---
+      var gearBySlot = { weapon: [], armor: [], accessory: [] };
+      Object.keys(gd.items).forEach(function (id) {
+        var item = gd.items[id];
+        var slot = item.equip && item.equip.slot;
+        if (gearBySlot[slot]) gearBySlot[slot].push(item);
+      });
+      var GEAR_FIELDS = [["weapon", "武器"], ["armor", "防具"], ["accessory", "アクセ1"], ["accessory2", "アクセ2"]];
+
+      // --- 主の表 ---
+      var tbody = document.querySelector("#bossTable tbody");
+      bossIds.forEach(function (bossId) {
+        var boss = bosses[bossId];
+        var conf = partyOf(bossId);
+        var tr = document.createElement("tr");
+        tr.dataset.boss = bossId;
+
+        var tdOn = document.createElement("td");
+        var check = document.createElement("input");
+        check.type = "checkbox";
+        check.checked = conf.on !== false;
+        check.className = "on";
+        tdOn.appendChild(check);
+
+        var tdName = document.createElement("td");
+        var species = gd.monsters[boss.species];
+        tdName.innerHTML = (boss.title || (species ? species.name : bossId)) +
+          "<br><span class='dim'>Lv" + boss.level + "</span>";
+
+        var tdParty = document.createElement("td");
+        var party = document.createElement("div");
+        party.className = "party";
+        for (var i = 0; i < 3; i++) {
+          party.appendChild(selectOf(speciesIds.map(function (id) {
+            return [id, gd.monsters[id].name];
+          }), conf.members[i] || "slime", "member"));
+        }
+        tdParty.appendChild(party);
+        var gear = document.createElement("div");
+        gear.className = "gear";
+        GEAR_FIELDS.forEach(function (field) {
+          var slot = field[0] === "accessory2" ? "accessory" : field[0];
+          var options = [["", field[1] + "：なし"]].concat(gearBySlot[slot].map(function (item) {
+            return [item.id, item.name];
+          }));
+          var sel = selectOf(options, (conf.gear || {})[field[0]] || "", "gear");
+          sel.dataset.field = field[0];
+          gear.appendChild(sel);
+        });
+        tdParty.appendChild(gear);
+
+        var tdLv = document.createElement("td");
+        var lv = document.createElement("input");
+        lv.type = "number"; lv.min = 1; lv.max = 99; lv.value = conf.lv;
+        lv.className = "lv";
+        tdLv.appendChild(lv);
+
+        tr.appendChild(tdOn); tr.appendChild(tdName); tr.appendChild(tdParty); tr.appendChild(tdLv);
+        tbody.appendChild(tr);
+      });
+
+      function partyOf(bossId) {
+        var saved = settings[bossId];
+        if (saved) return saved;
+        var d = DEFAULT_PARTIES[bossId] || { lv: bosses[bossId].level, members: ["slime", "slime", "slime"] };
+        return { on: true, lv: d.lv, members: d.members.slice(), gear: {} };
+      }
+
+      function selectOf(options, value, cls) {
+        var sel = document.createElement("select");
+        sel.className = cls;
+        options.forEach(function (o) {
+          var opt = document.createElement("option");
+          opt.value = o[0]; opt.textContent = o[1];
+          sel.appendChild(opt);
+        });
+        sel.value = value;
+        return sel;
+      }
+
+      // 画面の入力を読み取る
+      function readRows() {
+        return Array.prototype.map.call(tbody.querySelectorAll("tr"), function (tr) {
+          var gear = {};
+          Array.prototype.forEach.call(tr.querySelectorAll("select.gear"), function (sel) {
+            if (sel.value) gear[sel.dataset.field] = sel.value;
+          });
+          return {
+            bossId: tr.dataset.boss,
+            on: tr.querySelector("input.on").checked,
+            lv: Math.max(1, Math.min(99, Number(tr.querySelector("input.lv").value) || 1)),
+            members: Array.prototype.map.call(tr.querySelectorAll("select.member"), function (s) { return s.value; }),
+            gear: gear
+          };
+        });
+      }
+
+      function saveSettings(rows) {
+        var out = {};
+        rows.forEach(function (r) { out[r.bossId] = { on: r.on, lv: r.lv, members: r.members, gear: r.gear }; });
+        save(SETTINGS_KEY, out);
+      }
+
+      // 基準と比べてよいかの目印（同じ仲間・同じ回数・同じ種）。「試しに変える」は含めない（それを比べたいので）
+      function signature(row, runs, seed) {
+        return [row.lv, row.members.join(","), JSON.stringify(row.gear), runs, seed].join("|");
+      }
+
+      // --- 「試しに変える」を data/battle.js に重ねる ---
+      function applyOverride() {
+        var text = document.getElementById("override").value.trim();
+        var errorBox = document.getElementById("error");
+        errorBox.textContent = "";
+        gd.battle = JSON.parse(JSON.stringify(originalBattle));
+        if (!text) return true;
+        try {
+          merge(gd.battle, JSON.parse(text));
+          return true;
+        } catch (e) {
+          errorBox.textContent = "JSON が読めない：" + e.message;
+          return false;
+        }
+      }
+      function merge(target, src) {
+        Object.keys(src).forEach(function (k) {
+          if (src[k] && typeof src[k] === "object" && !Array.isArray(src[k]) &&
+              target[k] && typeof target[k] === "object") {
+            merge(target[k], src[k]);
+          } else {
+            target[k] = src[k];
+          }
+        });
+      }
+
+      // --- 1戦 ---
+      function makeBoss(boss, random) {
+        var enemy = NS.MonsterInstance.create(boss.species, boss.level, gd, random);
+        if (enemy.setEncounterMultipliers) enemy.setEncounterMultipliers(boss.statMultiplier);
+        if (enemy.setActionPattern) enemy.setActionPattern(boss.actionPattern);
+        if (enemy.setBossStatusImmunity) {
+          var list = ((gd.battle || {}).bossImmuneToStatus || []).slice();
+          (boss.immuneToStatus || []).forEach(function (id) { if (list.indexOf(id) < 0) list.push(id); });
+          enemy.setBossStatusImmunity(list);
+        }
+        return enemy;
+      }
+
+      function makeMember(id, lv, gear) {
+        var equipment = [];
+        GEAR_FIELDS.forEach(function (f) { if (gear[f[0]]) equipment.push(gear[f[0]]); });
+        return new NS.MonsterInstance(id, lv, gd, { nature: "balanced", equipment: equipment });
+      }
+
+      // 乱数もクリティカルも使わない「ふつうに当たったときのダメージ」。どの技を撃つか決めるのに使う
+      function expectedDamage(sys, actor, target, skillId) {
+        var skill = gd.getSkill(skillId);
+        if (!skill || !NS.BattleSystem.dealsDamage(skill)) return -1;
+        if (skill.pp && actor.currentPp < skill.pp) return -1;
+        var keepRandom = sys.random, keepCrit = sys._rollCritical;
+        sys.random = { next: function () { return 0.5; }, nextInt: function (a) { return a; },
+                       pick: function (arr) { return arr[0]; } };
+        sys._rollCritical = function () { return false; };
+        var damage = sys.calcDamage(actor, target, skill).damage;
+        sys.random = keepRandom; sys._rollCritical = keepCrit;
+        return damage * (skill.accuracy === undefined ? 1 : skill.accuracy);
+      }
+
+      function chooseAction(sys, member, boss) {
+        if (member.isFainted()) return { type: "skip" };
+        var slots = sys.getFieldSlots();
+
+        // 弱った仲間がいれば、いちばん多く治せる回復の技で、いちばん弱った仲間を
+        var wounded = -1, worst = HEAL_BELOW;
+        slots.forEach(function (m, i) {
+          if (m.isFainted()) return;
+          var ratio = m.currentHp / m.getMaxHp();
+          if (ratio < worst) { worst = ratio; wounded = i; }
+        });
+        if (wounded >= 0) {
+          var heal = bestOf(member, function (s) { return s.heal && !s.power ? (s.heal.max || s.heal.amount || 0) : -1; });
+          if (heal) return { type: "skill", skillId: heal, targetIndex: wounded };
+        }
+
+        // 毒の仲間がいれば、クレンズ
+        var poisoned = -1;
+        slots.forEach(function (m, i) {
+          if (poisoned < 0 && !m.isFainted() && NS.BattleSystem.hasCurable(m, { statuses: ["poison"] })) poisoned = i;
+        });
+        if (poisoned >= 0) {
+          var cure = bestOf(member, function (s) { return s.cureStatus && !s.power ? 1 : -1; });
+          if (cure) return { type: "skill", skillId: cure, targetIndex: poisoned };
+        }
+
+        // 主にいちばん痛い技
+        var best = sys.getNormalAttackId(), bestDamage = expectedDamage(sys, member, boss, best);
+        member.skills.forEach(function (id) {
+          var d = expectedDamage(sys, member, boss, id);
+          if (d > bestDamage) { bestDamage = d; best = id; }
+        });
+        return { type: "skill", skillId: best, targetIndex: 0 };
+      }
+
+      // 使える（PPが足りる）技のうち、score がいちばん大きいもの。無ければ null
+      function bestOf(member, score) {
+        var best = null, bestScore = 0;
+        member.skills.forEach(function (id) {
+          var skill = gd.getSkill(id);
+          if (!skill || (skill.pp && member.currentPp < skill.pp)) return;
+          var s = score(skill);
+          if (s > bestScore) { bestScore = s; best = id; }
+        });
+        return best;
+      }
+
+      function fight(row, index, seed) {
+        var boss = bosses[row.bossId];
+        var party = row.members.map(function (id) { return makeMember(id, row.lv, row.gear); });
+        var enemy = makeBoss(boss, new NS.Random(seed * 100003 + index * 7 + 1));
+        var sys = new NS.BattleSystem(gd, new NS.Random(seed * 1000003 + index));
+        sys.start(party, [enemy]);
+
+        var turn = 0;
+        while (!sys.finished && turn < MAX_TURNS) {
+          turn++;
+          sys.takeTurn(sys.getFieldSlots().map(function (m) { return chooseAction(sys, m, enemy); }));
+        }
+        var fainted = party.filter(function (m) { return m.isFainted(); }).length;
+        return { win: sys.result === "win", turns: turn, fainted: fainted };
+      }
+
+      // --- 実行（主ごとに区切って、画面が固まらないようにする） ---
+      var runButton = document.getElementById("run");
+      runButton.onclick = function () {
+        if (!applyOverride()) return;
+        var rows = readRows();
+        saveSettings(rows);
+        var runs = Math.max(10, Math.min(5000, Number(document.getElementById("runs").value) || 300));
+        var seed = Math.max(1, Number(document.getElementById("seed").value) || 1);
+        var targets = rows.filter(function (r) { return r.on; });
+        var results = [];
+        runButton.disabled = true;
+
+        (function next(i) {
+          if (i >= targets.length) {
+            runButton.disabled = false;
+            document.getElementById("status").textContent = "終わり（" + runs + "戦ずつ）";
+            lastResults = results;
+            if (!load(BASELINE_KEY)) pin();   // 基準がまだ無ければ、最初の結果を基準にする
+            render();
+            return;
+          }
+          var row = targets[i];
+          document.getElementById("status").textContent =
+            "実行中… " + (i + 1) + " / " + targets.length + "（" + nameOf(row.bossId) + "）";
+          setTimeout(function () {
+            var wins = 0, winTurns = 0, fainted = 0;
+            try {
+              for (var k = 0; k < runs; k++) {
+                var r = fight(row, k, seed);
+                if (r.win) { wins++; winTurns += r.turns; }
+                fainted += r.fainted;
+              }
+            } catch (e) {
+              document.getElementById("error").textContent = nameOf(row.bossId) + " で止まった：" + e.message;
+            }
+            results.push({
+              bossId: row.bossId, sig: signature(row, runs, seed),
+              rate: wins / runs, turns: wins ? winTurns / wins : null, fainted: fainted / runs
+            });
+            next(i + 1);
+          }, 20);
+        })(0);
+      };
+
+      function pin() {
+        if (!lastResults) return;
+        var baseline = load(BASELINE_KEY) || {};
+        lastResults.forEach(function (r) { baseline[r.bossId] = { sig: r.sig, rate: r.rate }; });
+        save(BASELINE_KEY, baseline);
+      }
+      document.getElementById("pin").onclick = function () { pin(); render(); };
+
+      document.getElementById("reset").onclick = function () {
+        save(SETTINGS_KEY, null);
+        location.reload();
+      };
+
+      function nameOf(bossId) {
+        var boss = bosses[bossId];
+        var species = gd.monsters[boss.species];
+        return boss.title || (species ? species.name : bossId);
+      }
+      function pct(v) { return Math.round(v * 100) + "%"; }
+
+      function render() {
+        var body = document.querySelector("#resultTable tbody");
+        body.innerHTML = "";
+        var baseline = load(BASELINE_KEY) || {};
+        (lastResults || []).forEach(function (r) {
+          var base = baseline[r.bossId];
+          var same = base && base.sig === r.sig;
+          var diff = same ? Math.round((r.rate - base.rate) * 100) : null;
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" + nameOf(r.bossId) + "</td>" +
+            "<td class='num'>" + (same ? pct(base.rate) : "<span class='dim'>—</span>") + "</td>" +
+            "<td class='num'>" + pct(r.rate) + "</td>" +
+            "<td class='num " + (diff > 0 ? "up" : diff < 0 ? "down" : "dim") + "'>" +
+              (diff === null ? "<span class='dim'>条件が違う</span>" : (diff > 0 ? "+" : "") + diff) + "</td>" +
+            "<td class='num'>" + (r.turns === null ? "—" : r.turns.toFixed(1)) + "</td>" +
+            "<td class='num'>" + r.fainted.toFixed(2) + "</td>";
+          body.appendChild(tr);
+        });
+      }
+
+      document.getElementById("status").textContent = "準備できた";
+    }
+  })();
+  </script>
+</body>
+</html>

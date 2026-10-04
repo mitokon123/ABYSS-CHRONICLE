@@ -133,6 +133,64 @@
       },
 
       /**
+       * --- 属性技の2段目（RC-1。シャインの radiance と同じく、1段目の型の一段上） ---
+       */
+
+      // フレイム。burst の一段上。大きく弾け、足元から炎の舌が立ち昇り、輪が抜けて、もう一度小さく弾ける
+      //   tongues / tongueHeight / tongueWidth … 炎の数・高さ・太さ   accentColor … 3つに1つの炎と火の粉の色
+      blaze: {
+        shape: "blaze",
+        duration: 720,
+        glow: 18,
+        accentColor: "#ffd75e",
+        radius: 84,
+        count: 26,
+        minSize: 4,
+        maxSize: 9,
+        tongues: 7,
+        tongueHeight: 96,
+        tongueWidth: 18,
+        ringRadius: 124,
+        ringWidth: 4
+      },
+
+      // ウェーブ。rain の一段上。白い泡を乗せた波が横から2枚打ち寄せ、しぶきが散り、足元に波紋が広がる
+      //   waveWidth / waveHeight / thickness … 波の大きさと太さ   drops / splash … しぶきの数と飛ぶ強さ
+      surge: {
+        shape: "surge",
+        duration: 820,
+        glow: 14,
+        waveWidth: 160,
+        waveHeight: 74,
+        thickness: 12,
+        drops: 24,
+        splash: 96,
+        minSize: 3,
+        maxSize: 6,
+        rippleRadius: 72,
+        footY: 30
+      },
+
+      // ロックスパイク。shards の一段上。足元から尖った岩が突き上がり、かけらが飛び散って、土煙が広がる
+      //   spikes / spikeHeight / spikeWidth / spread … 棘の数・高さ・太さ・並ぶ幅   gravity … かけらの落ちる強さ
+      spikes: {
+        shape: "spikes",
+        duration: 820,
+        glow: 10,
+        spikes: 5,
+        spikeHeight: 84,
+        spikeWidth: 22,
+        spread: 92,
+        footY: 34,
+        count: 16,
+        radius: 84,
+        gravity: 170,
+        minSize: 4,
+        maxSize: 8,
+        dustRadius: 84
+      },
+
+      /**
        * 降りそそぐ。上から粒が落ちてくる。
        *   spread … 左右の広がり   height … どこから落ちてくるか
        */
@@ -161,6 +219,32 @@
         rise: 46,
         lineWidth: 3,
         count: 10,
+        minSize: 3,
+        maxSize: 5
+      },
+
+      /**
+       * 共鳴（RC-1）。共鳴の技を出した本人のまわりに出す（当てる演出とは別）。
+       * 足元に響きの輪が何重にも広がり、光の粒が本人のまわりを巡りながら昇る。
+       * 色は技の属性（回復の共鳴はHPの緑）。data/categories.js の skillKind.resonance.casterEffect が指す
+       *   ripples / radius / flatten … 広がる輪の数・大きさ・つぶれ具合（足元の楕円に見せる）
+       *   motes / orbit / rise        … 巡る粒の数・回る半径・昇る高さ
+       *   turns                       … 粒が回る回数
+       */
+      //   layered: true … 奥（体の後ろ）と手前を描き分ける。後ろを回る粒はモンスターの後ろに隠れる（RC-1）
+      resonance: {
+        shape: "resonance",
+        layered: true,
+        duration: 760,
+        glow: 14,
+        ripples: 3,
+        radius: 58,
+        flatten: 0.38,
+        lineWidth: 3,
+        motes: 8,
+        orbit: 30,
+        rise: 34,
+        turns: 1.2,
         minSize: 3,
         maxSize: 5
       },
@@ -290,6 +374,67 @@
         minSize: 20,
         maxSize: 38,
         bubbles: 18
+      },
+
+      /**
+       * --- 全体の共鳴（RC-1。ゲイル・ダークネビュラ・ボルト） ---
+       * 息と同じく並び全体に1回だけ出す型（effectAt: "center"）。
+       * 相手ひとりずつの位置を画面からもらうので、つむじ風や稲妻はそれぞれの相手の上に出る
+       */
+
+      // ゲイル。風の筋が並びを左から右へ駆け抜け、相手ごとの足元からつむじ風が昇る
+      //   streaks / streakLength … 風の筋の数と長さ   rings / swirlRadius / rise … つむじ風の輪
+      galeSweep: {
+        shape: "galeSweep",
+        duration: 900,
+        glow: 12,
+        spread: 270,
+        height: 80,
+        streaks: 10,
+        streakLength: 150,
+        thickness: 4,
+        rings: 3,
+        swirlRadius: 42,
+        rise: 64,
+        lineWidth: 3,
+        count: 20,
+        minSize: 4,
+        maxSize: 7
+      },
+
+      // ダークネビュラ。渦を巻く闇の雲が並び全体を呑み込み、中で星が瞬く
+      //   turns … 雲が回る量   coreRadius … 相手ごとに沈む闇の大きさ   stars / starColor … 星
+      darkNebula: {
+        shape: "nebula",
+        duration: 1100,
+        glow: 16,
+        accentColor: "#2a1650",
+        starColor: "#e6dcff",
+        spread: 270,
+        height: 100,
+        count: 40,
+        minSize: 14,
+        maxSize: 28,
+        turns: 0.35,
+        coreRadius: 40,
+        stars: 18
+      },
+
+      // ボルト。相手ひとりずつに稲妻が少しずつ遅れて落ち、並び全体が光る
+      //   height … 稲妻の長さ   stagger … 相手ごとの遅れ   jag … ジグザグの幅   alpha … 全体の閃きの濃さ
+      thunderstorm: {
+        shape: "thunderstorm",
+        duration: 900,
+        glow: 20,
+        spread: 270,
+        height: 170,
+        stagger: 0.08,
+        segments: 7,
+        jag: 34,
+        boltWidth: 7,
+        alpha: 0.3,
+        sparks: 8,
+        sparkRadius: 40
       }
     }
   };

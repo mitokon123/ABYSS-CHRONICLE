@@ -35,7 +35,9 @@
 
     this.panel = new NS.Panel(game.ctx, this.theme);
     this.renderer = new NS.Renderer(game.ctx);
-    this.list = new NS.ScrollList(this.panel, this.layout.list);
+    // 持ち帰ったアイテムの絵を名前の左に出す
+    this.list = new NS.ScrollList(this.panel, this.layout.list,
+      { sprites: new NS.SpriteRenderer(game.ctx, game.assets) });
     // マウスだけでも先へ進めるように
     this.homeButton = new NS.TextButton(this.panel, this.layout.homeButton,
       this.texts.toHome || "拠点へ");
@@ -79,6 +81,7 @@
       rows.push({
         type: "entry",
         label: item ? item.name : entries[i].itemId,
+        icon: item ? item.icon : null,
         right: "x" + entries[i].count,
         color: color,
         value: entries[i].itemId

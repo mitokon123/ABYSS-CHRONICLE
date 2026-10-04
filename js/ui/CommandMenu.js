@@ -190,7 +190,34 @@
       // 選んでいる項目でも色は変えない。灰色のまま「▶」だけが動く
       this.panel.drawText(item.label, x, y,
         { color: item.color || (selected ? t.cursorColor : t.textColor) });
+
+      // item.badge を書くと、枠の右端に小さな札を出す（拠点の「作れる」「新入荷」など）。
+      // 札の色は item.badgeColor。札の前の点だけゆっくり明滅させて目を引く
+      if (item.badge) this._drawBadge(item, y, clock);
     }
+  };
+
+  /** 項目の右端の札（item.badge）。文字は枠の右端にそろえる */
+  CommandMenu.prototype._drawBadge = function (item, y, clock) {
+    var t = this.panel.theme;
+    var color = item.badgeColor || t.cursorColor;
+    var right = this.rect.x + this.rect.w - (t.padding || 8) - 4;
+    var font = t.smallFont || "12px monospace";
+
+    var ctx = this.panel.ctx;
+    ctx.save();
+    ctx.font = font;
+    var width = ctx.measureText(item.badge).width;
+    var pulse = (clock === undefined || clock === null) ? 1
+      : 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(clock / 260));
+    ctx.globalAlpha = ctx.globalAlpha * pulse;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(right - width - 8, y - 4, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    this.panel.drawText(item.badge, right, y, { align: "right", font: font, color: color });
   };
 
   /** カーソルの濃さ。時計が無い、または設定が無ければ明滅しない */

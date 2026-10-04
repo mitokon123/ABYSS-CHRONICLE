@@ -185,6 +185,13 @@
       light:   { file: "se_light_1.wav",   volume: 0.45 },   // フラッシュ
       dark:    { file: "se_dark_1.wav",    volume: 0.45 },   // シャドウ
       shine:       { file: "se_light_2.wav",      volume: 0.45 },   // シャイン（光の大技）
+      // 属性技の2段目（RC-1）
+      flame:       { file: "se_fire_2.wav",       volume: 0.45 },   // フレイム
+      wave:        { file: "se_water_2.wav",      volume: 0.45 },   // ウェーブ
+      gale:        { file: "se_wind_2.wav",       volume: 0.45 },   // ゲイル
+      rockSpike:   { file: "se_earth_2.wav",      volume: 0.45 },   // ロックスパイク
+      darkNebula:  { file: "se_dark_2.wav",       volume: 0.45 },   // ダークネビュラ
+      volt:        { file: "se_thunder_2.wav",    volume: 0.45 },   // ボルト
       fireBreath:  { file: "se_fire_breath.wav",  volume: 0.45 },   // 火の息
       darkBreath:  { file: "se_dark_breath.wav",  volume: 0.45 },   // 奈落の息
       venomBreath: { file: "se_poison_breath.wav", volume: 0.45 },  // どくのいき

@@ -40,9 +40,10 @@
    * @param {number} [direction] 向き。1 が既定で、-1 にすると上下が逆になる
    *   （強化は下から上へ、弱体は上から下へ、のように使う。
    *    向きを見ない形では何も変わらない）
+   * @param {object[]} [points] 並び全体に出す型で、相手ひとりずつの位置 [{x, y}]（雷が一人ずつに落ちる、など）
    * @returns {boolean} 始められたか
    */
-  EffectPlayer.prototype.play = function (effectId, clock, x, y, color, direction) {
+  EffectPlayer.prototype.play = function (effectId, clock, x, y, color, direction, points) {
     var definition = this.get(effectId);
     if (!definition || !definition.duration) return false;
 
@@ -53,6 +54,7 @@
       y: y,
       color: color || definition.color || this.config.defaultColor || "#ffffff",
       direction: (direction === -1) ? -1 : 1,
+      points: points || null,
       // 続けて同じ技を出しても同じ向きにならないよう、始めた時刻からずらす
       phase: ((clock || 0) % 997) / 997
     });
@@ -88,7 +90,13 @@
     this.intensity = (typeof value === "number") ? value : 1;
   };
 
-  EffectPlayer.prototype.render = function (ctx, clock) {
+  /**
+   * @param {string} [layer] "back" … モンスターより奥に描く部分だけ（layered の型だけが持つ）
+   *                         "front"・省略 … 手前に描く部分（ふつうの型はここで全部描く）
+   *   共鳴の粒のように「体の後ろを回る」ものは、モンスターを描く前に "back"、
+   *   描いたあとに "front" と2回呼んで奥と手前を描き分ける（RC-1）
+   */
+  EffectPlayer.prototype.render = function (ctx, clock, layer) {
     if (!NS.SkillEffect) return;
 
     var intensity = (this.intensity === undefined) ? 1 : this.intensity;
@@ -97,10 +105,13 @@
     var core = this.config.coreColor;
     for (var i = 0; i < this.entries.length; i++) {
       var entry = this.entries[i];
+      // 奥の層は、奥と手前を描き分ける型（data/effects.js の layered）だけ
+      if (layer === "back" && !entry.definition.layered) continue;
       NS.SkillEffect.draw(ctx, entry.definition, this._progress(entry, clock), {
         x: entry.x, y: entry.y,
         color: entry.color, coreColor: core, phase: entry.phase,
-        direction: entry.direction, intensity: intensity
+        direction: entry.direction, intensity: intensity, points: entry.points,
+        layer: entry.definition.layered ? (layer || "front") : null
       });
     }
   };

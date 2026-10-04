@@ -497,6 +497,10 @@
     var chosen = this.random.pick(usable);
     var skill = this.data.getSkill(chosen);
 
+    // 状態異常を治す技（クレンズ）は、治せるものが掛かっている仲間へ
+    if (skill && skill.target === "ally" && skill.cureStatus && !skill.heal) {
+      return { type: "skill", skillId: chosen, targetIndex: this._curableIndex(enemy, skill) };
+    }
     // 味方にかける技は、狙う先が自分の側になる。いちばん傷ついた仲間を治す
     if (skill && skill.target === "ally") {
       return { type: "skill", skillId: chosen, targetIndex: this._mostWoundedIndex(enemy) };
@@ -519,18 +523,34 @@
     return best;
   };
 
-  /** 回復技だが、自分の側に減っている仲間が一人もいないか */
+  /**
+   * 回復技だが、自分の側に効く仲間が一人もいないか。
+   *   HPを治す技 … 減っている仲間がいない
+   *   状態異常を治す技（クレンズ） … 治せる状態異常の仲間がいない
+   */
   BattleSystem.prototype._healPointless = function (actor, skillId) {
     var skill = this.data.getSkill(skillId);
-    if (!skill || !skill.heal || skill.power) return false;
+    if (!skill || skill.power || !(skill.heal || skill.cureStatus)) return false;
 
     var field = (this.enemies.indexOf(actor) >= 0)
       ? this.getFieldEnemies() : this.getFieldAllies();
 
     for (var i = 0; i < field.length; i++) {
-      if (!field[i].isFainted() && field[i].currentHp < field[i].getMaxHp()) return false;
+      if (field[i].isFainted()) continue;
+      if (skill.heal && field[i].currentHp < field[i].getMaxHp()) return false;
+      if (skill.cureStatus && BattleSystem.hasCurable(field[i], skill.cureStatus)) return false;
     }
     return true;
+  };
+
+  /** 自分の側で、その技が治せる状態異常に掛かっている仲間の番号（いなければ 0） */
+  BattleSystem.prototype._curableIndex = function (actor, skill) {
+    var field = (this.enemies.indexOf(actor) >= 0)
+      ? this.getFieldEnemies() : this.getFieldAllies();
+    for (var i = 0; i < field.length; i++) {
+      if (!field[i].isFainted() && BattleSystem.hasCurable(field[i], skill.cureStatus)) return i;
+    }
+    return 0;
   };
 
   /**
@@ -857,6 +877,9 @@
     var amount = (max > min) ? this.random.nextInt(min, max) : min;
     if (amount <= 0) return;
 
+    // 使う側の「回復の技」への倍率（粘晶のネックレスなど。data/items.js の healDealt）
+    if (this.effects) amount = Math.floor(amount * this.effects.getHealDealtMultiplier(actor));
+
     var before = target.currentHp;
     target.heal(amount);
 
@@ -881,6 +904,69 @@
       revealTarget: target,
       revealHp: target.currentHp
     });
+  };
+
+  /**
+   * 状態異常を治す技（data/skills.js の cureStatus。クレンズ）。
+   * 治すものが無ければ「治すものがなかった」と伝える（回復技の満タンと同じ扱い。手番を捨てたと分かるように）。
+   * 出来事の形は道具の解毒草とそろえてある（statusTarget / statusIds で、見せた瞬間に印を消す）
+   */
+  BattleSystem.prototype._applyCure = function (target, skill, side, events) {
+    if (!target || target.isFainted() || target._undying) return;
+
+    var cured = BattleSystem.cureStatuses(target, skill.cureStatus);
+    if (cured.length === 0) {
+      events.push({ type: "cureNone", side: side, targetSide: side,
+        targetName: target.getName(), target: target });
+      return;
+    }
+
+    var left = target.getStatusDefs ? target.getStatusDefs() : [];
+    var ids = [];
+    for (var i = 0; i < left.length; i++) ids.push(left[i].id);
+    events.push({
+      type: "cure", side: side,
+      // 治す相手は行動した側にいる。書かないと「敵の」が付いてしまう
+      targetSide: side,
+      targetName: target.getName(), target: target,
+      statusNames: cured.map(function (def) { return def.name; }),
+      statusTarget: target, statusIds: ids,
+      se: "heal"
+    });
+  };
+
+  /**
+   * 状態異常を治す（技の cureStatus。戦闘と探索中の技 Game.useFieldSkill の両方が使う）。
+   *   spec.statuses: ["poison"] … 書いたものだけ治す
+   *   statuses を省略           … curable: true のものを全部治す（道具の cureStatus と同じ決まり）
+   * @returns {object[]} 治した状態異常の定義（data/statuses.js）。無ければ空
+   */
+  BattleSystem.cureStatuses = function (target, spec) {
+    if (!target || !target.getStatusDefs || !target.removeStatus) return [];
+    var only = (spec && spec.statuses) || null;
+    var defs = target.getStatusDefs();
+    var picked = [];
+    // 治しながら配列が縮むので、先に「治すもの」を決めてから外す
+    for (var i = 0; i < defs.length; i++) {
+      if (only ? only.indexOf(defs[i].id) < 0 : !defs[i].curable) continue;
+      picked.push(defs[i]);
+    }
+    var cured = [];
+    for (var j = 0; j < picked.length; j++) {
+      if (target.removeStatus(picked[j].id)) cured.push(picked[j]);
+    }
+    return cured;
+  };
+
+  /** その相手に、技が治せる状態異常が掛かっているか（敵が意味のないクレンズを選ばないように） */
+  BattleSystem.hasCurable = function (target, spec) {
+    if (!target || !target.getStatusDefs) return false;
+    var only = (spec && spec.statuses) || null;
+    var defs = target.getStatusDefs();
+    for (var i = 0; i < defs.length; i++) {
+      if (only ? only.indexOf(defs[i].id) >= 0 : defs[i].curable) return true;
+    }
+    return false;
   };
 
   /**
@@ -1040,14 +1126,77 @@
       return;
     }
 
+    // 相手ごとの出来事を一度べつに受けて、あとで「同時に見せる」順に並べ直す
+    var segments = [];
     for (var i = 0; i < targets.length; i++) {
       // 立ち塞がっている者がいれば、1体ずつそちらへ向く（全員ぶんを1体で受ける）
       var target = this._coverFor(targets[i], side);
       // この技で先に倒れた相手は飛ばす
       if (target.isFainted() || target._removed) continue;
+      var start = events.length;
       this._resolveHit(actor, target, skill, side, events);
+      segments.push({ target: target, events: events.splice(start, events.length - start) });
+    }
+    this._pushSimultaneous(actor, skill, segments, events);
+  };
+
+  /**
+   * 全体の技の出来事を、画面が「同時に」見せられる順に並べ直す（RC-1。作者の指定）。
+   * 計算は相手1体ずつ済んでいるので、変わるのは見せる順番だけ。
+   *
+   *   1. 当たり … 全員の ダメージ／外れ／無効（と、いまひとつ等の印）  → 同時に出す
+   *   2. 倒れる … 全員の 倒れた／踏みとどまった                       → 同時に出す
+   *   3. そのほか … 吸収・特性の反撃・目を覚ます など（相手の順のまま）
+   *   4. 追加の効果 … 技の状態異常の結果・技の弱体                     → 同時に出す
+   * 同時に出す出来事には、同じ番号の simul を付ける（BattleScene が待たずに続けて見せる）。
+   *
+   * ★ 立ち塞がるで同じ相手が2回以上受けたときは並べ直さない（同じ所に数字が重なるため）
+   */
+  BattleSystem.prototype._pushSimultaneous = function (actor, skill, segments, events) {
+    var i, j;
+    var targets = [];
+    for (i = 0; i < segments.length; i++) {
+      if (targets.indexOf(segments[i].target) >= 0) {
+        for (j = 0; j < segments.length; j++) Array.prototype.push.apply(events, segments[j].events);
+        return;
+      }
+      targets.push(segments[i].target);
+    }
+
+    // ダメージより先に入る状態異常（どくのいき・即死）は、当たりの側に入れる（即死→倒れる の順を守る）
+    var earlyStatus = !!skill.status && !this._statusAfterDamage(skill);
+    var heads = [], falls = [], rest = [], extras = [];
+    for (i = 0; i < segments.length; i++) {
+      var list = segments[i].events;
+      j = 0;
+      while (j < list.length && (SIMUL_HEAD[list[j].type] ||
+             (earlyStatus && STATUS_RESULT[list[j].type] && list[j].target !== actor))) {
+        heads.push(list[j++]);
+      }
+      for (; j < list.length; j++) {
+        var e = list[j];
+        if (e.type === "faint" || e.type === "undying") falls.push(e);
+        // 技が入れた状態異常（反撃で本人に返ってきたものは除く）と、技の弱体
+        else if (STATUS_RESULT[e.type] && e.target !== actor) extras.push(e);
+        else if (e.type === "modifier" && e.skillId === skill.id) extras.push(e);
+        else rest.push(e);
+      }
+    }
+
+    var groups = [heads, falls, rest, extras];
+    for (i = 0; i < groups.length; i++) {
+      // 3. そのほか は順番に見せる。ほかは2つ以上あれば同時
+      if (i !== 2 && groups[i].length > 1) {
+        this._simulSeq = (this._simulSeq || 0) + 1;
+        for (j = 0; j < groups[i].length; j++) groups[i][j].simul = this._simulSeq;
+      }
+      Array.prototype.push.apply(events, groups[i]);
     }
   };
+
+  // 全体の技で「当たり」として同時に見せる出来事
+  var SIMUL_HEAD = { critical: true, effective: true, resisted: true, damage: true, miss: true, immune: true };
+  var STATUS_RESULT = { status: true, statusMiss: true, statusImmune: true };
 
   /**
    * 技を出せる形にととのえる（PPの支払いと宣言まで）。
@@ -1077,7 +1226,9 @@
       actorName: actor.getName(), skillName: skill.name,
       // 画面側が踏み込みの動きや技の演出を付けられるよう、
       // 行動した本人と使った技も渡す（damage で target を渡しているのと同じ理由）
-      actor: actor, skill: skill
+      actor: actor, skill: skill,
+      // 払ったあとのPP。画面はこの出来事を見せた瞬間にPPバーを減らす（HPと同じ見せ方）
+      ppAfter: actor.currentPp
     });
     return skill;
   };
@@ -1111,16 +1262,26 @@
       if (!skill.power) return;
     }
 
-    // バフ／デバフをかける技。威力を持たない技はここで終わり
-    if (skill.modifier) {
-      this._applyModifier(actor, target, skill, side, events);
+    // 状態異常を治す技（クレンズ）。威力を持たない技はここで終わり
+    if (skill.cureStatus) {
+      this._applyCure(target, skill, side, events);
       if (!skill.power) return;
     }
 
-    // 状態異常をかける技。ダメージも持つ技（毒の牙など）は、このあとダメージへ進む
-    if (skill.status) {
+    // バフ／デバフをかけるだけの技はここで終わり。
+    // 威力も持つ技（ロックスパイク）は、ダメージを見せたあとで掛ける（その一撃には乗らない）
+    if (skill.modifier && !skill.power) {
+      this._applyModifier(actor, target, skill, side, events);
+      return;
+    }
+
+    // 状態異常をかける技。
+    //   ダメージの無い技（どくのいき）… ここで入るか、入らなければ MISS
+    //   ダメージも持つ技（どくばり）… ダメージを見せたあと、追加で入るか MISS（作者の指定。_applyLateStatus）
+    //   即死だけは先に判定する（通った相手には、そのあとダメージを与えない）
+    var lateStatus = this._statusAfterDamage(skill);
+    if (skill.status && !lateStatus) {
       this._applyStatus(actor, target, skill, side, events);
-      // 即死が通った相手には、そのあとダメージを与えない
       if (target.isFainted()) return;
       if (!skill.power) return;
     }
@@ -1153,6 +1314,15 @@
       target: target, critical: result.critical
     });
 
+    // 0ダメージ（当たったが、びくともしなかった）。吸血・とげ・目を覚ますは起きない。
+    // 画面側は被弾の動きをせず「ダメージを与えられなかった」と出す（BattleScene）。
+    // 当たってはいるので、追加の状態異常の判定はする
+    if (result.damage <= 0) {
+      if (skill.modifier) this._applyModifier(actor, target, skill, side, events);
+      if (lateStatus) this._applyStatus(actor, target, skill, side, events);
+      return;
+    }
+
     // 与えたダメージの一部を自分のHPに変える（吸血など）。
     // 倒しきった相手からも吸えるので、faint より先に処理する
     this._applyDrain(actor, skill, result.damage, side, events);
@@ -1172,6 +1342,23 @@
 
     // 殴られて目を覚ます（眠り）。倒れた相手には意味がないので、そのあとに置く
     this._wakeOnDamage(target, events);
+
+    // ダメージのあとの追加の状態異常（どくばりの毒など）。入らなければ MISS。
+    // 目を覚ます判定より後に置く（眠らせる技で、入れた眠りがその場で覚めないように）。
+    // 倒した相手には入れない（上で return している）。
+    // 威力を持つ弱体の技（ロックスパイク）も、同じくここで掛ける
+    if (skill.modifier) this._applyModifier(actor, target, skill, side, events);
+    if (lateStatus) this._applyStatus(actor, target, skill, side, events);
+  };
+
+  /**
+   * 状態異常をダメージのあとで判定する技か。
+   * ダメージを持つ状態異常の技（どくばり）だけ。即死はダメージより先（通ったら殴らない）
+   */
+  BattleSystem.prototype._statusAfterDamage = function (skill) {
+    if (!skill.status || !skill.power) return false;
+    var def = this.data.getStatus ? this.data.getStatus(skill.status.id) : null;
+    return !(def && def.instantKill);
   };
 
   // --- 戦闘中に働く特性（data/abilities.js） ---
@@ -1476,6 +1663,8 @@
    *   技      基礎 = 攻撃力×skill.attackFactor + 技威力×skill.powerFactor - 防御力×defenseFactor
    *   通常攻撃 基礎 = 攻撃力×normal.attackFactor + normal.power           - 防御力×defenseFactor
    *   ダメージ = floor( max(0, 基礎) × 属性倍率 × クリティカル倍率 × 防御 × 特性装備 × 乱数 )
+   *   クリティカルのときは 基礎 から防御力を引かず、倍率は data/battle.js の critical
+   *   （共鳴だけ byKind で以前のまま：防御は引く・2.0）
    *
    * 「通常攻撃」は normalAttackSkill の技だけ。体当たりなどの無属性技は技の式。
    *
@@ -1508,16 +1697,25 @@
     // 最序盤に攻撃力だけだと2〜3しか出ず、威力を持つ技との差が開きすぎるため
     var power = isNormal ? numberOr(factors.power, 0) : (skill.power || 0);
 
+    // クリティカルは先に決める（防御を引くかどうかが変わるため）
+    var critConfig = battle.critical || {};
+    // 技の種類ごとの上書き（共鳴は以前のまま）。通常攻撃は種類を持たない
+    var critKind = (!isNormal && (critConfig.byKind || {})[skill.kind]) || {};
+    var critical = this._rollCritical(skill);
+    // クリティカルのときは防御力を引かない（RC-1。属性の耐性は下の elementMultiplier でそのまま効く）
+    var ignoreDefense = critical &&
+      ((critKind.ignoreDefense !== undefined) ? critKind.ignoreDefense : critConfig.ignoreDefense) === true;
+
     // 防御で0を下回っても、そこから先はマイナスにしない
     var base = attacker.getAttack() * attackFactor
              + power * powerFactor
-             - defender.getDefense() * defenseFactor;
+             - (ignoreDefense ? 0 : defender.getDefense() * defenseFactor);
     base = Math.max(0, base);
 
     var elementMultiplier = this._elementMultiplier(defender, elementId);
-    var critical = this._rollCritical(skill);
+    // 倍率は技の種類ごと（共鳴だけ 2.0）。無ければ共通の multiplier
     var criticalMultiplier = critical
-      ? numberOr((battle.critical || {}).multiplier, 1)
+      ? numberOr(critKind.multiplier, numberOr(critConfig.multiplier, 1))
       : 1;
 
     // 防御中はどんなダメージも軽くなる（属性もクリティカルも問わない）
@@ -1537,8 +1735,15 @@
       base * elementMultiplier * criticalMultiplier * defendMultiplier
            * abilityMultiplier * variance);
 
+    // 0になったら、ときどきだけ minDamage（1）通す（data/battle.js の zeroDamageChipChance）。
+    // 以前は必ず1通していたので、硬い相手にも通常攻撃を重ねれば必ず削れた
+    if (damage < minDamage) {
+      var chipChance = numberOr(config.zeroDamageChipChance, 1);
+      damage = (this.random.next() < chipChance) ? minDamage : 0;
+    }
+
     return {
-      damage: Math.max(minDamage, damage),
+      damage: damage,
       critical: critical,
       elementMultiplier: elementMultiplier,
       immune: false
@@ -1656,11 +1861,15 @@
 
     if (!firstAlive(this.enemies)) {
       this.result = "win";
+      this._clearUndying();
+      // 勝ったときは「戦いに勝った!」（勝利の曲）を先に出し、経験値・レベルアップはそのあと（作者の指定）。
+      // 画面側は勝利の曲を流してから少し間を置く（BattleScene の battleEnd）
+      events.push({ type: "battleEnd", result: this.result });
       this._awardExp(events);
       this._awardAffection(events);
-    } else {
-      this.result = "lose";
+      return;
     }
+    this.result = "lose";
     this._clearUndying();
     events.push({ type: "battleEnd", result: this.result });
   };
@@ -1839,10 +2048,18 @@
    * _resolveHit の「威力を持たない技はここで終わり」と同じ判定。
    * 図鑑・戦闘の技の説明で「威力」を出すかどうかにも使う
    */
+  /**
+   * その技の強化・弱体が「強くする」ものか（isRaising と同じ判定）。
+   * 演出の向き（強化は下から上・弱体は上から下）を、戦闘の外（動きの見本ページ）でも揃えるために出している
+   */
+  BattleSystem.isRaising = function (skill) {
+    return !!(skill && skill.modifier) && isRaising(skill.modifier);
+  };
+
   BattleSystem.dealsDamage = function (skill) {
     if (!skill) return false;
     if (skill.power) return true;
-    return !(skill.heal || skill.modifier || skill.status);
+    return !(skill.heal || skill.modifier || skill.status || skill.cureStatus);
   };
 
   NS.BattleSystem = BattleSystem;

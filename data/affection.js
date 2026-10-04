@@ -42,11 +42,12 @@
     stats: ["hp", "attack", "defense", "speed", "pp"],
     hideBondRewardUntilReached: true,
     stages: [
+      // icon … 拠点の仲間の一覧で、名前の横に出す印（data/sprites_icons.js）。出会いには出さない
       { id: "meet",  name: "出会い", need: 0 },
       // 必要な回数は α-9 のテストプレイで「思ったより簡単」だったので 1.5倍にした（20/60/120 → 30/90/180）
-      { id: "used",  name: "慣れ",   need: 30,  statBonus: 0.03 },
-      { id: "trust", name: "信頼",   need: 90,  statBonus: 0.03 },
-      { id: "bond",  name: "絆",     need: 180, bondReward: true }
+      { id: "used",  name: "慣れ",   need: 30,  statBonus: 0.03, icon: "iconAffectionUsed" },
+      { id: "trust", name: "信頼",   need: 90,  statBonus: 0.03, icon: "iconAffectionTrust" },
+      { id: "bond",  name: "絆",     need: 180, bondReward: true, icon: "iconAffectionBond" }
     ]
   };
 })(window.MyGame);

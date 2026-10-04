@@ -78,6 +78,14 @@
      */
     escape: function () {
       return { applied: true, amount: 0 };
+    },
+
+    /**
+     * スカウトしやすくする（誘いの香）。戦闘の中でしか意味が無く、
+     * 効き目は戦闘画面が持つ（BattleScene._resolveScoutBoost）。ここでは「使えた」と返すだけ
+     */
+    scoutBoost: function () {
+      return { applied: true, amount: 0 };
     }
   };
 
@@ -106,7 +114,7 @@
   ItemUsage.prototype.needsTarget = function (itemId) {
     var item = this.data.getItem(itemId);
     var type = item && item.effect && item.effect.type;
-    return type !== "escape";
+    return type !== "escape" && type !== "scoutBoost";
   };
 
   /** そのアイテムを使うと拠点へ帰るか */

@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>動きの見本 - ABYSS CHRONICLE</title>
+  <!--
+    ▼ このファイルについて（開発用。ゲーム本体ではない）
+
+    モンスターの動き（data/motions.js）と技の演出（data/effects.js）を、
+    戦闘画面と同じ描き方でボタンから1つずつ再生して見るためのページ。RC-1 で作った。
+    レベルと性格を変えて、能力値（ゲームと同じ MonsterInstance の計算）も見られる。
+    技はすべての技から選べ、選んだ技で上段の相手へ与えるダメージ（BattleSystem.calcDamage）も出る。
+    セーブや設定には一切書き込まない。
+
+    読み込むファイルは app.html の一覧をそのまま使う（js/main.js だけ除く）ので、
+    ゲームにファイルを足しても、ここを直す必要はない。
+    ★ 一覧を読むのに fetch を使うので、app.html と同じくサーバー経由（http://〜）で開くこと。
+  -->
+  <style>
+    body { margin: 0; background: #05070d; color: #c8d0e8; font-family: sans-serif; }
+    #wrap { display: flex; gap: 16px; padding: 12px; flex-wrap: wrap; align-items: flex-start; }
+    /* 戦闘画面のうち、モンスターのまわりだけを切り出して拡大して見せる（操作の欄が横に並ぶ大きさ） */
+    #view { height: auto; background: #0a0f1c;
+            image-rendering: pixelated; border: 1px solid #2a3350; }
+    #panel { width: 240px; }
+    h1 { font-size: 18px; margin: 0 0 8px; color: #ffd75e; }
+    h2 { font-size: 13px; margin: 14px 0 6px; color: #9aa4c0; }
+    button { display: block; width: 100%; margin: 4px 0; padding: 7px 10px; text-align: left;
+             background: #141b2e; color: #e8ecf8; border: 1px solid #2a3350; border-radius: 6px;
+             cursor: pointer; font-size: 14px; }
+    button:hover { background: #1d2742; }
+    button.on { border-color: #ffd75e; color: #ffd75e; }
+    select { width: 100%; padding: 6px; background: #141b2e; color: #e8ecf8; border: 1px solid #2a3350; }
+    .row { display: flex; gap: 6px; }
+    .row button { text-align: center; }
+    #note { font-size: 12px; color: #6b7590; margin-top: 12px; line-height: 1.6; }
+    /* レベルと能力値の欄（絵の下） */
+    #left { display: flex; flex-direction: column; gap: 10px; width: min(520px, calc(100vw - 300px)); }
+    #left #view { width: 100%; }
+    #statsBox { background: #0a0f1c; border: 1px solid #2a3350; padding: 10px 12px; font-size: 13px; }
+    #statsBox h2 { margin-top: 0; }
+    .lvrow { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+    .lvrow input[type=range] { flex: 1; }
+    .lvrow input[type=number] { width: 56px; padding: 4px; background: #141b2e; color: #e8ecf8;
+                                border: 1px solid #2a3350; }
+    .lvrow button { width: auto; display: inline-block; margin: 0; padding: 4px 9px; text-align: center; }
+    #statsBox select { margin-bottom: 8px; }
+    #stats { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    #stats th, #stats td { padding: 3px 6px; border-bottom: 1px solid #1d2742; text-align: right; }
+    #stats th:first-child, #stats td:first-child { text-align: left; }
+    #stats th { color: #9aa4c0; font-weight: normal; font-size: 12px; }
+    #stats .up { color: #7fd99a; }
+    #stats .dim { color: #6b7590; }
+    #expInfo, #skillsKnown { margin-top: 8px; line-height: 1.7; }
+    #expInfo .warn { color: #ff9a7a; }
+    #damageBox { margin-top: 12px; border-top: 1px solid #2a3350; padding-top: 10px; line-height: 1.7; }
+    #damageBox h2 { margin-top: 0; }
+    #damageBox .big { font-size: 16px; color: #ffd75e; }
+    #damageBox .crit { color: #ff9a7a; }
+    #damageBox .dim { color: #6b7590; font-size: 12px; }
+    #damageBox label { font-size: 12px; color: #9aa4c0; }
+    #skillPick { margin-bottom: 4px; }
+    #now { font-size: 13px; color: #ffd75e; min-height: 1.4em; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <!-- 見せる用。ゲームの画面（800×600）はページに出さず、ここへ切り出して描き写す -->
+    <div id="left">
+      <canvas id="view" width="400" height="400"></canvas>
+
+      <!-- レベルを変えて能力値を見る。戦闘画面の欄（Lv・HP・PP）も同じレベルに変わる -->
+      <div id="statsBox">
+        <h2>レベルと能力値</h2>
+        <div class="lvrow">
+          Lv
+          <button id="lvDown">−</button>
+          <input type="range" id="lv" min="1" max="99" value="30">
+          <button id="lvUp">＋</button>
+          <input type="number" id="lvNum" min="1" max="99" value="30">
+        </div>
+        <select id="nature"></select>
+        <table id="stats"></table>
+        <div id="expInfo"></div>
+        <div id="skillsKnown"></div>
+
+        <!-- 選んでいる技で、相手（上段のモンスター）へどれだけ与えるか。ゲームと同じ calcDamage で出す -->
+        <div id="damageBox">
+          <h2>ダメージ（選んでいる技 → 上段の相手）</h2>
+          <select id="foeSpecies"></select>
+          <div class="lvrow">
+            相手Lv
+            <input type="number" id="foeLv" min="1" max="99" value="30">
+            <label><input type="checkbox" id="foeFollow" checked> こちらのLvに合わせる</label>
+          </div>
+          <div id="damageInfo"></div>
+        </div>
+
+        <div id="note">特性の補正は込み。装備なし・個体値0・愛情度0・強化なしで計算している。</div>
+      </div>
+    </div>
+    <div id="panel">
+      <h1>動きの見本</h1>
+      <h2>モンスター</h2>
+      <select id="species"></select>
+
+      <h2>技を出す（技の種類で動きが変わる）</h2>
+      <select id="skillPick"></select>
+      <button id="skillPlay">選んだ技を出す</button>
+      <div id="skills"></div>
+
+      <h2>ほかの場面</h2>
+      <button data-scene="hit">被弾</button>
+      <button id="dodge">回避（相手の攻撃が外れる）</button>
+      <button data-scene="levelUp">レベルアップ（スカウトに応じたときも同じ）</button>
+      <button id="guard">防御（切り替え）</button>
+      <button id="sleep">眠り（切り替え）</button>
+
+      <h2>まとめて</h2>
+      <button id="all">全部を順に再生</button>
+
+      <h2>速さ</h2>
+      <div class="row">
+        <button data-speed="1" class="on">×1</button>
+        <button data-speed="0.5">×0.5</button>
+        <button data-speed="0.25">×0.25</button>
+      </div>
+      <div id="now"></div>
+      <div id="note">
+        開発用のページ。セーブには触れない。<br>
+        動きの数字は data/motions.js、共鳴の演出は data/effects.js の resonance。
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    // 技のボタン。[表示, 技id, 当たる相手（"foe" / "self"）]
+    var SKILLS = [
+      ["通常攻撃", "normalAttack", "foe"],
+      ["共鳴：アクア", "aqua", "foe"],
+      ["共鳴：キュア（回復）", "cure", "self"],
+      ["ブレス：火の息", "fireBreath", "foe"],
+      ["体技：体当たり", "tackle", "foe"],
+      ["斬撃：噛みつく", "bite", "foe"],
+      ["自分にかける：立ち塞がる", "standGuard", "self"]
+    ];
+
+    // app.html の読み込み一覧をそのまま使う（js/main.js は起動なので除く）
+    fetch("app.html?n=" + Date.now()).then(function (res) { return res.text(); }).then(function (html) {
+      var files = [];
+      var re = /"((?:js|data)\/[^"]+\.js)"/g, m;
+      while ((m = re.exec(html))) {
+        if (m[1] !== "js/main.js") files.push(m[1]);
+      }
+      loadInOrder(files, 0, start);
+    });
+
+    function loadInOrder(files, index, done) {
+      if (index >= files.length) { done(); return; }
+      var s = document.createElement("script");
+      s.src = files[index] + "?t=" + Date.now();
+      s.onload = function () { loadInOrder(files, index + 1, done); };
+      s.onerror = function () { loadInOrder(files, index + 1, done); };
+      document.head.appendChild(s);
+    }
+
+    function start() {
+      var NS = window.MyGame;
+      var gd = NS.DataLoader.build(NS.rawData);
+      // 念のため、セーブと設定の置き場所を見本用に変えておく（書き込みはしない）
+      if (gd.save) gd.save.storageKey = "__viewer.save";
+      if (gd.settings) gd.settings.storageKey = "__viewer.settings";
+
+      // ゲームの画面はページに出さない裏の canvas に描き、モンスターのまわりだけを #view へ写す
+      var canvas = document.createElement("canvas");
+      canvas.width = 800;
+      canvas.height = 600;
+      var view = document.getElementById("view");
+      var viewCtx = view.getContext("2d");
+      viewCtx.imageSmoothingEnabled = false;
+      // 切り出す範囲（敵の段と味方の段がちょうど入る）
+      var CROP = { x: 200, y: 30, w: 400, h: 400 };
+      var assets = new NS.AssetLoader();
+      assets.build(gd.sprites);
+      var game = new NS.Game(canvas, gd, assets);
+      game.ensureProgress();
+      if (game.tutorial) game.tutorial.take = function () { return null; };
+      game.clock = 0;
+
+      var speed = 1;
+      var scene, hero, foe;
+      var queue = [];      // [{ at, fn }] 決まった時刻にやること（当たった瞬間の演出など）
+      var sleeping = false;
+      var guarding = false;
+      var nowLabel = document.getElementById("now");
+
+      // --- モンスターの選択 ---
+      var select = document.getElementById("species");
+      Object.keys(gd.monsters).forEach(function (id) {
+        var o = document.createElement("option");
+        o.value = id;
+        o.textContent = gd.monsters[id].name;
+        select.appendChild(o);
+      });
+      select.value = "slime";
+      select.onchange = function () { build(select.value); };
+
+      // --- レベルと性格 ---
+      var level = 30;
+      var natureId = "balanced";
+      var natureSelect = document.getElementById("nature");
+      Object.keys(gd.natures || {}).forEach(function (id) {
+        var o = document.createElement("option");
+        o.value = id;
+        o.textContent = "性格：" + gd.natures[id].name;
+        natureSelect.appendChild(o);
+      });
+      natureSelect.value = natureId;
+      natureSelect.onchange = function () { natureId = natureSelect.value; build(select.value); };
+
+      var lvRange = document.getElementById("lv");
+      var lvNum = document.getElementById("lvNum");
+      var levelCap = (gd.growth && gd.growth.levelCap) || 99;
+      lvRange.max = lvNum.max = levelCap;
+      function setLevel(value) {
+        value = Math.max(1, Math.min(levelCap, Math.round(Number(value) || 1)));
+        level = value;
+        lvRange.value = lvNum.value = value;
+        build(select.value);
+      }
+      lvRange.oninput = function () { setLevel(lvRange.value); };
+      lvNum.onchange = function () { setLevel(lvNum.value); };
+      document.getElementById("lvDown").onclick = function () { setLevel(level - 1); };
+      document.getElementById("lvUp").onclick = function () { setLevel(level + 1); };
+
+      // 能力値の表。[表示名, 取り出す関数, 成長率のキー, 基礎値のキー]
+      var STAT_ROWS = [
+        ["HP",     "getMaxHp",   "hp",      "baseHp"],
+        ["PP",     "getMaxPp",   "pp",      "basePp"],
+        ["攻撃",   "getAttack",  "attack",  "baseAttack"],
+        ["防御",   "getDefense", "defense", "baseDefense"],
+        ["素早さ", "getSpeed",   "speed",   "baseSpeed"]
+      ];
+      function num(n) { return Number(n).toLocaleString("ja-JP"); }
+      // 「5〜6」の形。両端が同じなら1つだけ出す
+      function span(a, b) { return String(a) === String(b) ? String(a) : a + "〜" + b; }
+
+      function renderStats() {
+        var species = hero.getSpecies();
+        // 1つ前のレベルの同じ個体（どれだけ伸びたかを見せる）
+        var prev = level > 1 ? new NS.MonsterInstance(hero.speciesId, level - 1, gd, { nature: natureId }) : null;
+
+        var html = "<tr><th>能力</th><th>基礎</th><th>成長率</th><th>値</th><th>前のLvから</th></tr>";
+        STAT_ROWS.forEach(function (row) {
+          var value = hero[row[1]]();
+          var diff = prev ? value - prev[row[1]]() : 0;
+          html += "<tr><td>" + row[0] + "</td>" +
+            "<td class='dim'>" + (species[row[3]] || 0) + "</td>" +
+            "<td class='dim'>" + hero.getGrowthRate(row[2], level).toFixed(2) + "</td>" +
+            "<td>" + num(value) + "</td>" +
+            "<td class='" + (diff > 0 ? "up" : "dim") + "'>" + (prev ? (diff > 0 ? "+" : "") + diff : "—") + "</td></tr>";
+        });
+        document.getElementById("stats").innerHTML = html;
+
+        var maxLevel = hero.getMaxLevel();
+        var exp = "次のLvまで " + (level >= levelCap ? "—" : num(hero.getExpToNextLevel(level))) +
+          "　／　累計経験値 " + num(hero.getTotalExp()) +
+          "<br>レベル上限 Lv" + maxLevel +
+          (level > maxLevel ? "　<span class='warn'>（この種族の上限を超えている）</span>" : "");
+        document.getElementById("expInfo").innerHTML = exp;
+
+        var names = (hero.skills || []).map(function (id) {
+          var skill = gd.getSkill(id);
+          return skill ? skill.name : id;
+        });
+        document.getElementById("skillsKnown").textContent = "覚えている技：" + (names.join("・") || "なし");
+      }
+
+      // --- 相手（上段）。ダメージの受け手にもなる ---
+      var foeSelect = document.getElementById("foeSpecies");
+      Object.keys(gd.monsters).forEach(function (id) {
+        var o = document.createElement("option");
+        o.value = id;
+        o.textContent = "相手：" + gd.monsters[id].name;
+        foeSelect.appendChild(o);
+      });
+      // 既定はキノコン。防御が全23種のちょうど真ん中（Lv30で34）なので、ふつうの相手の目安になる。
+      // 硬い相手を見たいときはイワゴロー・モスゴーレムなどに変える
+      foeSelect.value = gd.monsters.sporin ? "sporin" : Object.keys(gd.monsters)[0];
+      var foeLvInput = document.getElementById("foeLv");
+      var foeFollow = document.getElementById("foeFollow");
+      foeLvInput.max = levelCap;
+      foeSelect.onchange = function () { build(select.value); };
+      foeLvInput.onchange = function () { foeFollow.checked = false; build(select.value); };
+      foeFollow.onchange = function () { build(select.value); };
+      function foeLevel() {
+        if (foeFollow.checked) foeLvInput.value = level;
+        return Math.max(1, Math.min(levelCap, Math.round(Number(foeLvInput.value) || 1)));
+      }
+
+      // --- 技の一覧（すべての技。種類ごとにまとめる） ---
+      var skillPick = document.getElementById("skillPick");
+      var kinds = (gd.categories && gd.categories.skillKind) || {};
+      var groups = [["normal", "通常攻撃"]];
+      Object.keys(kinds).sort(function (a, b) { return (kinds[a].order || 0) - (kinds[b].order || 0); })
+        .forEach(function (k) { groups.push([k, kinds[k].name]); });
+      groups.forEach(function (g) {
+        var box = document.createElement("optgroup");
+        box.label = g[1];
+        Object.keys(gd.skills).forEach(function (id) {
+          var s = gd.skills[id];
+          var kind = (id === "normalAttack") ? "normal" : s.kind;
+          if (kind !== g[0]) return;
+          var o = document.createElement("option");
+          o.value = id;
+          o.textContent = s.name + (s.power ? "（威力" + s.power + "）" : "");
+          box.appendChild(o);
+        });
+        if (box.children.length) skillPick.appendChild(box);
+      });
+      skillPick.value = "normalAttack";
+      skillPick.onchange = renderDamage;
+      document.getElementById("skillPlay").onclick = function () {
+        var s = gd.getSkill(skillPick.value);
+        if (s) playSkill(s.id, targetKindOf(s), s.name);
+      };
+      function targetKindOf(skill) {
+        return (skill.target === "self" || skill.target === "ally") ? "self" : "foe";
+      }
+
+      /**
+       * 選んでいる技で、相手へ与えるダメージの幅。ゲームの calcDamage をそのまま使い、
+       * 乱数（最小・最大）とクリティカルの有無だけを固定して呼ぶ
+       */
+      function damageOf(skill, roll, critical) {
+        var sys = scene.system;
+        var savedRandom = sys.random;
+        sys.random = { next: function () { return roll; } };
+        sys._rollCritical = function () { return critical; };
+        try { return sys.calcDamage(hero, foe, skill); }
+        finally { sys.random = savedRandom; delete sys._rollCritical; }
+      }
+
+      function renderDamage() {
+        var box = document.getElementById("damageInfo");
+        var skill = gd.getSkill(skillPick.value);
+        if (!skill || !hero || !foe) { box.innerHTML = ""; return; }
+        var foeHp = foe.getMaxHp();
+        var head = "<span class='dim'>" + foe.getName() + " Lv" + foe.level + "　HP " + num(foeHp) +
+          "・防御 " + num(foe.getDefense()) + "</span><br>";
+
+        if (skill.heal) {
+          var h = skill.heal;
+          var amount = (h.amount !== undefined) ? h.amount : (h.min + "〜" + h.max);
+          box.innerHTML = head + skill.name + "：回復 <span class='big'>" + amount + "</span>" +
+            (skill.power ? "" : "<br><span class='dim'>ダメージは与えない技</span>");
+          if (!skill.power) return;
+        }
+        if (!NS.BattleSystem.dealsDamage(skill)) {
+          box.innerHTML = head + skill.name + "：<span class='dim'>ダメージを与えない技（強化・状態異常など）</span>";
+          return;
+        }
+
+        var lo = damageOf(skill, 0, false), hi = damageOf(skill, 0.999999, false);
+        if (lo.immune) {
+          box.innerHTML = head + skill.name + "：<span class='big'>0</span>　（この相手には効かない）";
+          return;
+        }
+        // 何回当てれば倒せるか（少ない方は運が良いとき）
+        function hits(d) { return d > 0 ? Math.ceil(foeHp / d) : "—"; }
+        var fewest = hits(hi.damage), most = hits(lo.damage);
+        var el = lo.elementMultiplier;
+        var elText = el > 1 ? "　<span class='crit'>効果抜群 ×" + el + "</span>"
+                   : el < 1 ? "　<span class='dim'>いまひとつ ×" + el + "</span>" : "";
+
+        var html = head + skill.name + "：<span class='big'>" + span(num(lo.damage), num(hi.damage)) + "</span>" + elText +
+          "<br>相手HPの " + span(Math.round(lo.damage / foeHp * 100), Math.round(hi.damage / foeHp * 100)) + "%" +
+          "　／　倒すまで " + span(fewest, most) + "回";
+
+        var critRate = ((gd.battle || {}).critical || {}).baseRate || 0;
+        critRate += skill.criticalBonus || 0;
+        if (gd.getSkillRule(skill, "canCritical") !== false && critRate > 0) {
+          var clo = damageOf(skill, 0, true), chi = damageOf(skill, 0.999999, true);
+          html += "<br><span class='crit'>クリティカル " + span(num(clo.damage), num(chi.damage)) +
+            "（" + Math.round(critRate * 100) + "%）</span>";
+        } else {
+          html += "<br><span class='dim'>クリティカルなし</span>";
+        }
+        if (skill.drain) html += "<br><span class='dim'>吸収 " + span(Math.max(1, Math.floor(lo.damage * skill.drain)),
+          Math.max(1, Math.floor(hi.damage * skill.drain))) + "</span>";
+        if (skill.target === "allEnemies") html += "<br><span class='dim'>全体技（1体あたりの値）</span>";
+        box.innerHTML = html;
+      }
+
+      function build(speciesId) {
+        hero = new NS.MonsterInstance(speciesId, level, gd, { nature: natureId });
+        foe = new NS.MonsterInstance(foeSelect.value, foeLevel(), gd);
+        scene = new NS.BattleScene(game, [hero], [foe], null, function () {});
+        scene.system.start([hero], [foe]);
+        scene.phase = "message";
+        queue = [];
+        if (sleeping) { hero.addStatus("sleep"); }
+        hero._defending = guarding;
+        scene._captureStatusMarks();
+        renderStats();
+        renderDamage();
+      }
+      build("slime");
+
+      // --- 技を出す ---
+      var skillBox = document.getElementById("skills");
+      SKILLS.forEach(function (entry) {
+        var b = document.createElement("button");
+        b.textContent = entry[0];
+        b.onclick = function () { playSkill(entry[1], entry[2], entry[0]); };
+        skillBox.appendChild(b);
+      });
+
+      function playSkill(skillId, targetKind, label) {
+        var skill = gd.getSkill(skillId);
+        if (!skill) return;
+        // ダメージの欄も、いま出した技に合わせる
+        if (skillPick.value !== skillId) { skillPick.value = skillId; renderDamage(); }
+        var target = (targetKind === "self") ? hero : foe;
+        var use = { type: "useSkill", actor: hero, actorName: hero.getName(), skill: skill, side: "ally" };
+        scene.actionMotions.clear();
+        scene._playActionMotion(use);      // 本人の動き＋共鳴のまわりの演出
+        scene._playSkillEffect(use);       // 「いま出している技」を覚えさせる
+        var kind = scene._skillMotionKind(skill);
+        nowLabel.textContent = label + "　（場面: " + kind + " → " + (hero.getActionMotionId(kind) || "動きなし") + "）";
+
+        // 当たる瞬間（動きの半分くらい）に、相手側の演出とのけぞりを出す
+        var motionId = hero.getActionMotionId(kind);
+        var def = motionId ? gd.motions[motionId] : null;
+        var hitAt = game.clock + (def && def.duration ? def.duration * 0.45 : 250);
+        queue.push({ at: hitAt, fn: function () {
+          var ev = (skill.modifier && !skill.power)
+            // 強化か弱体かはゲームと同じ判定で決める（弱体＝ちからぬきなどは上から下へ流れる）
+            ? { type: "modifier", target: target, raised: NS.BattleSystem.isRaising(skill), side: "ally" }
+            : { type: "damage", target: target, side: "ally", amount: 1 };
+          scene._playSkillEffect(ev);
+          // ダメージを与える技なら、相手がのけぞる（相手は上段なので上へ押される）
+          if (target === foe && NS.BattleSystem.dealsDamage(skill)) {
+            scene._startMotion(foe, "hit", -1);
+            // ゲームと同じく乱数とクリティカルを振った1回分の数字を浮かべる（相手のHPは減らさない）
+            var hit = scene.system.calcDamage(hero, foe, skill);
+            scene._applyStyle(hit.immune ? "immune" : (hit.critical ? "critical" : "damage"),
+              foe, String(hit.damage));
+          }
+          if (skill.heal) scene._startMotion(hero, "heal", 1);
+        } });
+      }
+
+      // --- ほかの場面 ---
+      Array.prototype.forEach.call(document.querySelectorAll("[data-scene]"), function (b) {
+        b.onclick = function () {
+          var kind = b.getAttribute("data-scene");
+          scene.actionMotions.clear();
+          scene._startMotion(hero, kind, 1);
+          nowLabel.textContent = b.textContent + "　（" + (hero.getActionMotionId(kind) || "動きなし") + "）";
+        };
+      });
+
+      // 回避：相手（上段）が踏み込み、当たる瞬間に外れて、こちらが身をかわす。
+      // ゲームと同じ「外れた」出来事を渡すので、眠っている間はかわさないところまで同じになる
+      function playDodge() {
+        scene.actionMotions.clear();
+        scene._startMotion(foe, "attack", 1);
+        var motionId = foe.getActionMotionId("attack");
+        var def = motionId ? gd.motions[motionId] : null;
+        queue.push({ at: game.clock + (def && def.duration ? def.duration * 0.3 : 150), fn: function () {
+          scene._playActionMotion({ type: "miss", target: hero, side: "enemy" });
+          scene._applyStyle("miss", hero, "MISS");
+        } });
+        nowLabel.textContent = "回避　（" + (hero.getActionMotionId("dodge") || "動きなし") + "）";
+      }
+      document.getElementById("dodge").onclick = playDodge;
+
+      var guardBtn = document.getElementById("guard");
+      guardBtn.onclick = function () {
+        hero._defending = !hero._defending;
+        guarding = hero._defending;
+        guardBtn.className = guarding ? "on" : "";
+        nowLabel.textContent = hero._defending
+          ? "防御中　（" + (hero.getActionMotionId("guard") || "動きなし") + "）"
+          : "防御を解いた";
+      };
+
+      var sleepBtn = document.getElementById("sleep");
+      sleepBtn.onclick = function () {
+        sleeping = !sleeping;
+        if (sleeping) hero.addStatus("sleep"); else hero.removeStatus("sleep");
+        scene._captureStatusMarks();
+        sleepBtn.className = sleeping ? "on" : "";
+        nowLabel.textContent = sleeping ? "眠り（目を閉じて脱力・寝息・z）" : "眠りを解いた";
+      };
+
+      // --- 全部を順に ---
+      document.getElementById("all").onclick = function () {
+        var t = 0;
+        SKILLS.forEach(function (entry) {
+          queue.push({ at: game.clock + t, fn: function () { playSkill(entry[1], entry[2], entry[0]); } });
+          t += 1400;
+        });
+        ["hit", "levelUp"].forEach(function (kind) {
+          queue.push({ at: game.clock + t, fn: function () {
+            scene._startMotion(hero, kind, 1);
+            nowLabel.textContent = (kind === "hit" ? "被弾" : "レベルアップ");
+          } });
+          t += 1200;
+        });
+        queue.push({ at: game.clock + t, fn: playDodge });
+      };
+
+      // --- 速さ ---
+      Array.prototype.forEach.call(document.querySelectorAll("[data-speed]"), function (b) {
+        b.onclick = function () {
+          speed = parseFloat(b.getAttribute("data-speed"));
+          Array.prototype.forEach.call(document.querySelectorAll("[data-speed]"), function (x) { x.className = ""; });
+          b.className = "on";
+        };
+      });
+
+      // --- 描画のループ（ゲームの時計を、選んだ速さで進める） ---
+      var ctx = canvas.getContext("2d");
+      var last = performance.now();
+      function frame(now) {
+        var dt = Math.min(50, now - last);
+        last = now;
+        game.clock += dt * speed;
+
+        queue.sort(function (a, b) { return a.at - b.at; });
+        while (queue.length && queue[0].at <= game.clock) queue.shift().fn();
+
+        scene.actionMotions.update(game.clock);
+        scene.skillEffects.update(game.clock);
+        // 浮かぶ文字（MISS など）と画面の揺れも進める。進めないと消えずに残って重なる
+        scene.floatingText.update(dt * speed);
+        scene.screenEffects.update(dt * speed);
+        scene.render(ctx);
+        viewCtx.clearRect(0, 0, view.width, view.height);
+        viewCtx.drawImage(canvas, CROP.x, CROP.y, CROP.w, CROP.h, 0, 0, view.width, view.height);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+  })();
+  </script>
+</body>
+</html>

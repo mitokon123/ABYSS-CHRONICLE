@@ -138,6 +138,8 @@
       // 買った加護と、選択肢から外している加護（挑戦をまたいで残る）
       boughtBlessings: state.boughtBlessings || null,
       offBlessings: state.offBlessings || null,
+      // 拠点のメニューの印のために、店と図鑑で何を見たか（{ shop: { key: true }, dex: 数 }）
+      homeSeen: state.homeSeen || null,
       dungeon: state.dungeon || null,
       // 中断のときだけ。挑戦の記録（加護・拾ったもの）と、その階の仕掛け
       run: state.run || null,
@@ -221,6 +223,8 @@
         // 古いセーブには無いので、その場合は「何も買っていない・何も外していない」扱い
         boughtBlessings: payload.boughtBlessings || {},
         offBlessings: payload.offBlessings || {},
+        // 古いセーブには無い。null なら拠点で「いまの分は見た」として始める（HomeScene）
+        homeSeen: payload.homeSeen || null,
         dungeon: payload.dungeon || null,
         run: payload.run || null,
         features: payload.features || null,

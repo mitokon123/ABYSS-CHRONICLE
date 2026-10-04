@@ -13,6 +13,7 @@
  *   ↑↓        … 左でバージョンを選ぶ
  *   ←→ / 決定 … 内容側へ移り、↑↓で読み進める
  *   ホイール    … カーソルの位置にある側をスクロール
+ *   右端のバー  … どちらの枠も、持ち物などの一覧と同じバーでつまんで送れる（js/ui/ScrollList.js）
  *   Esc / 戻る … タイトルへ
  */
 (function (NS) {
@@ -40,16 +41,43 @@
     this.backButton = new NS.BackButton(this.panel, game.data);
 
     this.index = 0;       // 選んでいるバージョン
-    this.scroll = 0;      // 内容の表示開始行
-    this.listTop = 0;     // バージョン一覧の表示開始位置
     this.focus = "list";  // "list"（バージョンを選ぶ）/ "notes"（内容を読む）
+
+    var self = this;
+    var L = this.layout.list;
+    // 左：バージョンの一覧。枠は自分で描き、行も自分で描く
+    var rows = this._visibleVersions();
+    this.list = new NS.ScrollList(this.panel, {
+      x: L.x, y: L.y, w: L.w, h: rows * L.rowHeight, rowHeight: L.rowHeight,
+      visibleRows: rows, frame: false
+    }, {
+      renderRow: function (row, i, y, selected) { self._renderVersionRow(row, y, selected); }
+    });
+
+    // 右：内容。見出し（バージョン名）の下から行を並べる
+    var N = this.layout.notes;
+    var lh = this.theme.lineHeight || 18;
+    var origin = this.panel.innerOrigin(N);
+    var lines = this._visibleLines();
+    this.notes = new NS.ScrollList(this.panel, {
+      x: N.x, y: origin.y + 40 - (lh - 4), w: N.w, h: lines * lh, rowHeight: lh,
+      visibleRows: lines, frame: false
+    }, {
+      readOnly: true,
+      renderRow: function (row, i, y) { self._renderNoteLine(row, y + lh - 4); }
+    });
   }
 
   PatchNoteScene.prototype.enter = function () {
     this.index = 0;
-    this.scroll = 0;
-    this.listTop = 0;
     this.focus = "list";
+
+    var rows = [];
+    for (var i = 0; i < this.versions.length; i++) {
+      rows.push({ type: "entry", version: this.versions[i] });
+    }
+    this.list.setRows(rows);
+    this._loadNotes();
   };
 
   /**
@@ -66,15 +94,11 @@
     return Math.max(1, Math.floor((L.h - 10) / L.rowHeight));
   };
 
-  /** 選んでいるバージョンが見えるように、表示開始位置をずらす */
-  PatchNoteScene.prototype._scrollListToIndex = function () {
-    var visible = this._visibleVersions();
-
-    if (this.index < this.listTop) this.listTop = this.index;
-    if (this.index >= this.listTop + visible) this.listTop = this.index - visible + 1;
-
-    var maxTop = Math.max(0, this.versions.length - visible);
-    this.listTop = Math.max(0, Math.min(maxTop, this.listTop));
+  /** 選んでいるバージョンの内容を、右の枠に入れ直す（先頭から読む） */
+  PatchNoteScene.prototype._loadNotes = function () {
+    var lines = this._buildLines();
+    for (var i = 0; i < lines.length; i++) lines[i].type = "line";
+    this.notes.setRows(lines);
   };
 
   PatchNoteScene.prototype.getSelected = function () {
@@ -94,13 +118,17 @@
     // カーソルを重ねた側を操作できるようにする
     this._updateFocusByPointer(input);
 
-    if (this.focus === "notes") this._updateNotes(input);
-    else this._updateList(input);
+    // バーとホイールはどちらの枠でも効く。上下キーは操作中の側だけ
+    var focus = this.focus;
+    this._updateList(input, focus === "list");
+    this._updateNotes(input, focus === "notes");
   };
 
   /** マウスを重ねた側へ操作の対象を移す */
   PatchNoteScene.prototype._updateFocusByPointer = function (input) {
     if (!input.getPointer) return;
+    // バーをつまんだまま枠の外へ出ても、つまんだ側の操作を続ける
+    if (this.list.isDragging() || this.notes.isDragging()) return;
 
     var pointer = input.getPointer();
     if (!pointer.inside) return;
@@ -110,61 +138,35 @@
     else if (NS.Panel.containsPoint(this.layout.notes, pointer)) this.focus = "notes";
   };
 
-  PatchNoteScene.prototype._updateList = function (input) {
-    var count = this.versions.length;
-    if (count === 0) return;
+  /**
+   * 左の一覧。上下キー・マウスを重ねる・ホイール・バーで動かす。
+   * @param {boolean} active 操作中の側か（上下キーと決定を見る）
+   */
+  PatchNoteScene.prototype._updateList = function (input, active) {
+    if (this.versions.length === 0) return;
 
-    var before = this.index;
-
-    if (input.isPressed("up")) this.index = (this.index - 1 + count) % count;
-    if (input.isPressed("down")) this.index = (this.index + 1) % count;
-
-    var hovered = this._hoveredVersion(input);
-    if (hovered >= 0) this.index = hovered;
-
-    // ホイールは端で止める（回り込むと今どこを見ているか分からなくなる）
-    var wheel = input.getPointer ? input.getPointer().wheel : 0;
-    if (wheel) this.index = clamp(this.index + wheel, 0, count - 1);
+    this.list.handleInput(input, { keys: active });
 
     // 別のバージョンを選んだら、内容は先頭から読み直す
-    if (this.index !== before) this.scroll = 0;
-    this._scrollListToIndex();
-
-    if (input.isPressed("confirm") || input.isPressed("right")) this.focus = "notes";
-  };
-
-  PatchNoteScene.prototype._updateNotes = function (input) {
-    var max = this._maxScroll();
-
-    if (input.isPressed("up")) this.scroll = Math.max(0, this.scroll - 1);
-    if (input.isPressed("down")) this.scroll = Math.min(max, this.scroll + 1);
-
-    var wheel = input.getPointer ? input.getPointer().wheel : 0;
-    if (wheel) this.scroll = clamp(this.scroll + wheel, 0, max);
-
-    if (input.isPressed("left")) this.focus = "list";
-  };
-
-  /** カーソルが乗っているバージョンの番号（乗っていなければ -1） */
-  PatchNoteScene.prototype._hoveredVersion = function (input) {
-    if (!input.getPointer) return -1;
-
-    var pointer = input.getPointer();
-    if (!pointer.inside) return -1;
-    if (!pointer.moved && !pointer.clicked) return -1;
-
-    // 出ている行だけを見る（送った先の見えていない行は押せない）
-    var L = this.layout.list;
-    var end = Math.min(this.versions.length, this.listTop + this._visibleVersions());
-
-    for (var i = this.listTop; i < end; i++) {
-      var rect = {
-        x: L.x, y: L.y + L.rowHeight * (i - this.listTop),
-        w: L.w, h: L.rowHeight - 4
-      };
-      if (NS.Panel.containsPoint(rect, pointer)) return i;
+    if (this.list.index !== this.index) {
+      this.index = this.list.index;
+      this._loadNotes();
     }
-    return -1;
+
+    if (active && (input.isPressed("confirm") || input.isPressed("right"))) this.focus = "notes";
+  };
+
+  /**
+   * 右の内容。上下キーで1行ずつ、ホイールとバーでも送れる。
+   * @param {boolean} active 操作中の側か（上下キーと ← を見る）
+   */
+  PatchNoteScene.prototype._updateNotes = function (input, active) {
+    this.notes.handleInput(input);
+    if (!active) return;
+
+    if (input.isPressed("up")) this.notes.scrollByRows(-1);
+    if (input.isPressed("down")) this.notes.scrollByRows(1);
+    if (input.isPressed("left")) this.focus = "list";
   };
 
   // --- 内容の組み立て ---
@@ -206,10 +208,6 @@
     var N = this.layout.notes;
     var lh = this.theme.lineHeight || 18;
     return Math.max(1, Math.floor((N.h - (this.theme.padding || 8) * 2 - 24) / lh));
-  };
-
-  PatchNoteScene.prototype._maxScroll = function () {
-    return Math.max(0, this._buildLines().length - this._visibleLines());
   };
 
   // --- 描画 ---
@@ -265,46 +263,35 @@
       { align: "center", font: this.theme.smallFont, color: this.layout.tagTextColor || "#0a0f1c" });
   };
 
-  /** 左：バージョンの一覧（新しいものが上） */
+  /**
+   * 左：バージョンの一覧（新しいものが上）。
+   * 出ている行だけを描く。入りきらないぶんは右端のバーで送る
+   */
   PatchNoteScene.prototype._renderVersionList = function () {
     var L = this.layout.list;
+    this.panel.drawBox({ x: L.x, y: L.y - 10, w: L.w, h: L.h });
+    this.list.render(this.game.clock);
+  };
+
+  /** バージョン1行（row の上端 y から描く）。バーが出ているときはその幅を空ける */
+  PatchNoteScene.prototype._renderVersionRow = function (row, y, selected) {
+    var L = this.layout.list;
     var t = this.theme;
+    var version = row.version;
+    var w = L.w - this.list.barSpace();
 
-    var box = { x: L.x, y: L.y - 10, w: L.w, h: L.h };
-    this.panel.drawBox(box);
-
-    // 出す行だけを描く。バージョンが増えても枠からはみ出さない
-    var visible = this._visibleVersions();
-    var end = Math.min(this.versions.length, this.listTop + visible);
-
-    for (var i = this.listTop; i < end; i++) {
-      var version = this.versions[i];
-      var selected = (i === this.index);
-      var y = L.y + L.rowHeight * (i - this.listTop);
-
-      if (selected) {
-        this.panel.ctx.fillStyle = this.layout.selectedBg || "rgba(74,107,168,0.3)";
-        this.panel.ctx.fillRect(L.x + 2, y, L.w - 4, L.rowHeight - 4);
-      }
-
-      this.panel.drawText(version.version, L.x + 12, y + 20,
-        { color: selected ? t.cursorColor : t.textColor });
-      this.panel.drawText(version.date || "", L.x + L.w - 12, y + 20,
-        { align: "right", font: t.smallFont, color: t.hintColor });
-      // ひとこと説明は枠より長くなることがあるので、はみ出すぶんは「…」で切る
-      this.panel.drawText(clipText(this.panel, version.summary || "", L.w - 24, t.smallFont),
-        L.x + 12, y + 38, { font: t.smallFont, color: t.subTextColor });
+    if (selected) {
+      this.panel.ctx.fillStyle = this.layout.selectedBg || "rgba(74,107,168,0.3)";
+      this.panel.ctx.fillRect(L.x + 2, y, w - 4, L.rowHeight - 4);
     }
 
-    // 上下に続きがあることを示す
-    if (this.listTop > 0) {
-      this.panel.drawText("▲", L.x + L.w - 18, box.y + 16,
-        { font: t.smallFont, color: t.hintColor });
-    }
-    if (end < this.versions.length) {
-      this.panel.drawText("▼", L.x + L.w - 18, box.y + L.h - 8,
-        { font: t.smallFont, color: t.hintColor });
-    }
+    this.panel.drawText(version.version, L.x + 12, y + 20,
+      { color: selected ? t.cursorColor : t.textColor });
+    this.panel.drawText(version.date || "", L.x + w - 12, y + 20,
+      { align: "right", font: t.smallFont, color: t.hintColor });
+    // ひとこと説明は枠より長くなることがあるので、はみ出すぶんは「…」で切る
+    this.panel.drawText(clipText(this.panel, version.summary || "", w - 24, t.smallFont),
+      L.x + 12, y + 38, { font: t.smallFont, color: t.subTextColor });
   };
 
   /** 右：選んでいるバージョンの内容 */
@@ -325,51 +312,29 @@
       origin.x, origin.y + 16,
       { color: (this.focus === "notes") ? t.cursorColor : t.textColor });
 
-    var lines = this._buildLines();
-    var visible = this._visibleLines();
-
     // まだ中身の無いバージョン（開発中）は、空欄に見えないよう一言出す
-    if (lines.length === 0) {
+    if (this.notes.rows.length === 0) {
       this.panel.drawText(this.texts.empty || "", origin.x, origin.y + 44,
         { font: t.smallFont, color: t.hintColor });
       return;
     }
 
-    var max = Math.max(0, lines.length - visible);
-    if (this.scroll > max) this.scroll = max;
-
-    var top = origin.y + 40;
-    var textX = origin.x + (this.layout.tag || {}).w + 10;
-    var end = Math.min(lines.length, this.scroll + visible);
-    var y = top;
-
-    for (var i = this.scroll; i < end; i++) {
-      var line = lines[i];
-      if (line.tag) this._drawTag(line.tag, origin.x, y);
-      if (line.heading) {
-        // 見出しは札の位置から書き始め、目立つ色にする
-        this.panel.drawText(line.text, origin.x, y,
-          { font: t.font, color: this.layout.sectionColor || t.cursorColor });
-      } else if (line.text) {
-        this.panel.drawText(line.text, textX, y, { font: t.smallFont, color: t.textColor });
-      }
-      y += lh;
-    }
-
-    this._renderScrollMarks(N, top, lines.length, visible);
+    this.notes.render();
   };
 
-  PatchNoteScene.prototype._renderScrollMarks = function (rect, top, total, visible) {
+  /** 内容の1行（y は文字の下端） */
+  PatchNoteScene.prototype._renderNoteLine = function (line, y) {
     var t = this.theme;
-    var color = (this.focus === "notes") ? t.cursorColor : t.hintColor;
+    var x = this.panel.innerOrigin(this.layout.notes).x;
+    var textX = x + (this.layout.tag || {}).w + 10;
 
-    if (this.scroll > 0) {
-      this.panel.drawText("▲", rect.x + rect.w - 16, top - 6,
-        { font: t.smallFont, color: color });
-    }
-    if (this.scroll + visible < total) {
-      this.panel.drawText("▼", rect.x + rect.w - 16, rect.y + rect.h - 8,
-        { font: t.smallFont, color: color });
+    if (line.tag) this._drawTag(line.tag, x, y);
+    if (line.heading) {
+      // 見出しは札の位置から書き始め、目立つ色にする
+      this.panel.drawText(line.text, x, y,
+        { font: t.font, color: this.layout.sectionColor || t.cursorColor });
+    } else if (line.text) {
+      this.panel.drawText(line.text, textX, y, { font: t.smallFont, color: t.textColor });
     }
   };
 
@@ -380,11 +345,6 @@
     this.panel.drawText(hint || "", pos.x, pos.y,
       { font: this.theme.smallFont, color: this.theme.hintColor });
   };
-
-  /** 値を範囲内に収める */
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
 
   /**
    * 決められた幅に収まるよう、はみ出すぶんを「…」に置き換える。

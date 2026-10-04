@@ -464,6 +464,15 @@
     return (typeof scale === "number" && scale > 0) ? scale : 1;
   };
 
+  /**
+   * 姿の名前（"squash" / "stretch" / "sleep" など）に対応する絵のid。
+   * data/monsters.js の poses に書いた種族だけが持つ。無ければ null（ふつうの絵のまま）
+   */
+  MonsterInstance.prototype.getPoseSpriteId = function (pose) {
+    if (!pose || !this._species || !this._species.poses) return null;
+    return this._species.poses[pose] || null;
+  };
+
   /** ふだんの絵の動かし方（data/motions.js のid）。種族が決める */
   MonsterInstance.prototype.getMotionId = function () {
     return this._species ? this._species.motion : null;

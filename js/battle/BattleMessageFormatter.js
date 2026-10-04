@@ -99,6 +99,10 @@
       case "immune":
         return fill(t.immune, { target: this._targetName(event) });
       case "damage":
+        // 0ダメージ（防御で削り切った）は「0 のダメージ」ではなく、通らなかったことを伝える
+        if (event.amount <= 0 && t.noDamage) {
+          return fill(t.noDamage, { target: this._targetName(event) });
+        }
         return fill(t.damage, { target: this._targetName(event), amount: event.amount });
       case "faint":
         return fill(t.faint, { target: this._targetName(event) });
@@ -134,6 +138,12 @@
         return fill(t.healed, { target: this._targetName(event), amount: event.healAmount });
       case "healFull":
         return fill(t.healFull, { target: this._targetName(event) });
+      // 状態異常を治す技（クレンズ）
+      case "cure":
+        return fill(t.cured, { target: this._targetName(event),
+                               status: (event.statusNames || []).join("・") });
+      case "cureNone":
+        return fill(t.cureNone, { target: this._targetName(event) });
       case "modifierEnd":
         return fill(t.modifierEnd,
                     { target: this._targetName(event), skill: event.skillName });

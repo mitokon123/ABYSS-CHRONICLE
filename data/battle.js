@@ -10,7 +10,8 @@
  *   基礎 = max(0, 基礎)
  *   ダメージ = floor( 基礎 × 属性倍率 × クリティカル倍率 × 防御コマンド倍率
  *                     × 特性・装備の倍率 × 乱数(randomMin〜randomMax) )
- *   ダメージ = max(minDamage, ダメージ)   ※属性無効のときは 0
+ *   ダメージが 0 になったら … zeroDamageChipChance（40%）で minDamage（1）、残り（60%）は 0
+ *                             ※属性無効のときは必ず 0（こちらは「効かない!」）
  *
  *   「通常攻撃」は normalAttackSkill で指定した技だけ。それ以外はすべて「技」の式
  *   （体当たりや噛みつくのような無属性の技も、技の式で計算する）。
@@ -25,7 +26,8 @@
  *
  * ▼ クリティカル
  *   確率 = critical.baseRate + 技の criticalBonus
- *   当たると damage に critical.multiplier を掛ける。
+ *   当たると 基礎 から防御力を引かず（critical.ignoreDefense）、critical.multiplier（1.66）を掛ける。
+ *   共鳴だけは critical.byKind で以前のまま（防御は引く・2.0）。属性の耐性は無視しない。
  *
  * ▼ 命中
  *   技に accuracy が書かれていればその値、無ければ defaultAccuracy。
@@ -99,7 +101,12 @@
       defenseFactor: 0.30,  // 防御力に掛ける係数（通常攻撃・体技・斬撃。共鳴とブレスは byKind で 0.15）
       randomMin: 0.9,
       randomMax: 1.1,
-      minDamage: 1
+      // 計算が0になったとき（防御で削り切った・乱数で切り捨てた）の扱い（RC-1。作者の指定）。
+      //   zeroDamageChipChance の確率で minDamage（1）だけ通り、残りは0のまま。
+      //   0のときは被弾の動きをしない（当たったが、びくともしなかった）。
+      //   ★ RC-1 までは必ず1通していた（minDamage を下限にしていた）
+      minDamage: 1,
+      zeroDamageChipChance: 0.4
     },
 
     /**
@@ -109,9 +116,21 @@
      */
     targetWeights: [0.50, 0.35, 0.15],
 
+    /**
+     * クリティカル（RC-1 で作者が変更）。
+     *   ignoreDefense … true なら、クリティカルのときは相手の防御力を引かない（こうかなどで上げた分も）。
+     *                   属性の耐性・防御コマンド・特性や装備の軽減はそのまま効く
+     *   multiplier    … 倍率。防御を無視するぶん、2.0 から 1.66 に下げた
+     *   byKind        … 技の種類ごとの上書き（multiplier / ignoreDefense）。
+     *                   共鳴だけは以前のまま（防御は引く・2.0 倍。作者の指定）
+     */
     critical: {
-      baseRate: 0.03,   // 全キャラ共通のクリティカル率
-      multiplier: 2.0   // クリティカル時の倍率
+      baseRate: 0.03,      // 全キャラ共通のクリティカル率
+      multiplier: 1.66,    // クリティカル時の倍率（通常攻撃・斬撃・体技など）
+      ignoreDefense: true,
+      byKind: {
+        resonance: { multiplier: 2.0, ignoreDefense: false }
+      }
     },
 
     /**

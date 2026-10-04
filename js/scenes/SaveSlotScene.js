@@ -399,6 +399,7 @@
     game.clearedDungeons = null;
     game.boughtBlessings = null;
     game.offBlessings = null;
+    game.homeSeen = null;
     game.run = null;
     // 合計プレイ時間も0から数え直す（前の周回・前のファイルのぶんを持ち越さない）
     game.playTime = 0;

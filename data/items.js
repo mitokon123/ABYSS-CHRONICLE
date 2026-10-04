@@ -5,6 +5,11 @@
  * id          : 識別子
  * name        : 表示名
  * category    : 分類id（categories.js の item を参照）
+ * icon        : 一覧で名前の左に出す 16×16 の絵（data/sprites_icons.js の iconItem〇〇）。
+ *               書かなければ絵なしで名前だけ出る
+ * from        : 素材が手に入るステージ（data/dungeons.js のid）。
+ *               図鑑と店の一覧で、素材をステージごとに小見出し（「苔むす坑道」など）で分ける。
+ *               いくつかのステージで出る素材は、最初に手に入るステージを書く
  * description : 図鑑・持ち物画面での説明文
  * maxStack    : 1種類あたりの所持上限
  * price       : ショップでの買値。0 にすると売り買いできない（重要アイテムなど）
@@ -12,6 +17,8 @@
  * effect      : 使ったときの効果（無い場合は使用できない）
  *   type  : "healHp" … HPを回復する（value で効果量）
  *           "escape" … その場から拠点へ帰る（相手を選ばない）
+ *           "scoutBoost" … 使った次のターンから、その戦闘のあいだスカウトの成功率に multiplier を掛ける
+ *                          （相手を選ばない。重ねても上がらない。BattleScene._resolveScoutBoost）
  *   value : 効果量
  * usableIn    : 使える場面。
  *     "home"    … 拠点の持ち物画面
@@ -40,6 +47,7 @@
     herb: {
       id: "herb",
       name: "薬草",
+      icon: "iconItemHerb",
       category: "heal",
       description: "そのへんに生えている草。HPを少し回復する。",
       maxStack: 99,
@@ -51,6 +59,7 @@
     potion: {
       id: "potion",
       name: "回復薬",
+      icon: "iconItemPotion",
       category: "heal",
       description: "よく効く薬。HPをそれなりに回復する。",
       maxStack: 99,
@@ -69,9 +78,11 @@
     elixir: {
       id: "elixir",
       name: "深淵の雫",
+      icon: "iconItemElixir",
       category: "heal",
       description: "深淵の底で採れる雫。HPを大きく回復する。",
-      maxStack: 9,
+      // RC-1 で 9 → 99（作者の指定。回復の道具はそろえて 99）
+      maxStack: 99,
       price: 250,
       effect: { type: "healHp", value: 100 },
       usableIn: ["home", "dungeon", "battle"]
@@ -93,6 +104,7 @@
     antidote: {
       id: "antidote",
       name: "解毒草",
+      icon: "iconItemAntidote",
       category: "heal",
       description: "苦い葉。噛むと毒が抜ける。",
       maxStack: 99,
@@ -105,9 +117,11 @@
     spiritBerry: {
       id: "spiritBerry",
       name: "精気の実",
+      icon: "iconItemSpiritBerry",
       category: "heal",
       description: "淡く光る木の実。かじると、技を出す力が少し戻る。",
-      maxStack: 9,
+      // RC-1 で 9 → 99（作者の指定。回復の道具はそろえて 99）
+      maxStack: 99,
       price: 70,
       effect: { type: "healPp", value: 5 },
       usableIn: ["home", "dungeon", "battle"]
@@ -119,6 +133,7 @@
     returnStone: {
       id: "returnStone",
       name: "帰還の石",
+      icon: "iconItemReturnStone",
       category: "tool",
       description: "淡く光る石。砕くと拠点へ引き戻される。使うとなくなる。",
       maxStack: 9,
@@ -127,18 +142,37 @@
       usableIn: ["dungeon"]
     },
 
+    // スカウトしやすくする（RC-1。作者の指定：×1.5・その戦闘のあいだ・坑道クリアで店に並ぶ）。
+    // 使った次のターンから効く。重ねて使っても上がらない（2つ目は減らない）。
+    // スカウトできない戦い（主の初戦など）では、戦闘の道具の一覧に出ない
+    scoutIncense: {
+      id: "scoutIncense",
+      name: "誘いの香",
+      icon: "iconItemScoutIncense",
+      category: "tool",
+      description: "甘く漂う香。焚くと、その戦いのあいだ相手が誘いに応じやすくなる。",
+      maxStack: 9,
+      price: 80,
+      effect: { type: "scoutBoost", multiplier: 1.5 },
+      usableIn: ["battle"]
+    },
+
     // --- 装備 ---
 
     /**
      * --- 武器 ---
      * 攻める力の中心。攻撃の加算はここに集め、アクセサリーの加算は小さめにしてある。
-     *   獣の牙(+2) → 燃え殻の剣(+4・火) → 灼牙の戦刃(+10) → 深淵の牙(+7・速×1.1) → 沼骨の槍(+7・闇)
+     *   獣の牙(+2) → 燃え殻の剣(+4・火) → 灼牙の戦刃(+10) → 深淵の牙(+9・速×1.1)
+     *   → 粘晶の剣(+12・水) → 沼骨の槍(+14・地) → 探索者の長剣(+17・クリア後の店)
+     * ★ RC-1 で作者が見直した。それまでは亀裂の戦刃(+10)が最後まで攻撃力の一番で、
+     *   殴って戦う仲間（通常攻撃・斬撃・体技）に、亀裂より先で更新する武器が無かった
      */
 
     // 最初から買える武器。ショップに並ぶ
     fangCharm: {
       id: "fangCharm",
       name: "獣の牙",
+      icon: "iconItemFangCharm",
       category: "equipment",
       description: "獣の牙を握りに据えた小さな刃。攻める力がわずかに増す。",
       maxStack: 9,
@@ -157,6 +191,7 @@
     emberBlade: {
       id: "emberBlade",
       name: "燃え殻の剣",
+      icon: "iconItemEmberBlade",
       category: "equipment",
       description: "燃え殻を鍛え直した剣。振るうと刃先に火が宿る。",
       maxStack: 9,
@@ -172,10 +207,11 @@
       }
     },
 
-    // 灼熱の獣を倒さないと作れない。攻撃の加算では最大
+    // 灼熱の獣を倒さないと作れない。亀裂の時点では攻撃の加算が最大（深層より先で抜かれる）
     blazeCharm: {
       id: "blazeCharm",
       name: "灼牙の戦刃",
+      icon: "iconItemBlazeCharm",
       category: "equipment",
       description: "灼熱の獣の牙を研ぎ上げた刃。持つ者の攻める力を大きく引き上げる。",
       maxStack: 9,
@@ -192,10 +228,11 @@
       }
     },
 
-    // 深層の素材で作る武器。攻撃は戦刃に届かないが、速さが伸びる（加算ではなく倍率）
+    // 深層の素材で作る武器。攻撃は戦刃に届かないが、速さが伸びる（加算ではなく倍率）。RC-1 で攻撃 +7 → +9
     abyssFang: {
       id: "abyssFang",
       name: "深淵の牙",
+      icon: "iconItemAbyssFang",
       category: "equipment",
       description: "深淵の欠片を牙の形に削り出した刃。軽く、振りが速い。",
       maxStack: 9,
@@ -205,18 +242,21 @@
       equip: {
         slot: "weapon",
         effects: [
-          { type: "statBonus", stat: "attack", value: 7 },
+          { type: "statBonus", stat: "attack", value: 9 },
           { type: "statMultiplier", stat: "speed", value: 1.1 }
         ]
       }
     },
 
-    // 毒沼の素材で作る武器。闇の技を使う仲間（ヌマボネ・ヨドミ）向け
+    // 毒沼の素材で作る武器。地の技を使う仲間（イワゴロー・ヒビイワ・モスゴーレム）向け。
+    // RC-1 で闇 → 地・攻撃 +7 → +14（作者の指定）。それまで地の火力を上げる装備が1つも無く、
+    // 闇だけが武器と竜牙の指輪で重ねられた
     marshSpear: {
       id: "marshSpear",
       name: "沼骨の槍",
+      icon: "iconItemMarshSpear",
       category: "equipment",
-      description: "錆びた骨を束ねて穂先にした槍。突くたびに闇がにじむ。",
+      description: "錆びた骨を束ねて穂先にした槍。沼の泥を吸った穂先は、岩のように重い。",
       maxStack: 9,
       price: 360,
       effect: null,
@@ -224,8 +264,30 @@
       equip: {
         slot: "weapon",
         effects: [
-          { type: "statBonus", stat: "attack", value: 7 },
-          { type: "damageDealt", value: 1.10, element: "dark" }
+          { type: "statBonus", stat: "attack", value: 14 },
+          { type: "damageDealt", value: 1.10, element: "earth" }
+        ]
+      }
+    },
+
+    // スライムのかけらで作る武器（RC-1。余りがちなかけらの使い道として作者が考えたもの）。
+    // 水の技を使う仲間向け。RC-1 で攻撃 +7 → +12（作者の指定）
+    slimeBlade: {
+      id: "slimeBlade",
+      name: "粘晶の剣",
+      icon: "iconItemSlimeBlade",
+      category: "equipment",
+      description: "スライムのかけらを固めて刃にした剣。澄んだ刃に水の力が通う。",
+      maxStack: 9,
+      // 売値 117G（作者の指定。最初の 180G の65%。売値は price × shop.js の sellRate 0.5）
+      price: 234,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "weapon",
+        effects: [
+          { type: "statBonus", stat: "attack", value: 12 },
+          { type: "damageDealt", value: 1.10, element: "water" }
         ]
       }
     },
@@ -245,6 +307,7 @@
     stoneBand: {
       id: "stoneBand",
       name: "石の帽子",
+      icon: "iconItemStoneBand",
       category: "equipment",
       description: "ずしりと重い石の帽子。かぶると守りが上がる。",
       maxStack: 9,
@@ -263,6 +326,7 @@
     mossCharm: {
       id: "mossCharm",
       name: "苔の外套",
+      icon: "iconItemMossCharm",
       category: "equipment",
       description: "坑道の主の核を縫い込んだ外套。体が丈夫になる。",
       maxStack: 9,
@@ -281,13 +345,17 @@
     /**
      * --- 店で買う第一章クリア後の装備（腐食の毒沼クリアでよろず屋に並ぶ） ---
      * お金の使いみち。α-9 のテストプレイで、クリア時に 2700G 余ったため足した（数値と値段は作者が決めたもの）。
-     * 工房で作れるいちばん良い装備（素材で作る意味）は超えない強さにしてある：
-     *   探索者の長剣 攻+9 は灼牙の戦刃 攻+10 のすぐ下、厚革の胴着 防+14 は黄泉鱗の鎧 防+17 の下
+     * 最初は「工房で作れるいちばん良い装備は超えない」強さにしてあったが、
+     * RC-1 で作者が見直した：
+     *   探索者の長剣 攻+17 … 攻撃の加算だけなら武器の一番（属性の倍率は無い。800G）
+     *   厚革の胴着 防+14 は黄泉鱗の鎧 防+17 の下のまま
+     *   精気の指輪 PP+3 → PP+8（770G に見合う量に）
      */
 
     explorerSword: {
       id: "explorerSword",
       name: "探索者の長剣",
+      icon: "iconItemExplorerSword",
       category: "equipment",
       description: "探索者が深く潜るときに選ぶ、癖のない長剣。",
       maxStack: 9,
@@ -297,7 +365,7 @@
       equip: {
         slot: "weapon",
         effects: [
-          { type: "statBonus", stat: "attack", value: 9 }
+          { type: "statBonus", stat: "attack", value: 17 }
         ]
       }
     },
@@ -305,6 +373,7 @@
     thickLeatherVest: {
       id: "thickLeatherVest",
       name: "厚革の胴着",
+      icon: "iconItemThickLeatherVest",
       category: "equipment",
       description: "何枚も革を重ねた胴着。重いが、そのぶん体を守る。",
       maxStack: 9,
@@ -323,6 +392,7 @@
     spiritRing: {
       id: "spiritRing",
       name: "精気の指輪",
+      icon: "iconItemSpiritRing",
       category: "equipment",
       description: "精気の実を磨いて嵌めた指輪。技を出す力が増す。",
       maxStack: 9,
@@ -332,7 +402,7 @@
       equip: {
         slot: "accessory",
         effects: [
-          { type: "statBonus", stat: "pp", value: 3 }
+          { type: "statBonus", stat: "pp", value: 8 }
         ]
       }
     },
@@ -340,6 +410,7 @@
     travelerCharm: {
       id: "travelerCharm",
       name: "旅人の護符",
+      icon: "iconItemTravelerCharm",
       category: "equipment",
       description: "長く潜る探索者のお守り。毒・痺れ・眠気を少し遠ざける。",
       maxStack: 9,
@@ -365,6 +436,7 @@
     glowLantern: {
       id: "glowLantern",
       name: "光る提灯",
+      icon: "iconItemGlowLantern",
       category: "equipment",
       description: "鱗粉を詰めた小さな提灯。光をよく通す。",
       maxStack: 9,
@@ -380,10 +452,11 @@
       }
     },
 
-    // ゲーム中で初めて素早さが上がる装備。守りに寄せる石の帽子の対
+    // ゲーム中で初めて素早さが上がる装備。守りに寄せる石の帽子の対。RC-1 で素早さ +5 → +7
     swiftPlume: {
       id: "swiftPlume",
       name: "風切りの羽根",
+      icon: "iconItemSwiftPlume",
       category: "equipment",
       description: "灰の羽根を束ねた飾り。体が軽くなり、動きが速くなる。",
       maxStack: 9,
@@ -393,7 +466,7 @@
       equip: {
         slot: "accessory",
         effects: [
-          { type: "statBonus", stat: "speed", value: 5 }
+          { type: "statBonus", stat: "speed", value: 7 }
         ]
       }
     },
@@ -403,6 +476,7 @@
     emberWard: {
       id: "emberWard",
       name: "炎よけの札",
+      icon: "iconItemEmberWard",
       category: "equipment",
       description: "焼けた殻を貼り合わせた札。火に対する強さそのものが増す。",
       maxStack: 9,
@@ -425,6 +499,7 @@
     duskWard: {
       id: "duskWard",
       name: "宵よけの札",
+      icon: "iconItemDuskWard",
       category: "equipment",
       description: "宵の露を染み込ませた札。闇に対する強さそのものが増す。",
       maxStack: 9,
@@ -445,6 +520,7 @@
     stormVeil: {
       id: "stormVeil",
       name: "雷光の羽衣",
+      icon: "iconItemStormVeil",
       category: "equipment",
       description: "ビリムシの翅を編んだ薄衣。まとうと力の巡りが速くなり、雷を弾く。",
       maxStack: 9,
@@ -462,11 +538,12 @@
       }
     },
 
-    // 防具の頂点。泥重の甲（防+12／速×0.85）より硬く、鈍くもならない。
+    // 防具の頂点。泥重の甲（防+12）より硬い。
     // そのぶん素材が重い（ヨミリュウを倒さないと作れない）
     dragonGuard: {
       id: "dragonGuard",
       name: "黄泉鱗の鎧",
+      icon: "iconItemDragonGuard",
       category: "equipment",
       description: "ヨミリュウの鱗を綴じ合わせた鎧。並の一撃では傷ひとつ付かない。",
       maxStack: 9,
@@ -487,6 +564,7 @@
     crownCircle: {
       id: "crownCircle",
       name: "王冠の輪",
+      icon: "iconItemCrownCircle",
       category: "equipment",
       description: "王の冠を打ち直した輪。身につけた者の全てをわずかに押し上げる。",
       maxStack: 9,
@@ -500,6 +578,49 @@
           { type: "statBonus", stat: "attack", value: 3 },
           { type: "statBonus", stat: "defense", value: 3 },
           { type: "statBonus", stat: "speed", value: 2 }
+        ]
+      }
+    },
+
+    // スライムのかけらで作る防具（RC-1）。泥重の甲（防+12・地+3）より少し柔らかく、水に強い
+    slimeMail: {
+      id: "slimeMail",
+      name: "粘晶の鎧",
+      icon: "iconItemSlimeMail",
+      category: "equipment",
+      description: "スライムのかけらを幾重にも固めた鎧。打たれても衝撃が逃げ、水をよく弾く。",
+      maxStack: 9,
+      // 売値 130G（作者の指定。最初の 200G の65%）
+      price: 260,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "armor",
+        effects: [
+          { type: "statBonus", stat: "defense", value: 11 },
+          { type: "resistBonus", element: "water", value: 2 }
+        ]
+      }
+    },
+
+    // スライムのかけらで作るアクセサリー（RC-1）。
+    // ゲーム中で初めて、回復の技を強くする装備。キュアを覚えるスライムに持たせる想定
+    slimeNecklace: {
+      id: "slimeNecklace",
+      name: "粘晶のネックレス",
+      icon: "iconItemSlimeNecklace",
+      category: "equipment",
+      description: "スライムのかけらを連ねた首飾り。癒やしの力がよく通る。",
+      maxStack: 9,
+      // 売値 137G（作者の指定。最初の 210G の65%）
+      price: 274,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", element: "water", value: 2 },
+          { type: "healDealt", value: 1.2 }
         ]
       }
     },
@@ -518,6 +639,7 @@
     venomWard: {
       id: "venomWard",
       name: "毒よけの護符",
+      icon: "iconItemVenomWard",
       category: "equipment",
       description: "毒の針をより合わせた護符。毒そのものを寄せつけなくなる。",
       maxStack: 9,
@@ -537,6 +659,7 @@
     mireArmor: {
       id: "mireArmor",
       name: "泥重の甲",
+      icon: "iconItemMireArmor",
       category: "equipment",
       description: "泥を吸った甲羅を骨で綴じた鎧。重いが、並の攻撃はまるで通らない。",
       maxStack: 9,
@@ -557,6 +680,7 @@
     venomCrown: {
       id: "venomCrown",
       name: "毒沼の冠",
+      icon: "iconItemVenomCrown",
       category: "equipment",
       description: "主の毒嚢を包んで戴く冠。毒を宿したまま、その力だけを借りる。",
       maxStack: 9,
@@ -584,6 +708,7 @@
     stoneMail: {
       id: "stoneMail",
       name: "岩鎧の欠片",
+      icon: "iconItemStoneMail",
       category: "equipment",
       description: "イワゴローの体の一部。抱えていると重いが、驚くほど頑丈だ。",
       maxStack: 9,
@@ -602,13 +727,14 @@
     windCrest: {
       id: "windCrest",
       name: "風乗りの羽飾り",
+      icon: "iconItemWindCrest",
       category: "equipment",
       description: "ハイバネの風切り羽を挿した飾り。身につけると足が軽くなる。",
       maxStack: 9,
       price: 220,
       effect: null,
       usableIn: [],
-      // ゲーム中で初めての風属性の装備。速さは風切りの羽根と同じで、風の技も伸びる
+      // ゲーム中で初めての風属性の装備。速さは風切りの羽根（RC-1 で +7）より少し低いかわりに、風の技も伸びる
       equip: {
         slot: "accessory",
         effects: [
@@ -621,6 +747,7 @@
     chargedCore: {
       id: "chargedCore",
       name: "帯電の芯",
+      icon: "iconItemChargedCore",
       category: "equipment",
       description: "ビリムシの体内で電気をためていた芯。握ると指先がしびれる。",
       maxStack: 9,
@@ -640,6 +767,7 @@
     fangRing: {
       id: "fangRing",
       name: "竜牙の指輪",
+      icon: "iconItemFangRing",
       category: "equipment",
       description: "ヨミリュウの牙を削って作られた指輪。持つ者に闇を纏わせる。",
       maxStack: 9,
@@ -670,6 +798,7 @@
     boneCharm: {
       id: "boneCharm",
       name: "髑髏の護符",
+      icon: "iconItemBoneCharm",
       category: "equipment",
       description: "ヌマボネの頭骨を削って作った護符。死そのものを一度だけ弾く。",
       maxStack: 9,
@@ -688,6 +817,8 @@
     oreShard: {
       id: "oreShard",
       name: "鉱石のかけら",
+      icon: "iconItemOreShard",
+      from: "mossyMine",
       category: "material",
       description: "坑道で拾える鈍く光る石。何かの素材になりそうだ。",
       maxStack: 99,
@@ -699,6 +830,8 @@
     glowDust: {
       id: "glowDust",
       name: "光る鱗粉",
+      icon: "iconItemGlowDust",
+      from: "mossyMine",
       category: "material",
       description: "暗がりでほのかに光る粉。虫が落としていった。",
       maxStack: 99,
@@ -712,6 +845,8 @@
     blazingFang: {
       id: "blazingFang",
       name: "灼熱の牙",
+      icon: "iconItemBlazingFang",
+      from: "scorchingFissure",
       category: "material",
       description: "灼熱の獣の牙。折れてなお、芯が赤く灯っている。",
       maxStack: 99,
@@ -723,6 +858,8 @@
     emberAsh: {
       id: "emberAsh",
       name: "燃え殻",
+      icon: "iconItemEmberAsh",
+      from: "scorchingFissure",
       category: "material",
       description: "スミビが落としていった燃えかす。まだほのかに温かい。",
       maxStack: 99,
@@ -734,6 +871,8 @@
     ashFeather: {
       id: "ashFeather",
       name: "灰の羽根",
+      icon: "iconItemAshFeather",
+      from: "scorchingFissure",
       category: "material",
       description: "灰をまとった軽い羽根。手に取ると、そのまま風に乗って飛んでいきそうだ。",
       maxStack: 99,
@@ -745,6 +884,8 @@
     scorchedShell: {
       id: "scorchedShell",
       name: "焼けた殻",
+      icon: "iconItemScorchedShell",
+      from: "scorchingFissure",
       category: "material",
       description: "マグマの熱で焼き締まった殻のかけら。火をよく弾く。",
       maxStack: 99,
@@ -758,6 +899,8 @@
     duskDew: {
       id: "duskDew",
       name: "宵の露",
+      icon: "iconItemDuskDew",
+      from: "silentDepths",
       category: "material",
       description: "ヨドミが残していった黒い雫。触れるとひやりと重い。",
       maxStack: 99,
@@ -769,6 +912,8 @@
     crownShard: {
       id: "crownShard",
       name: "王冠のかけら",
+      icon: "iconItemCrownShard",
+      from: "silentDepths",
       category: "material",
       description: "深層の主がかぶっていた冠のかけら。芯に澄んだ水を宿している。",
       maxStack: 99,
@@ -780,6 +925,8 @@
     dragonScale: {
       id: "dragonScale",
       name: "黄泉竜の鱗",
+      icon: "iconItemDragonScale",
+      from: "silentDepths",
       category: "material",
       description: "ヨミリュウの鱗。光にかざしても、向こう側が透けることはない。",
       maxStack: 99,
@@ -791,6 +938,8 @@
     stormWing: {
       id: "stormWing",
       name: "雷光の翅",
+      icon: "iconItemStormWing",
+      from: "silentDepths",
       category: "material",
       description: "ビリムシの翅。ちぎれてもなお、指先に軽くしびれを残す。",
       maxStack: 99,
@@ -802,6 +951,8 @@
     twistedVine: {
       id: "twistedVine",
       name: "ねじれ蔦",
+      icon: "iconItemTwistedVine",
+      from: "silentDepths",
       category: "material",
       description: "カゲヅタの蔦を切り取ったもの。乾いてもまだ何かに絡みつこうとする。",
       maxStack: 99,
@@ -816,6 +967,8 @@
     venomStinger: {
       id: "venomStinger",
       name: "毒の針",
+      icon: "iconItemVenomStinger",
+      from: "venomMarsh",
       category: "material",
       description: "ドクバチの針。抜けても先から雫が落ちつづける。",
       maxStack: 99,
@@ -827,6 +980,8 @@
     muddyShell: {
       id: "muddyShell",
       name: "泥甲羅",
+      icon: "iconItemMuddyShell",
+      from: "venomMarsh",
       category: "material",
       description: "ドロガメの甲羅のかけら。沼の泥が染み込んで、もう洗っても落ちない。",
       maxStack: 99,
@@ -838,6 +993,8 @@
     rustedBone: {
       id: "rustedBone",
       name: "錆びた骨",
+      icon: "iconItemRustedBone",
+      from: "venomMarsh",
       category: "material",
       description: "沼に沈んでいた骨。長く浸かっていたせいで、赤茶けて脆い。",
       maxStack: 99,
@@ -850,6 +1007,8 @@
     venomSac: {
       id: "venomSac",
       name: "毒嚢",
+      icon: "iconItemVenomSac",
+      from: "venomMarsh",
       category: "material",
       description: "ヌシガエルの体内にあった袋。この沼の毒は、すべてここから出ていた。",
       maxStack: 99,
@@ -861,6 +1020,8 @@
     mossyCore: {
       id: "mossyCore",
       name: "苔むした核",
+      icon: "iconItemMossyCore",
+      from: "mossyMine",
       category: "material",
       description: "坑道の主を動かしていた石の核。まだ温かい。",
       maxStack: 99,
@@ -872,10 +1033,14 @@
     slimeShard: {
       id: "slimeShard",
       name: "スライムのかけら",
+      icon: "iconItemSlimeShard",
+      from: "silentDepths",
       category: "material",
       description: "ぷるぷるした欠片。何かの素材になりそうだ。",
       maxStack: 99,
-      price: 12,
+      // RC-1 で 12 → 30（作者の指定）。12G だと、店で買ったかけらで粘晶の装備を作って売るだけで
+      // お金が増え続けた（剣 48G→売値117G など）。30G なら材料のほうが高くつく（剣 120G・鎧と首飾り 150G）
+      price: 30,
       effect: null,
       usableIn: []
     },
@@ -883,6 +1048,9 @@
     abyssFragment: {
       id: "abyssFragment",
       name: "深淵の欠片",
+      icon: "iconItemAbyssFragment",
+      // ヌマボネ（毒沼）も落とすが、最初に手に入るのは深層（ヨドミ・ヨミリュウ・宝箱）
+      from: "silentDepths",
       category: "material",
       description: "深部でまれに見つかる黒い欠片。強い力を感じる。",
       maxStack: 99,

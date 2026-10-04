@@ -39,7 +39,7 @@
     this.panel = new NS.Panel(game.ctx, this.theme);
     this.sprites = new NS.SpriteRenderer(game.ctx, game.assets);
     this.renderer = new NS.Renderer(game.ctx);
-    this.list = new NS.ScrollList(this.panel, this.layout.list);
+    this.list = new NS.ScrollList(this.panel, this.layout.list, { sprites: this.sprites });
     this.backButton = new NS.BackButton(this.panel, game.data);
     this.abilitySystem = new NS.AbilitySystem(game.data);
 
@@ -263,15 +263,32 @@
     var discovery = this.game.discovery;
     var categories = (data.categories || {}).item || {};
 
+    // 小見出し：装備は枠（武器・防具・アクセサリー）、素材は手に入るステージ（items.js の from）。
+    // ステージの並びは data/dungeons.js の order（店の素材と同じ並び）
+    var defs = {};
+    var slotDefs = (data.categories || {}).equipSlot || {};
+    for (var slot in slotDefs) {
+      if (Object.prototype.hasOwnProperty.call(slotDefs, slot)) defs[slot] = slotDefs[slot];
+    }
+    var dungeons = data.dungeons || {};
+    for (var dungeonId in dungeons) {
+      if (!Object.prototype.hasOwnProperty.call(dungeons, dungeonId)) continue;
+      defs[dungeonId] = { name: dungeons[dungeonId].name, order: dungeons[dungeonId].order };
+    }
     var subgroups = {
-      keyOf: function (id, item) { return item.equip ? NS.EffectSystem.slotOf(item) : null; },
-      defs: (data.categories || {}).equipSlot || {}
+      keyOf: function (id, item) {
+        if (item.equip) return NS.EffectSystem.slotOf(item);
+        return item.from || null;
+      },
+      defs: defs
     };
 
     return buildRows(data.items, categories, "category", function (id, item) {
       var obtained = discovery.isItemObtained(id);
       return {
         label: obtained ? item.name : (this.texts.unknownName || "???"),
+        // 絵も、手に入れるまでは見せない
+        icon: obtained ? item.icon : null,
         right: obtained ? (this.texts.obtainedLabel || "") : "",
         value: id
       };
@@ -491,9 +508,17 @@
     var end = Math.min(lines.length, this.detailScroll + m.visible);
     var y = m.top;
 
+    // アイテムの絵（icon）は1行目の左に出す。送って1行目が隠れたら絵も出さない
+    var indent = 0;
+    if (m.content.icon && m.content.icon.icon) {
+      indent = NS.StatusMarks.itemIconSize(t) + 8;
+      if (this.detailScroll === 0) NS.StatusMarks.drawItemIcon(this.sprites, m.content.icon, origin.x, m.top - 16, t);
+    }
+
     for (var i = this.detailScroll; i < end; i++) {
       var line = lines[i];
-      this.panel.drawText(line.text, line.center ? (rect.x + rect.w / 2) : origin.x, y,
+      var x = line.center ? (rect.x + rect.w / 2) : origin.x + (line.besideIcon ? indent : 0);
+      this.panel.drawText(line.text, x, y,
         {
           align: line.center ? "center" : "left",
           font: line.font || t.smallFont,
@@ -795,14 +820,15 @@
       return { sprite: null, lines: lines };
     }
 
-    lines.push({ text: item.name, font: t.font, color: t.textColor });
+    // 名前と分類は、左上の絵（icon）の右に並べる（besideIcon）
+    lines.push({ text: item.name, font: t.font, color: t.textColor, besideIcon: true });
 
     var category = ((data.categories || {}).item || {})[item.category];
     if (category) {
       // 装備は「装備・武器」のように枠まで出す
       var label = category.name;
       if (item.equip) label += "・" + NS.EffectSystem.slotName(item, data);
-      lines.push({ text: label, color: category.color });
+      lines.push({ text: label, color: category.color, besideIcon: true });
     }
 
     lines.push({ text: "所持 " + this.game.inventory.getCount(item.id) });
@@ -829,7 +855,7 @@
     }
     for (var s = 0; s < sources.length; s++) lines.push({ text: "・" + sources[s] });
 
-    return { sprite: null, lines: lines };
+    return { sprite: null, icon: item, lines: lines };
   };
 
   /**

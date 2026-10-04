@@ -31,6 +31,8 @@
       // 「効かない」はダメージ0の理由が分からなくなるため残す
       immune:       "{target} には効かない!",               // target
       damage:       "{target} に {amount} のダメージ!",     // target, amount
+      // 防御で削り切って0になったとき（属性無効の immune とは別）
+      noDamage:     "{target} にダメージを与えられなかった!", // target
       faint:        "{target} は倒れた!",                   // target
 
       // バフ／デバフ（data/skills.js の modifier）。
@@ -56,6 +58,8 @@
       // HPを回復する技（data/skills.js の heal）
       healed:       "{target} の HPが {amount} 回復した!",   // target, amount
       healFull:     "しかし {target} は 元気なままだ",       // target
+      cured:        "{target} の {status}が 治った!",        // target, status（クレンズ）
+      cureNone:     "しかし {target} には 治すものがなかった", // target
 
       // 戦闘中に働く特性（data/abilities.js の regen / counterStatus / drain / firstStrike / undying）。
       //   abilityTriggered … 特性が働いた合図。このあとに毒・麻痺などの文が続く（放電・毒のとげ・先手）
@@ -92,6 +96,9 @@
       battleEnd: "スカウトに成功し、戦いは終わった。",
       refused:   "しかし {name} は 応じてくれなかった...",   // name
       partyFull: "しかし これ以上連れていけない!",
+      // 誘いの香（スカウトしやすくする道具）
+      boostStart:   "甘い香りが漂いはじめた。次のターンから仲間に誘いやすくなる!",
+      boostAlready: "もう香りは漂っている。",
 
       // パーティがいっぱいのときに選ぶ行き先
       choiceTitle:  "{name} をどうする?",                    // name
@@ -260,6 +267,16 @@
       lockedShort:"{name} はまだ使えない",                   // name
       statusTitle:"パーティ",
       emptyParty: "仲間がいない",
+      // メニューの右端に出す札（何かあるときだけ）
+      //   badgeCraft … いまの素材とお金で作れるものがある
+      //   badgeShop  … 前に店を開いたときより、並ぶ品が増えた
+      //   badgeDex   … 前に図鑑を開いたときより、記録が増えた
+      // 仲間の一覧の経験値のバーの右に出す数字（次のレベルまで）。レベル上限なら expMax
+      expLeft:    "あと {n}",
+      expMax:     "MAX",
+      badgeCraft: "作れる",
+      badgeShop:  "新入荷",
+      badgeDex:   "NEW",
       hint:       "↑↓: 選択    決定: 決定    Esc: タイトルへ",
       // Esc でタイトルへ戻る前の確認。既定は「いいえ」
       toTitleTitle: "タイトルに戻りますか？",
@@ -288,6 +305,17 @@
 
       start: "この姿で始める",
       apply: "この内容にする",
+
+      // 自分で色を作る（色見本のいちばん右）
+      // 色見本の「じぶんで」（右下に＋の付いた見本）を選んでいるときの案内
+      hintCustom:    "↑↓: 選択    ←→: 色を選ぶ    決定: この色を作り直す",
+      editorTitle:   "ふくの色を作る",
+      hueLabel:      "色合い",
+      satLabel:      "あざやかさ",
+      lightLabel:    "明るさ",
+      editorOk:      "決める",
+      editorCancel:  "やめる",
+      hintEditor:    "↑↓: 選ぶ    ←→: 動かす（押し続けると速く）    決定: 決める    Esc: やめる",
 
       hintNew:  "↑↓: 選択    ←→: 色・性別・一人称を選ぶ    決定: 決定",
       hintEdit: "↑↓: 選択    ←→: 色・性別・一人称を選ぶ    決定: 決定    Esc: 戻る"
@@ -518,9 +546,6 @@
       subtitle:     "ゲームの設定と操作キーの確認",
       volumeTitle:  "ゲーム設定",
       keysTitle:    "操作キー",
-      // ※ 音源ファイルを1つも置いていないうちは、音量を変えても何も鳴らない。
-      //   その状態でも「壊れている」と思われないよう、一言添えてある
-      audioNote:    "※ 音源を入れていない場合、音量を変えても音は鳴りません",
       hint:         "↑↓: 選択    ←→: 変更    Q/E・ホイール: 操作キーを送る    Esc: 戻る",
       saved:        "設定を保存しました",
       saveFailed:   "設定を保存できませんでした"
@@ -600,6 +625,8 @@
       statusNote:   "相手の耐性で通りにくくなる",
       ppLabel:      "消費PP",
       accuracyLabel:"命中",
+      // 使う回復の技の回復量の倍率（healDealt。粘晶のネックレス）。「回復の技 ×1.2」と出る
+      healDealtLabel: "回復の技",
       criticalLabel:"クリティカル",
       knownLabel:   "判明",
       unknownName:  "???",
@@ -777,6 +804,8 @@
       fieldSkillUsed:   "{user} の {skill}! {target} の HPが {amount} 回復した", // user, skill, target, amount
       fieldSkillNoPp:   "PPが足りない",
       fieldSkillFull:   "{target} は元気なままだ",                        // target
+      fieldSkillCured:  "{user} の {skill}! {target} の {status}が治った", // user, skill, target, status
+      fieldSkillNothingToCure: "{target} には治すものがない",             // target
       fieldSkillFainted:"{target} は倒れていて使えない",                  // target
       hintFieldSkill:   "↑↓: 技を選ぶ    決定: 決定    Esc: やめる",
       hintFieldTarget:  "↑↓: 相手を選ぶ    決定: 使う（続けて使える）    Esc: 技選びへ",

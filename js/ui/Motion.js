@@ -23,7 +23,7 @@
       return {
         offsetX: 0, offsetY: 0,
         scale: 1, scaleX: 1, scaleY: 1,
-        alpha: 1, rotate: 0, frame: 0, anchor: null
+        alpha: 1, rotate: 0, frame: 0, anchor: null, pinTop: 0
       };
     },
 
@@ -98,7 +98,11 @@
         alpha: clamp01(channel(definition.alpha, elapsed, base, 1)),
         rotate: channel(definition.rotate, elapsed, base, 0),
         frame: frameIndex(definition.frames, elapsed, base, frameCount),
-        anchor: definition.anchor || null
+        anchor: definition.anchor || null,
+        // 絵の上から何行を「動かさない」か（天井の裂け目など。SpriteRenderer.drawMotion）
+        pinTop: definition.pinTop || 0,
+        // ずっと続く動きでも姿を決められる（眠っている間の "sleep" など）
+        pose: definition.pose || null
       };
     },
 
@@ -124,7 +128,9 @@
 
       return {
         offsetX: shot(definition.offsetX, t, 0, dir),
-        offsetY: shot(definition.offsetY, t, 0, dir),
+        // lift … 相手の位置に関係なく、画面の上へ浮く量（RC-1。浮いたまま攻めるヨミリュウの体技など）。
+        //   offsetY は相手のいる向きで上下が入れ替わる（敵は下へ・味方は上へ踏み込む）ので、「上へ浮く」は書けない
+        offsetY: shot(definition.offsetY, t, 0, dir) - shot(definition.lift, t, 0, 1),
         scale: Math.max(0, shot(definition.scale, t, 1, 1)),
         scaleX: Math.max(0, shot(definition.scaleX, t, 1, 1)),
         scaleY: Math.max(0, shot(definition.scaleY, t, 1, 1)),
@@ -132,7 +138,10 @@
         // 回転は向きに関係なく、いつも同じ方向へまわす
         rotate: shot(definition.rotate, t, 0, 1),
         frame: 0,
-        anchor: definition.anchor || null
+        anchor: definition.anchor || null,
+        pinTop: definition.pinTop || 0,
+        // その瞬間に使う姿の名前（poses。種族の data/monsters.js の poses で絵に変わる）
+        pose: poseAt(definition.poses, t)
       };
     },
 
@@ -144,7 +153,7 @@
      * ずれは足し算、大きさと濃さは掛け算。
      *
      * コマ絵の番号は base（ずっと続く方）のものを使う。
-     * 攻撃の絵を別に用意したくなったら、ここを見直す。
+     * 攻撃の一瞬だけ別の絵にしたいときは、1回だけの動きの poses で「姿」を指定する（RC-1）。
      */
     combine: function (base, extra) {
       if (!extra) return base || this.still();
@@ -161,7 +170,11 @@
         frame: base.frame,
         // 伸縮の基準は、ふだんの動き（base）が決めたものを優先する。
         // 攻撃の一瞬だけ基準が入れ替わると、絵が飛んで見えるため
-        anchor: base.anchor || extra.anchor || null
+        anchor: base.anchor || extra.anchor || null,
+        // 動かさない行数も、ふだんの動きが決めたものを優先する（途中で切り替わると裂け目が飛ぶ）
+        pinTop: base.pinTop || extra.pinTop || 0,
+        // 姿は1回だけの動き（攻撃・被弾）が指定していればそちらを優先する
+        pose: extra.pose || base.pose || null
       };
     },
 
@@ -272,7 +285,10 @@
    *
    *   outBack … 素早く出て、ゆっくり戻る。踏み込みらしく見える（既定）
    *   pulse  … なめらかに出て、なめらかに戻る
+   *   hops   … count 回（既定2）、出て戻るを繰り返す。続けて飛びかかる動きに使う
    *   decay  … 大きく始まり、揺れながら収まる。当たった衝撃らしく見える
+   *   wobble … 0から始まって左右（上下）に揺れ、だんだん収まる（cycles 回。既定2）。
+   *            decay と違って始まりで飛ばないので、身を揺らす・震えるのに使う（RC-1）
    *   windup … 先に逆へ引いてから、勢いよく出て戻る。技を放つ動きに使う
    *   fade   … 最大から、まっすぐ元へ戻るだけ
    *   rise   … 0から最大へ向かい、戻らない。倒れて消えるなど「元に戻らない」動き
@@ -283,11 +299,16 @@
     var name = spec.shape || "outBack";
 
     if (name === "pulse") return Math.sin(Math.PI * t);
+    // count 回、出て戻るを繰り返す（2回続けて飛びかかる、など。既定 2回）
+    if (name === "hops") return Math.abs(Math.sin(Math.PI * (spec.count || 2) * t));
     if (name === "fade") return 1 - t;
     if (name === "rise") return t * t;
     if (name === "decay") {
       var cycles = spec.cycles || 2;
       return Math.cos(Math.PI * 2 * cycles * t) * (1 - t);
+    }
+    if (name === "wobble") {
+      return Math.sin(Math.PI * 2 * (spec.cycles || 2) * t) * (1 - t);
     }
     if (name === "windup") {
       // 先に逆へ引いてから、勢いよく出て戻る。
@@ -302,6 +323,20 @@
     var out = spec.outRatio || 0.3;
     if (t < out) return easeOut(t / out);
     return 1 - easeIn((t - out) / (1 - out));
+  }
+
+  /**
+   * 1回だけの動きの、その瞬間の姿。
+   *   poses: [{ at: 0, pose: "squash" }, { at: 0.3, pose: "stretch" }, { at: 0.7, pose: null }]
+   * at（0〜1）を過ぎた最後のものを使う。null ならふだんの絵に戻る
+   */
+  function poseAt(poses, t) {
+    if (!poses || !poses.length) return null;
+    var found = null;
+    for (var i = 0; i < poses.length; i++) {
+      if ((poses[i].at || 0) <= t) found = poses[i].pose || null;
+    }
+    return found;
   }
 
   function easeOut(x) { return 1 - (1 - x) * (1 - x); }

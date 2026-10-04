@@ -18,11 +18,28 @@
  *   赤い服に青い影がつくので、汚れて見える。3つで1組にしてある。
  *
  * 色そのものは data/player.js の appearance.colors。ここに色は書かない。
+ *
+ * ▼ 自分で作った色（RC-1）
+ *   用意した色のほかに、色コード（"#4a7fe0" の形）もそのまま色として使える。
+ *   セーブには色のid の代わりに色コードが入る。
+ *   光の面と影は、地の色から自動で作る（lightOf / shadowOf）。
+ *   その絵は起動時には作れないので、使うときに作って描画物へ足す（ensureCustom）。
+ *   そのため main.js で PlayerLook.assets に AssetLoader を渡しておく。
  */
 (function (NS) {
   "use strict";
 
+  var CUSTOM_SUFFIX = "custom";   // 自分で作った色の絵のid の後ろに付ける名前
+
   var PlayerLook = {
+
+    /** 描画物を作る先（js/main.js が入れる）。自分で作った色の絵を後から足すのに使う */
+    assets: null,
+
+    /** 自分で作った色（"#rrggbb"）か */
+    isCustom: function (colorId) {
+      return typeof colorId === "string" && /^#[0-9a-fA-F]{6}$/.test(colorId);
+    },
 
     /** その色の絵のid（もとのid + "_" + 色のid） */
     variantId: function (spriteId, colorId) {
@@ -48,8 +65,9 @@
       return colors.length > 0 ? colors[0].id : null;
     },
 
-    /** その色があるか。無ければ既定の色に落とす */
+    /** その色があるか。無ければ既定の色に落とす（自分で作った色はそのまま） */
     resolveColorId: function (gameData, colorId) {
+      if (this.isCustom(colorId)) return colorId.toLowerCase();
       var colors = this.colorsOf(gameData);
       for (var i = 0; i < colors.length; i++) {
         if (colors[i].id === colorId) return colorId;
@@ -57,8 +75,9 @@
       return this.defaultColorId(gameData);
     },
 
-    /** 色の定義（名前や色コードを出すのに使う） */
+    /** 色の定義（名前や色コードを出すのに使う）。自分で作った色は名前が色コードになる */
     colorDef: function (gameData, colorId) {
+      if (this.isCustom(colorId)) return this.customDef(colorId);
       var colors = this.colorsOf(gameData);
       for (var i = 0; i < colors.length; i++) {
         if (colors[i].id === colorId) return colors[i];
@@ -78,9 +97,16 @@
       var id = this.resolveColorId(gameData, colorId);
       if (!id) return list;
 
+      // 自分で作った色は、その色の絵をここで作る（同じ色ならすでにあるので作り直さない）
+      var suffix = id;
+      if (this.isCustom(id)) {
+        this.ensureCustom(gameData, id);
+        suffix = CUSTOM_SUFFIX;
+      }
+
       var out = [];
       for (var i = 0; i < list.length; i++) {
-        var variant = this.variantId(list[i], id);
+        var variant = this.variantId(list[i], suffix);
         // 作られていない場合に備えて、無ければもとの絵で描く
         out.push(gameData.sprites[variant] ? variant : list[i]);
       }
@@ -121,13 +147,102 @@
       if (keys.shadow && color.shadow) palette[keys.shadow] = color.shadow;
 
       // 形は共有する（同じ配列を指すだけ。写しは作らない）
-      gameData.sprites[this.variantId(spriteId, color.id)] = {
-        pixels: source.pixels,
-        palette: palette
-      };
+      var def = { pixels: source.pixels, palette: palette };
+      var id = this.variantId(spriteId, color.suffix || color.id);
+      gameData.sprites[id] = def;
+
+      // 起動のあとに作った絵（自分で作った色）は、描画物も作っておく
+      if (color.suffix && this.assets) {
+        var one = {};
+        one[id] = def;
+        this.assets.build(one);
+      }
       return true;
+    },
+
+    // --- 自分で作った色 ---
+
+    /** 色コードから、光の面・影まで入った色の定義を作る */
+    customDef: function (hex) {
+      var base = hex.toLowerCase();
+      return {
+        id: base,
+        name: base.toUpperCase(),
+        base: base,
+        // 用意した6色と同じくらいの差（光の面は少し白へ、影はかなり黒へ寄せる）
+        light: mix(base, "#ffffff", 0.25),
+        shadow: mix(base, "#000000", 0.36),
+        suffix: CUSTOM_SUFFIX
+      };
+    },
+
+    /**
+     * 自分で作った色の絵を用意する。絵のid は色によらず「もとのid_custom」で1組だけ持ち、
+     * 色が変わったときだけ作り直す（選ぶたびに絵が増えていかないように）。
+     */
+    ensureCustom: function (gameData, hex) {
+      var key = hex.toLowerCase();
+      if (this._customBuilt === key) return;
+
+      var look = this.appearanceOf(gameData);
+      var base = look.sprite || [];
+      var list = isArray(base) ? base : [base];
+      var color = this.customDef(key);
+      for (var s = 0; s < list.length; s++) this._makeOne(gameData, list[s], color, look.colorKeys || {});
+      this._customBuilt = key;
+    },
+
+    _customBuilt: null,
+
+    // --- 色の計算（色を作る画面で使う） ---
+
+    /** "#rrggbb" → { h:0〜359, s:0〜100, l:0〜100 } */
+    hexToHsl: function (hex) {
+      var rgb = toRgb(hex);
+      var r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
+      var max = Math.max(r, g, b), min = Math.min(r, g, b);
+      var l = (max + min) / 2;
+      var h = 0, s = 0;
+      if (max !== min) {
+        var d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if (max === r) h = ((g - b) / d + (g < b ? 6 : 0));
+        else if (max === g) h = ((b - r) / d + 2);
+        else h = ((r - g) / d + 4);
+        h *= 60;
+      }
+      return { h: Math.round(h) % 360, s: Math.round(s * 100), l: Math.round(l * 100) };
+    },
+
+    /** { h, s, l } → "#rrggbb" */
+    hslToHex: function (h, s, l) {
+      s /= 100; l /= 100;
+      var c = (1 - Math.abs(2 * l - 1)) * s;
+      var x = c * (1 - Math.abs((h / 60) % 2 - 1));
+      var m = l - c / 2;
+      var rgb = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
+              : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+      return "#" + rgb.map(function (v) { return hex2(Math.round((v + m) * 255)); }).join("");
     }
   };
+
+  function toRgb(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+
+  function hex2(v) {
+    v = Math.max(0, Math.min(255, v));
+    return (v < 16 ? "0" : "") + v.toString(16);
+  }
+
+  /** 2つの色を混ぜる（rate は b の割合） */
+  function mix(a, b, rate) {
+    var x = toRgb(a), y = toRgb(b);
+    return "#" + [0, 1, 2].map(function (i) {
+      return hex2(Math.round(x[i] + (y[i] - x[i]) * rate));
+    }).join("");
+  }
 
   function isArray(value) {
     return Object.prototype.toString.call(value) === "[object Array]";

@@ -52,7 +52,8 @@
     this.mode = "list";
     this.reorderFrom = -1;  // 並び替えの移動元
 
-    this.equipList = new NS.ScrollList(this.panel, this.layout.equipList || this.layout.detail);
+    this.equipList = new NS.ScrollList(this.panel, this.layout.equipList || this.layout.detail,
+      { sprites: this.sprites });
     // 仲間・預かり所の一覧。行（絵とHPバーの箱）は _renderRow が描き、
     // スクロール・ホイール・右端のバーは ScrollList に任せる（他の一覧と同じ動き）
     var self = this;
@@ -331,16 +332,19 @@
     var done = this.game.useFieldSkill(user, this.fieldSkillId, target);
 
     if (done.success) {
-      this._notice = fill(this.texts.fieldSkillUsed, {
+      // 状態異常を治す技（クレンズ）は「○○が治った」、HPの回復は「HPが n 回復した」
+      this._notice = fill(done.cured ? this.texts.fieldSkillCured : this.texts.fieldSkillUsed, {
         user: user.getName(), skill: skill ? skill.name : "",
-        target: target.getName(), amount: done.amount
+        target: target.getName(), amount: done.amount,
+        status: (done.cured || []).join("・")
       });
       this.game.audio.playSe("heal");
       this._buildFieldTargets();
       return;
     }
 
-    var key = { noPp: "fieldSkillNoPp", fainted: "fieldSkillFainted", full: "fieldSkillFull" }[done.reason];
+    var key = { noPp: "fieldSkillNoPp", fainted: "fieldSkillFainted", full: "fieldSkillFull",
+                nothingToCure: "fieldSkillNothingToCure" }[done.reason];
     this._notice = key ? fill(this.texts[key], { target: target ? target.getName() : "" }) : null;
     this.game.playError();
   };
@@ -606,6 +610,7 @@
         entries.push({
           type: "entry",
           label: worn.name,
+          icon: worn.icon,
           right: this.texts.unequipLabel || "",
           color: t.cursorColor,
           value: { action: "unequip", index: i }
@@ -620,6 +625,7 @@
         entries.push({
           type: "entry",
           label: item.name,
+          icon: item.icon,
           right: "x" + slots[i].count,
           value: { action: "equip", itemId: item.id }
         });

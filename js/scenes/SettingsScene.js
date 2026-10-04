@@ -15,6 +15,7 @@
   "use strict";
 
   var NOTICE_DURATION = 1400; // 通知を表示しておく時間（ms）
+  var KEY_BASELINE = 20;      // 操作キーの行の、上端から文字の下端までの高さ
 
   /**
    * @param {MyGame.Game} game
@@ -36,13 +37,29 @@
     this.settings = game.settings || new NS.SettingsManager(game.data);
 
     this.index = 0;
-    // 操作キーの一覧は行数が多いので、送った位置を覚えておく
-    this.keyScroll = 0;
     this.notice = new NS.Notice(this.theme.notice);
+
+    // 操作キーの一覧。行数が多いので、持ち物などの一覧と同じバーで送る（読むだけ）
+    var self = this;
+    var K = this.layout.keys || {};
+    var origin = this.panel.innerOrigin(K);
+    this.keyList = new NS.ScrollList(this.panel, {
+      x: K.x, y: origin.y + 38 - KEY_BASELINE, w: K.w,
+      h: K.visibleRows * K.rowHeight, rowHeight: K.rowHeight,
+      visibleRows: K.visibleRows, frame: false
+    }, {
+      readOnly: true,
+      renderRow: function (row, i, y) { self._renderKeyRow(row.action, y + KEY_BASELINE); }
+    });
   }
 
   SettingsScene.prototype.enter = function () {
     this.index = 0;
+
+    var order = this.keyConfig.order || [];
+    var rows = [];
+    for (var i = 0; i < order.length; i++) rows.push({ type: "line", action: order[i] });
+    this.keyList.setRows(rows);
   };
 
   // --- 更新 ---
@@ -72,40 +89,12 @@
   /**
    * 操作キーの一覧を送る。
    * 上下は設定の項目を選ぶのに使っているので、
-   * ホイールと Q/E（左右のタブ送り）で動かす。
+   * ホイール・右端のバー・Q/E（左右のタブ送り）で動かす。端で止まる。
    */
   SettingsScene.prototype._updateKeyScroll = function (input) {
-    var max = this._maxKeyScroll();
-    if (max <= 0) {
-      this.keyScroll = 0;
-      return;
-    }
-
-    if (input.isPressed("prevTab")) this.keyScroll--;
-    if (input.isPressed("nextTab")) this.keyScroll++;
-    this.keyScroll += this._keyWheel(input);
-
-    // 端で止める（回り込むと、どこまで見たか分からなくなる）
-    this.keyScroll = Math.max(0, Math.min(max, this.keyScroll));
-  };
-
-  /** 一覧の枠の上でホイールを回した量（行数） */
-  SettingsScene.prototype._keyWheel = function (input) {
-    var K = this.layout.keys;
-    if (!K || !input.getPointer) return 0;
-
-    var pointer = input.getPointer();
-    if (!pointer.wheel || !pointer.inside) return 0;
-    if (!NS.Panel.containsPoint(K, pointer)) return 0;
-
-    return pointer.wheel;
-  };
-
-  /** どこまで送れるか（0 なら全部入りきっている） */
-  SettingsScene.prototype._maxKeyScroll = function () {
-    var K = this.layout.keys || {};
-    var total = (this.keyConfig.order || []).length;
-    return Math.max(0, total - (K.visibleRows || total));
+    this.keyList.handleInput(input);
+    if (input.isPressed("prevTab")) this.keyList.scrollByRows(-1);
+    if (input.isPressed("nextTab")) this.keyList.scrollByRows(1);
   };
 
   /**
@@ -207,7 +196,6 @@
     this._renderHeading();
     this._renderItems();
     this._renderKeyList();
-    this._renderNote();
     this._renderNotice(ctx);
     this._renderHint();
     this.backButton.render();
@@ -329,53 +317,20 @@
     this.panel.drawText(this.texts.keysTitle || "", origin.x, origin.y + 12,
       { font: t.smallFont, color: t.subTextColor });
 
-    var order = this.keyConfig.order || [];
+    this.keyList.render();
+  };
+
+  /** 操作キー1行（y は文字の下端）。キーの表示はバーが出ているときその幅を空ける */
+  SettingsScene.prototype._renderKeyRow = function (action, y) {
+    var K = this.layout.keys;
+    var t = this.theme;
     var labels = this.keyConfig.actionLabels || {};
-    var top = origin.y + 38;
-    var visible = K.visibleRows || order.length;
-    var start = this.keyScroll;
-    var end = Math.min(order.length, start + visible);
+    var right = K.x + K.w - (t.padding || 8) - this.keyList.barSpace();
 
-    for (var i = start; i < end; i++) {
-      var action = order[i];
-      var y = top + K.rowHeight * (i - start);
-
-      this.panel.drawText(labels[action] || action, origin.x, y,
-        { font: t.smallFont });
-      this.panel.drawText(this.game.input.getKeyLabels(action).join("  /  "),
-        K.x + K.w - (t.padding || 8), y,
-        { align: "right", font: t.smallFont, color: t.subTextColor });
-    }
-
-    this._renderKeyScrollMarks(K, t, order.length, end);
-  };
-
-  /** 上下に続きがあることを示す印（一覧と同じ見せ方にそろえる） */
-  SettingsScene.prototype._renderKeyScrollMarks = function (K, t, total, end) {
-    if (this.keyScroll > 0) {
-      this.panel.drawText("▲", K.x + K.w - 18, K.y + 20,
-        { font: t.smallFont, color: t.hintColor });
-    }
-    if (end < total) {
-      this.panel.drawText("▼", K.x + K.w - 18, K.y + K.h - 10,
-        { font: t.smallFont, color: t.hintColor });
-    }
-  };
-
-  /** 音声が未実装であることの注記 */
-  /**
-   * ただし書き。項目の枠が伸びたぶんだけ下へずらす
-   * （data/ui.js の note.y は「最低でもこの位置」という意味になる）。
-   */
-  SettingsScene.prototype._renderNote = function () {
-    var pos = this.layout.note;
-    if (!pos) return;
-
-    var box = this._itemsRect();
-    var y = Math.max(pos.y, box.y + box.h + (this.layout.noteGap || 22));
-
-    this.panel.drawText(this.texts.audioNote || "", pos.x, y,
-      { font: this.theme.smallFont, color: this.theme.hintColor });
+    this.panel.drawText(labels[action] || action, this.panel.innerOrigin(K).x, y,
+      { font: t.smallFont });
+    this.panel.drawText(this.game.input.getKeyLabels(action).join("  /  "), right, y,
+      { align: "right", font: t.smallFont, color: t.subTextColor });
   };
 
   SettingsScene.prototype._renderNotice = function (ctx) {

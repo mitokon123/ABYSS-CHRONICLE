@@ -32,6 +32,7 @@
  *   accuracyMul : 命中率に掛ける倍率
  *   effects     : 特性・装備・加護とまったく同じ書き方の効果。EffectSystem がそのまま読む
  *   instantKill : true なら当たった時点で戦闘不能
+ *   idleMotion  : 戦闘中、ふだんの動きをこの動き（data/motions.js のid）に差し替える（眠り：sleeping）
  *   motionSpeed : 戦闘中、ふだんの動き（浮く・呼吸する・コマ絵）の速さの倍率。
  *                 1 がふつう、0.3 なら鈍く、0 なら止まる（その瞬間の形のまま固まる）。
  *                 複数掛かっているときはいちばん遅いものが効く。攻撃・のけぞりの動きには掛からない
@@ -124,7 +125,12 @@
       curable: true,
       blocksTurn: "always",
       wakeOnDamage: 0.5,
-      // 眠っているあいだは、ふだんの動きが完全に止まる（その瞬間の形で固まる）
+      // 眠っているあいだは、ふだんの動き（跳ねる・浮く）を止めて、
+      // 代わりに「目を閉じて脱力し、寝息を立てる」動きにする（data/motions.js の sleeping。RC-1）。
+      // 頭の上に小さな z も昇る（data/ui.js の battle.sleepZzz）。
+      // 眠りの絵（目を閉じた姿）は種族の data/monsters.js の poses.sleep。無い種族はふつうの絵のまま
+      idleMotion: "sleeping",
+      // ふだんの動きの時計は止めておく（起きたとき、眠った瞬間の形から動き出す）
       motionSpeed: 0,
       message: "{name} は眠ってしまった",
       blockMessage: "{name} は眠っている",

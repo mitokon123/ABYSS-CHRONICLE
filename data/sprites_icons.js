@@ -9,6 +9,7 @@
  *   iconStatus〇〇 … 状態異常（data/statuses.js の icon から指す）
  *   iconStat〇〇   … ステータス。バフ／デバフの印に使う（data/ui.js の icons.stats から指す）
  *   iconArrowUp / iconArrowDown … ステータスの絵の右下に重ねる矢印（上がった／下がった）
+ *   iconItem〇〇   … アイテム（data/items.js の icon から指す）
  *
  * 書き方（パレット・pixels）は data/sprites.js を参照。
  * 光は左上から。K が輪郭、H が光、D が影。
@@ -526,6 +527,1386 @@
         "..........KRRRK.",
         "...........KRK..",
         "............K..."
+      ]
+    },
+
+    // ================= 愛情度の段階（data/affection.js の stages の icon） =================
+    // 慣れ＝輪郭だけのハート、信頼＝桃色で満ちたハート、絆＝金に輝くハート。出会いには印を出さない
+
+    iconAffectionUsed: {
+      palette: { ".": null, "K": "#4a1a2a", "P": "#f5a3c0" },
+      pixels: [
+        "................",
+        "...KKK....KKK...",
+        "..KPPPK..KPPPK..",
+        ".KP...PKKP...PK.",
+        "KP.....PP.....PK",
+        "KP............PK",
+        "KP............PK",
+        ".KP..........PK.",
+        "..KP........PK..",
+        "...KP......PK...",
+        "....KP....PK....",
+        ".....KP..PK.....",
+        "......KPPK......",
+        ".......KK.......",
+        "................",
+        "................"
+      ]
+    },
+
+    iconAffectionTrust: {
+      palette: { ".": null, "K": "#4a1a2a", "P": "#f06090", "H": "#ffb0c8", "W": "#ffffff", "D": "#b03060" },
+      pixels: [
+        "................",
+        "...KKK....KKK...",
+        "..KHHPK..KPPPK..",
+        ".KHWPPPKKPPPPPK.",
+        "KHHPPPPPPPPPPPPK",
+        "KHPPPPPPPPPPPPPK",
+        "KPPPPPPPPPPPPPDK",
+        ".KPPPPPPPPPPPDK.",
+        "..KPPPPPPPPPDK..",
+        "...KPPPPPPPDK...",
+        "....KPPPPPDK....",
+        ".....KPPPDK.....",
+        "......KPDK......",
+        ".......KK.......",
+        "................",
+        "................"
+      ]
+    },
+
+    iconAffectionBond: {
+      palette: { ".": null, "K": "#4a2a08", "P": "#ffcf4a", "H": "#fff2b0", "W": "#ffffff",
+                 "D": "#c08a1e", "S": "#fff6c8" },
+      pixels: [
+        "..............S.",
+        "...KKK....KKK.S.",
+        "..KHHPK..KPPPK..",
+        ".KHWPPPKKPPPPPK.",
+        "KHHPPPPPPPPPPPPK",
+        "KHPPPPPPPPPPPPPK",
+        "KPPPPPPPPPPPPPDK",
+        ".KPPPPPPPPPPPDK.",
+        "..KPPPPPPPPPDK..",
+        "...KPPPPPPPDK...",
+        "....KPPPPPDK....",
+        ".....KPPPDK.....",
+        "......KPDK......",
+        ".......KK.......",
+        ".S..............",
+        "................"
+      ]
+    },
+
+    // ================= アイテム =================
+    // 一覧で名前の左に出す（data/items.js の icon から指す）。
+    // 同じ回復でも、HP は赤、PP は青、毒消しは青緑の葉、と色で分ける
+
+    // 薬草：3枚葉の小枝。明るい黄緑
+    iconItemHerb: {
+      palette: { ".": null, "K": "#1e3a14", "L": "#a8e870", "G": "#5ab83a", "D": "#2e7a24", "S": "#7a9a3a" },
+      pixels: [
+        "................",
+        "......KKK.......",
+        ".....KLLGK......",
+        ".....KLGGK......",
+        ".KKK.KLGDK.KKK..",
+        "KLLGKKGGDKKGGGK.",
+        "KLGGGKKGDKGGGDK.",
+        ".KGGGDKSKKGGDDK.",
+        "..KGDDKSKGGDDK..",
+        "...KKKKSKKDDK...",
+        "......KSKKKK....",
+        "......KSK.......",
+        ".....KSK........",
+        ".....KSK........",
+        ".....KK.........",
+        "................"
+      ]
+    },
+
+    // 回復薬：丸い瓶に赤い薬。コルクの栓
+    iconItemPotion: {
+      palette: { ".": null, "K": "#2a2438", "C": "#a0703a", "W": "#c8e0f0", "H": "#ffffff",
+                 "R": "#e8445a", "P": "#ff9aa8", "D": "#a02838" },
+      pixels: [
+        "................",
+        ".....KKKKKK.....",
+        ".....KCCCCK.....",
+        ".....KKKKKK.....",
+        "......KHWK......",
+        "......KHWK......",
+        ".....KKHWKK.....",
+        "....KWHWWWWK....",
+        "...KWHRRRRRWK...",
+        "...KHRRRRRRRK...",
+        "...KHRPRRRRDK...",
+        "...KRPRRRRRDK...",
+        "...KRRRRRRDDK...",
+        "....KRRRRDDK....",
+        ".....KKKKKK.....",
+        "................"
+      ]
+    },
+
+    // 深淵の雫：紫の雫。芯が淡く光り、まわりに光の粒
+    iconItemElixir: {
+      palette: { ".": null, "K": "#1a0e30", "V": "#6a3ab8", "L": "#a880e8", "D": "#3a1a78",
+                 "C": "#5ad8f0", "W": "#e8ffff", "Y": "#c8f0ff" },
+      pixels: [
+        "................",
+        ".......KK.....Y.",
+        "......KVVK......",
+        "......KVVK......",
+        ".....KVVVVK.....",
+        ".....KVLVVK.....",
+        "....KVLVVVVK....",
+        "....KLVVVVDK....",
+        "...KVLVCCVVDK...",
+        "...KVVCWCCVDK...",
+        "...KVVCCCCVDK...",
+        "...KVVVCCVDDK...",
+        "....KVVVVDDK....",
+        ".Y...KDDDDK.....",
+        "......KKKK......",
+        "................"
+      ]
+    },
+
+    // 解毒草：幅の広い1枚葉。青緑で、葉脈が白っぽく通る
+    iconItemAntidote: {
+      palette: { ".": null, "K": "#123a2a", "T": "#3aa878", "L": "#d0f0a0", "D": "#1f6a4a", "S": "#7a8a3a" },
+      pixels: [
+        "................",
+        "...........KKK..",
+        ".........KKTTTK.",
+        ".......KKTTLTTK.",
+        "......KTTTLTTDK.",
+        ".....KTTTLTTTDK.",
+        "....KTTTLTTTDK..",
+        "....KTTLTTTTDK..",
+        "...KTTLTTTTDK...",
+        "...KTLTTTTDDK...",
+        "...KTLTTTDDK....",
+        "...KLTTDDDK.....",
+        "..KLKKKKKK......",
+        ".KSK............",
+        ".KK.............",
+        "................"
+      ]
+    },
+
+    // 精気の実：淡く光る青い実。PP の色にそろえてある
+    iconItemSpiritBerry: {
+      palette: { ".": null, "K": "#0e2a4a", "B": "#4fb0d1", "H": "#e0f8ff", "D": "#2a6a9a",
+                 "G": "#5ab84a", "S": "#6a4a2a" },
+      pixels: [
+        "................",
+        "........KK......",
+        ".......KGGK.....",
+        "......KGGK......",
+        ".....KKSKKK.....",
+        "....KBBSBBBK....",
+        "...KBHHBBBBBK...",
+        "...KBHBBBBBBK...",
+        "..KBBBBBBBBBDK..",
+        "..KBBBBBBBBBDK..",
+        "..KBBBBBBBBDDK..",
+        "..KBBBBBBBDDDK..",
+        "...KBBBBBDDDK...",
+        "....KDDDDDDK....",
+        ".....KKKKKK.....",
+        "................"
+      ]
+    },
+
+    // --- 道具 ---
+
+    // 帰還の石：淡く光る丸い石。表に渦の模様
+    iconItemReturnStone: {
+      palette: { ".": null, "K": "#1a2a3a", "S": "#7ab8c8", "H": "#c8f0f8", "D": "#3a6a80",
+                 "W": "#ffffff", "G": "#9ae8f8" },
+      pixels: [
+        "..G.............",
+        "............G...",
+        "......KKKKK.....",
+        "....KKHHHSSKK...",
+        "...KHHSSSSSSSK..",
+        "..KHSSSWWWSSSDK.",
+        "..KHSSWSSSWSSDK.",
+        "..KSSSWSWSWSSDK.",
+        "..KSSSWSSWWSSDK.",
+        "..KSSSSWSSSSDDK.",
+        "...KSSSSWWSDDK..",
+        "...KDSSSSSDDDK..",
+        "....KKDDDDDKK...",
+        "......KKKKK.....",
+        ".G...........G..",
+        "................"
+      ]
+    },
+
+    // 誘いの香：小さな香炉から、甘い桃色の煙が揺れて昇る
+    iconItemScoutIncense: {
+      palette: { ".": null, "K": "#2a1a10", "B": "#8a6a4a", "H": "#b89068", "D": "#5a4028",
+                 "E": "#ff9a3c", "P": "#f0a0c8", "Q": "#ffd6ea" },
+      pixels: [
+        "........Q.......",
+        ".......P.Q......",
+        "......P...Q.....",
+        ".......PP.P.....",
+        ".........PP.....",
+        "........P.Q.....",
+        ".......PP.......",
+        "......KEEK......",
+        "..KKKKHEEHKKKK..",
+        "..KHHHHHHHHHDK..",
+        "...KBBBBBBBDK...",
+        "....KBBBBBDK....",
+        ".....KDDDDK.....",
+        "....KKKKKKKK....",
+        "....KDDDDDDK....",
+        ".....KKKKKK....."
+      ]
+    },
+
+    // --- 素材 ---
+    // 色は、落とすモンスターの絵のパレットから取っている（ひと目で出どころが分かるように）
+
+    // 鉱石のかけら：角ばった灰色の石に、金色の鉱脈
+    iconItemOreShard: {
+      palette: { ".": null, "K": "#1a1916", "S": "#7d7a72", "H": "#9b9890", "P": "#b8b5ac",
+                 "D": "#4f4d47", "O": "#d8b45a", "Q": "#fff0b0" },
+      pixels: [
+        "................",
+        "................",
+        "........KK......",
+        "......KKPHK.....",
+        ".....KPHHSSK....",
+        "....KPHHOSSSK...",
+        "...KPHHOQOSSDK..",
+        "..KHHSSSOSSDDK..",
+        "..KHSSSSSSDDDK..",
+        "..KSSOSSSDDDK...",
+        "...KSQOSDDDDK...",
+        "...KSSSDDDDK....",
+        "....KKDDDKK.....",
+        "......KKK.......",
+        "................",
+        "................"
+      ]
+    },
+
+    // 光る鱗粉：黄色い粉の小山と、舞う光の粒（ヒカリムシの色）
+    iconItemGlowDust: {
+      palette: { ".": null, "K": "#1a1608", "N": "#6b5a2e", "D": "#c9a83e", "Y": "#ffe36e",
+                 "H": "#fff2a8", "W": "#ffffff" },
+      pixels: [
+        "................",
+        "...W.......H....",
+        "..WHW...........",
+        "...W....H....W..",
+        ".......HWH......",
+        "..H.....H.......",
+        "..........Y.....",
+        ".....Y..........",
+        "........KKK.....",
+        "......KKHYYKK...",
+        "....KKHYYYYYDK..",
+        "...KHYYYYYYDDDK.",
+        "..KYYYYYYYDDDNK.",
+        "..KDDDDDDDDNNNK.",
+        "...KKKKKKKKKKK..",
+        "................"
+      ]
+    },
+
+    // 灼熱の牙：右上の折れ口と芯が赤く灯る、反った牙
+    iconItemBlazingFang: {
+      palette: { ".": null, "K": "#2b0f08", "I": "#f0e0c0", "J": "#c8b090", "D": "#8a6a50",
+                 "R": "#ff5000", "O": "#ffb040" },
+      pixels: [
+        "................",
+        ".........KK.KK..",
+        "........KOOKOOK.",
+        "........KRORROK.",
+        "........KIRORJK.",
+        ".......KIIRRJDK.",
+        ".......KIIRJJDK.",
+        "......KIIIJJDK..",
+        "......KIIJJDDK..",
+        ".....KIIJJDDK...",
+        "....KIIJJDDK....",
+        "...KIIJDDDK.....",
+        "..KIJDDKK.......",
+        ".KIDKK..........",
+        ".KK.............",
+        "................"
+      ]
+    },
+
+    // 燃え殻：炭のかたまりに、橙に光るひび（スミビの色）
+    iconItemEmberAsh: {
+      palette: { ".": null, "K": "#0f0a08", "N": "#1e1512", "D": "#2e211c", "C": "#463430",
+                 "H": "#6b544c", "P": "#8f746a", "R": "#ff6a20", "O": "#ffb040" },
+      pixels: [
+        "................",
+        ".........O......",
+        "................",
+        "......KKKK......",
+        "....KKPHHCKK....",
+        "...KPHHCCRCDK...",
+        "..KPHCCCROCDDK..",
+        "..KHCRCCCRCDDK..",
+        "..KHCORCCCDDNK..",
+        "..KCCCCRCDDDNK..",
+        "...KCCDDDDDNK...",
+        "....KKNNNNKK....",
+        "......KKKK......",
+        "...........O....",
+        "................",
+        "................"
+      ]
+    },
+
+    // 灰の羽根：灰色の羽根。軸が斜めに通る（ハイバネの色）
+    iconItemAshFeather: {
+      palette: { ".": null, "K": "#1c1613", "N": "#3a322d", "D": "#5e5650", "A": "#9a938d",
+                 "H": "#bdb6ae", "P": "#ded8d0", "Q": "#e8e0d0" },
+      pixels: [
+        "................",
+        "............KK..",
+        "..........KKHPK.",
+        ".........KHPHAK.",
+        "........KHPHANK.",
+        ".......KHPHAADK.",
+        "......KHPNAADK..",
+        ".....KHPHAANK...",
+        "....KHPQAADK....",
+        "....KPQANDK.....",
+        "...KHQAADK......",
+        "...KQDDKK.......",
+        "..KQKKK.........",
+        ".KQK............",
+        ".KK.............",
+        "................"
+      ]
+    },
+
+    // 焼けた殻：焼き締まった殻のかけら。割れ目にマグマ（マグマガニの色）
+    iconItemScorchedShell: {
+      palette: { ".": null, "K": "#180b09", "D": "#422620", "A": "#5c3a30", "H": "#7d5245",
+                 "P": "#9a6a58", "R": "#ff5000", "O": "#ffa040" },
+      pixels: [
+        "................",
+        "................",
+        "................",
+        "................",
+        ".....KKKKKK.....",
+        "...KKPHHHHAKK...",
+        "..KPHHAAHAAADK..",
+        ".KPHAAROAAAADDK.",
+        ".KHAARAAOAAADDK.",
+        ".KHAAAAAAROADDK.",
+        ".KAAAAAAAAAADDK.",
+        "..KDDDDDDDDDDK..",
+        "...KK.KKKK.KK...",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+
+    // 宵の露：重たい黒い雫。ふちだけ紫に光る（ヨドミの色）
+    iconItemDuskDew: {
+      palette: { ".": null, "K": "#0e0a18", "D": "#1c1530", "P": "#3d3060", "L": "#6b57a0",
+                 "V": "#8b6fd6", "W": "#e6e0ff" },
+      pixels: [
+        "................",
+        ".......K........",
+        ".......K........",
+        "......KPK.......",
+        "......KPK.......",
+        ".....KLPDK......",
+        ".....KLPDK......",
+        "....KLPPPDK.....",
+        "...KLWPPPDDK....",
+        "...KLPPPPDDK....",
+        "..KLPPPPPDDDK...",
+        "..KVPPPPPDDDK...",
+        "..KVPPPPDDDDK...",
+        "...KVPPDDDDK....",
+        "....KKKKKKK.....",
+        "................"
+      ]
+    },
+
+    // 王冠のかけら：金の冠の折れた一片。青い石がはまっている（キングスライムの色）
+    iconItemCrownShard: {
+      palette: { ".": null, "K": "#2a1a08", "G": "#e8b830", "H": "#fff0a0", "D": "#a87818",
+                 "B": "#5b9fd8", "P": "#8fc7ee", "N": "#2f66a8" },
+      pixels: [
+        "................",
+        "...K............",
+        "..KHK.....K.....",
+        "..KHK....KGK....",
+        ".KHGGK...KGK....",
+        ".KHGGK..KGGDK...",
+        ".KHGGGKKGGGDK...",
+        ".KHGGGGGGGGDDK..",
+        ".KHGKKKKGGGDDK..",
+        ".KGKPBNKGGGDDK..",
+        ".KGKBBNKGGDDDK..",
+        ".KGGKKKGGGDDK...",
+        ".KDDDDDDDDDK....",
+        "..KKK.KKK.KK....",
+        "................",
+        "................"
+      ]
+    },
+
+    // 黄泉竜の鱗：紫の鱗1枚。内側に一回り小さい鱗の筋
+    // （ヨミリュウの色。そのままでは暗い枠に沈むので一段明るく）
+    iconItemDragonScale: {
+      palette: { ".": null, "K": "#0a0710", "M": "#2a1d48", "P": "#4a3670", "L": "#6a50a0",
+                 "H": "#a088d0" },
+      pixels: [
+        "................",
+        "................",
+        "....KKKKKKKK....",
+        "...KHHLLLLLPK...",
+        "..KHLLLLPPPPMK..",
+        "..KHLLPPPPPPMK..",
+        "..KLLKKKKKKPMK..",
+        "..KLPKHLLPKPMK..",
+        "..KLPKLPPMKPMK..",
+        "...KPPKPMKPMK...",
+        "...KPPKMMKPMK...",
+        "....KPPKKPMK....",
+        ".....KPPPMK.....",
+        "......KMMK......",
+        ".......KK.......",
+        "................"
+      ]
+    },
+
+    // 雷光の翅：水色の翅と翅脈。先に小さな火花（ビリムシの色）
+    iconItemStormWing: {
+      palette: { ".": null, "K": "#123a4a", "B": "#3f8fa8", "C": "#7fd9e8", "H": "#d8f8ff",
+                 "Y": "#ffd75e" },
+      pixels: [
+        "..............Y.",
+        ".........KKKK..Y",
+        ".......KKCCHHK..",
+        "......KCCCCHHK.Y",
+        ".....KCBCCCCHK..",
+        "....KCCBCCCCCK..",
+        "...KCCCCBCCCCK..",
+        "...KCBCCCBCCK...",
+        "..KCCCBCCCBCK...",
+        "..KCCCCBCCCK....",
+        ".KCCBCCCBCK.....",
+        ".KCCCBCCKK......",
+        "KBCCCCKK........",
+        "KBBKKK..........",
+        "KK..............",
+        "................"
+      ]
+    },
+
+    // ねじれ蔦：輪を描いてねじれた蔦と葉（カゲヅタの色。そのままでは暗い枠に沈むので一段明るく）
+    iconItemTwistedVine: {
+      palette: { ".": null, "K": "#0c1410", "M": "#44704e", "L": "#6aa070", "H": "#a0d8a0" },
+      pixels: [
+        "................",
+        "...........KKK..",
+        "..........KHLLK.",
+        ".........KLLMK..",
+        "....KK..KMKKK...",
+        "...KHLK.KMK.....",
+        "...KLLMKMK......",
+        "....KKMMK.......",
+        ".....KMMKK......",
+        "....KMKKMMK.....",
+        "...KMK..KLMK....",
+        "..KMK..KLMK.....",
+        "..KMK.KLMK......",
+        "...KMKMMK.......",
+        "....KMMK........",
+        ".....KK........."
+      ]
+    },
+
+    // 毒の針：銀の針。先から紫の毒が垂れる（ドクバチの色）
+    iconItemVenomStinger: {
+      palette: { ".": null, "K": "#0d1207", "A": "#7a962a", "H": "#a3c23a", "P": "#c8e05a",
+                 "I": "#eef0f4", "J": "#a8aab8", "Q": "#c050f0", "R": "#e090ff" },
+      pixels: [
+        "................",
+        "...........KKK..",
+        "..........KPHAK.",
+        ".........KPHAAK.",
+        ".........KHAAK..",
+        "........KIJKK...",
+        ".......KIJK.....",
+        "......KIJK......",
+        ".....KIJK.......",
+        "....KIJK........",
+        "...KIJK.........",
+        "...KJK..........",
+        "...KK...........",
+        "..KQK...........",
+        ".KRQQK..........",
+        "..KKK..........."
+      ]
+    },
+
+    // 泥甲羅：板の継ぎ目が見える甲羅のかけら。下のほうに泥が染みている（ドロガメの色）
+    iconItemMuddyShell: {
+      palette: { ".": null, "K": "#0d1207", "D": "#3d5226", "A": "#5f7a33", "H": "#86a344",
+                 "P": "#b4cc63", "M": "#5a4428" },
+      pixels: [
+        "................",
+        "................",
+        "................",
+        ".....KKKKKK.....",
+        "...KKPPHHHHKK...",
+        "..KPHHDHHHDHAK..",
+        ".KHHHDAHHHADAAK.",
+        ".KHDDDADDDDDAAK.",
+        ".KHAAADAAADAADK.",
+        ".KAAAADAAADAADK.",
+        ".KMAADDDDDDMMDK.",
+        "..KMMMAAAMMMDK..",
+        "...KKKKKKKKKK...",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+
+    // 錆びた骨：斜めの骨。赤茶けて、ところどころ錆の色
+    iconItemRustedBone: {
+      palette: { ".": null, "K": "#1a0e08", "A": "#b87a50", "H": "#d8a078", "D": "#7a4a2a",
+                 "R": "#9a5030", "P": "#e8c8a8" },
+      pixels: [
+        "................",
+        "..........KK....",
+        ".........KPHK...",
+        ".........KHAKKK.",
+        "........KHAAPHK.",
+        ".......KHARKAAK.",
+        "......KHADKKKK..",
+        ".....KHADK......",
+        "....KHRDK.......",
+        "...KHADK........",
+        ".KKKAADK........",
+        "KHPAKDDK........",
+        "KAAKRADK........",
+        ".KKKADK.........",
+        "...KDK..........",
+        "....K..........."
+      ]
+    },
+
+    // 毒嚢：口をしばった紫の袋。下から毒が垂れる
+    iconItemVenomSac: {
+      palette: { ".": null, "K": "#1a0a20", "V": "#9040c0", "L": "#c070f0", "D": "#5a2080",
+                 "W": "#f0d8ff", "Q": "#c050f0", "G": "#4a6b1e" },
+      pixels: [
+        "................",
+        ".......KK.......",
+        "......KGGK......",
+        "......KGGK......",
+        ".....KKKKKK.....",
+        "....KLLVVVVK....",
+        "...KLWLVVVVDK...",
+        "..KLWLVVVVVVDK..",
+        "..KLLVVVVVVVDK..",
+        "..KVVVVVVVVDDK..",
+        "..KVVVVVVVDDDK..",
+        "...KVVVVVDDDK...",
+        "....KDDDDDDK....",
+        ".....KKQKKK.....",
+        ".......Q........",
+        "................"
+      ]
+    },
+
+    // 苔むした核：苔の生えた丸い石。芯がまだ温かく光る（モスゴーレムの色）
+    iconItemMossyCore: {
+      palette: { ".": null, "K": "#131a10", "S": "#6e6a5c", "H": "#918c7c", "P": "#b3ae9c",
+                 "D": "#3b3a30", "M": "#4a8a3a", "G": "#7ab84a", "O": "#ffb050" },
+      pixels: [
+        "................",
+        "................",
+        "......KKKK......",
+        "....KKGGMHKK....",
+        "...KGGMMHHSSK...",
+        "..KGMMHPHSSSDK..",
+        "..KMHHPHSOSSDK..",
+        ".KHHPHSOOOSSDDK.",
+        ".KHPHSSOOSSSDDK.",
+        ".KHHSSSSSSSDDMK.",
+        "..KSSSSSSDDMMK..",
+        "..KDSSSDDDMMGK..",
+        "...KKDDDDMGKK...",
+        ".....KKKKKK.....",
+        "................",
+        "................"
+      ]
+    },
+
+    // スライムのかけら：ぷるんとした緑のかたまり（スライムの色）
+    iconItemSlimeShard: {
+      palette: { ".": null, "K": "#071a12", "N": "#16402c", "D": "#2f8a5d", "G": "#5fd18c",
+                 "H": "#86e5ad", "L": "#a8f0c4" },
+      pixels: [
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        ".....KKKKK......",
+        "....KLLHGGK.....",
+        "...KLHGGGGGK....",
+        "..KHLGGGGGGDK...",
+        "..KHGGGGGGGDK...",
+        ".KHGGGGGGGGDDK..",
+        ".KHGGGGGGGGDDK..",
+        ".KGGGGGGGGDDNK..",
+        "..KDDDDDDDNNK...",
+        "...KKKKKKKKK....",
+        "................"
+      ]
+    },
+
+    // 深淵の欠片：黒い結晶のかけら。ふちが紫に光る
+    iconItemAbyssFragment: {
+      palette: { ".": null, "K": "#1a1030", "X": "#1e1236", "P": "#3a2866", "V": "#8b6fd6",
+                 "W": "#e6e0ff" },
+      pixels: [
+        "........K.......",
+        ".......KVK......",
+        ".......KVK......",
+        "......KVPXK.....",
+        "......KVPXK.....",
+        ".....KVPPXXK....",
+        ".....KVPXXXK....",
+        "....KVWPXXXXK...",
+        "....KVPPXXXXK...",
+        "...KVPPXXXXXK...",
+        "...KVPXXXXXK....",
+        "....KVPXXXXK....",
+        "....KVPXXXK.....",
+        ".....KVXXK......",
+        "......KXK.......",
+        ".......K........"
+      ]
+    },
+
+    // --- 装備 ---
+    // 武器は右上へ斜めに構えた向きでそろえる（左下が柄）。
+    // 色は、作るのに使う素材・元になったモンスターから取っている
+
+    // 探索者の長剣：癖のない鋼の剣。金のつば
+    iconItemExplorerSword: {
+      palette: { ".": null, "K": "#1a1e26", "H": "#ffffff", "B": "#c8d2dc", "D": "#7a8898",
+                 "G": "#c89830", "g": "#f0d070", "A": "#6a4a2a", "a": "#4a3018", "O": "#d8b040" },
+      pixels: [
+        ".............K..",
+        "............KHK.",
+        "...........KHBK.",
+        "..........KHBDK.",
+        ".........KHBDK..",
+        "........KHBDK...",
+        ".....K.KHBDK....",
+        "....KgKHBDK.....",
+        "....KggBDK......",
+        "...KKAGGK.......",
+        "..KOAaKggK......",
+        "..KOOK.KK.......",
+        "...KOK..........",
+        "....K...........",
+        "................",
+        "................"
+      ]
+    },
+
+    // 獣の牙：牙の色の短い刃
+    iconItemFangCharm: {
+      palette: { ".": null, "K": "#2a1a0e", "H": "#fff8e8", "B": "#f0e0c0", "D": "#b8a078",
+                 "G": "#7a4a28", "g": "#a06a3a", "A": "#5a3a20", "a": "#3a2410", "O": "#f0e0c0" },
+      pixels: [
+        "................",
+        "................",
+        "................",
+        "...........K....",
+        "..........KHK...",
+        ".........KHBK...",
+        "........KHBDK...",
+        ".......KHBDK....",
+        ".....KKHBDK.....",
+        "....KggBDK......",
+        "...KKAGGK.......",
+        "..KOAaKgK.......",
+        "..KOOK.K........",
+        "...KOK..........",
+        "....K...........",
+        "................"
+      ]
+    },
+
+    // 燃え殻の剣：炭色の刃。刃先と縁に火が宿る
+    iconItemEmberBlade: {
+      palette: { ".": null, "K": "#0f0a08", "H": "#ff9a3c", "B": "#6b544c", "D": "#2e211c",
+                 "G": "#463430", "g": "#6b544c", "A": "#7a3a1a", "a": "#4a200a", "O": "#ff9a3c",
+                 "R": "#e8542a", "Y": "#ffe27a" },
+      pixels: [
+        "............KRK.",
+        "...........KRYRK",
+        "...........KHKRK",
+        "..........KHBKK.",
+        ".........KHBDK..",
+        "........KHBDK...",
+        ".....K.KHBDK....",
+        "....KgKHBDK.....",
+        "....KggBDK......",
+        "...KKAGGK.......",
+        "..KOAaKggK......",
+        "..KOOK.KK.......",
+        "...KOK..........",
+        "....K...........",
+        "................",
+        "................"
+      ]
+    },
+
+    // 灼牙の戦刃：幅広の赤く灼けた刃
+    iconItemBlazeCharm: {
+      palette: { ".": null, "K": "#2b0f08", "H": "#ffd0a0", "B": "#e8542a", "D": "#8c3a1e",
+                 "G": "#5a2211", "g": "#8c3a1e", "A": "#3d1608", "a": "#2b0f08", "O": "#ff9a3c" },
+      pixels: [
+        "............K...",
+        "...........KHK..",
+        "..........KHBK..",
+        ".........KHBBK..",
+        "........KHBBBK..",
+        ".......KHBBBDK..",
+        "....K.KHBBBDK...",
+        "...KgKHBBBDK....",
+        "...KggBBBDK.....",
+        "....KgGBDK......",
+        "..KKAaGGK.......",
+        ".KOOaKKggK......",
+        "..KOOK.KK.......",
+        "...KK...........",
+        "................",
+        "................"
+      ]
+    },
+
+    // 深淵の牙：紫に透ける細身の刃
+    iconItemAbyssFang: {
+      palette: { ".": null, "K": "#0e0a18", "H": "#c8b8ff", "B": "#6b57a0", "D": "#2a1a48",
+                 "G": "#6b57a0", "g": "#8b6fd6", "A": "#3d3060", "a": "#1e1236", "O": "#8b6fd6" },
+      pixels: [
+        "................",
+        ".............K..",
+        "............KHK.",
+        "...........KHBK.",
+        "..........KHBDK.",
+        ".........KHBDK..",
+        "........KHBDK...",
+        "......KKHBDK....",
+        ".....KgHBDK.....",
+        ".....KgGDK......",
+        "...KKAaGGK......",
+        "..KOOaKKK.......",
+        "...KOOK.........",
+        "....KK..........",
+        "................",
+        "................"
+      ]
+    },
+
+    // 沼骨の槍：骨の柄と穂先。錆色の綴じ目と、にじむ闇の粒
+    iconItemMarshSpear: {
+      palette: { ".": null, "K": "#0a0d10", "A": "#a8b8bc", "a": "#5a6a70", "H": "#e8f0ec",
+                 "B": "#a8b8bc", "D": "#5a6a70", "G": "#9a5030", "g": "#c87048", "V": "#8b6fd6" },
+      pixels: [
+        "................",
+        ".......V...KKK..",
+        "....V.....KHBBK.",
+        ".........KHBBK..",
+        "........KHBBDK..",
+        "..V....KgBBDK...",
+        ".......KgGKK....",
+        "......KAaGK.....",
+        ".....KAaKK......",
+        "....KAaK........",
+        "...KAaK.........",
+        "..KAaK..........",
+        ".KAaK...........",
+        "KaaK............",
+        ".KK.............",
+        "................"
+      ]
+    },
+
+    // 厚革の胴着：茶色の革。縫い目と金具つきの帯
+    iconItemThickLeatherVest: {
+      palette: { ".": null, "K": "#1e120a", "A": "#8a5a30", "H": "#b07a48", "D": "#5a3a1e",
+                 "S": "#d8b080", "B": "#3a2414", "G": "#c89830" },
+      pixels: [
+        "....KK....KK....",
+        "..KKHHK..KHHKK..",
+        ".KHHAAHKKHAAHHK.",
+        "KHAAAAAHHAAAAAHK",
+        "KHAAASAAAASAAADK",
+        "KHAAAAAAAAAAAADK",
+        ".KHAASAAAASAADK.",
+        "..KHAAAAAAAADK..",
+        "..KHASAAAASADK..",
+        "..KBBBBGGBBBBK..",
+        "..KHASAAAASADK..",
+        "..KHAAAAAAAADK..",
+        "...KHDDDDDDDK...",
+        "....KKKKKKKK....",
+        "................",
+        "................"
+      ]
+    },
+
+    // 黄泉鱗の鎧：紫の鱗を段に綴じた鎧（ヨミリュウの色を一段明るく）
+    iconItemDragonGuard: {
+      palette: { ".": null, "K": "#0a0710", "A": "#4a3670", "H": "#8a70b8", "D": "#2a1d48",
+                 "S": "#a088d0" },
+      pixels: [
+        "....KK....KK....",
+        "..KKHHK..KHHKK..",
+        ".KHHAAHKKHAAHHK.",
+        "KHAAASAHHSAAASHK",
+        "KHAAAAAAAAAAAADK",
+        "KHDDADDDADDDADDK",
+        ".KHSAAASAAASADK.",
+        "..KHAAAAAAAADK..",
+        "..KHDDADDDADDK..",
+        "..KHASAAASAADK..",
+        "..KHAAAAAAAADK..",
+        "..KHADDDADDDDK..",
+        "...KHDDDDDDDK...",
+        "....KKKKKKKK....",
+        "................",
+        "................"
+      ]
+    },
+
+    // 泥重の甲：甲羅の板を骨で綴じた鎧。裾に泥（ドロガメの色）
+    iconItemMireArmor: {
+      palette: { ".": null, "K": "#0d1207", "A": "#5f7a33", "H": "#86a344", "D": "#3d5226",
+                 "S": "#d8e4e0", "M": "#5a4428", "P": "#b4cc63" },
+      pixels: [
+        "....KK....KK....",
+        "..KKHHK..KHHKK..",
+        ".KHHAAHKKHAAHHK.",
+        "KHAASAADDAASAAHK",
+        "KHAAAAADDAAAAADK",
+        "KHAAAPADDAPAAADK",
+        ".KHAAAADDAAAADK.",
+        "..KDDDDSSDDDDK..",
+        "..KHAAADDAAADK..",
+        "..KHAAADDAAADK..",
+        "..KHAAADDAAADK..",
+        "..KMMMMMMMMMMK..",
+        "...KMDMDMDMDK...",
+        "....KKKKKKKK....",
+        "................",
+        "................"
+      ]
+    },
+
+    // 岩鎧の欠片：ひびの入った丸い岩に、革の帯（イワゴローの色）
+    iconItemStoneMail: {
+      palette: { ".": null, "K": "#1a1916", "A": "#7d7a72", "H": "#9b9890", "P": "#b8b5ac",
+                 "D": "#4f4d47", "N": "#35342f", "S": "#6a4a2a" },
+      pixels: [
+        "................",
+        "................",
+        ".....KKKKKK.....",
+        "....KHHHHHHK....",
+        "...KPPAAAANHK...",
+        "..KPAAAAAANAHK..",
+        ".KHANAAAANAAAHK.",
+        ".KHAANAAANAAADK.",
+        ".KHAANAAAANAADK.",
+        ".KSSSSSSSSSSSSK.",
+        ".KHAAANAAAANADK.",
+        "..KHANAAAAAADK..",
+        "...KHNAAAAADK...",
+        "....KHDDDDDK....",
+        ".....KKKKKK.....",
+        "................"
+      ]
+    },
+
+    // 石の帽子：丸い石の帽子。つばに影
+    iconItemStoneBand: {
+      palette: { ".": null, "K": "#1a1916", "A": "#8a8478", "H": "#b0aa9c", "D": "#5a564c",
+                 "P": "#d0cabc", "N": "#3a3830" },
+      pixels: [
+        "................",
+        "................",
+        "......KKKK......",
+        "....KKHHHHKK....",
+        "...KHHPAAAHHK...",
+        "..KHAPAAANAAHK..",
+        "..KHPAAAANAADK..",
+        ".KHAAAAAAANAAHK.",
+        ".KHAAAAAAANAADK.",
+        ".KHAAAAAAAAAADK.",
+        "KHNNNNNNNNNNNNHK",
+        "KHDDDDDDDDDDDDDK",
+        ".KKKKKKKKKKKKKK.",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+
+    // 苔の外套：苔の生えた頭巾つきの外套。胸に核の留め具（モスゴーレムの色）
+    iconItemMossCharm: {
+      palette: { ".": null, "K": "#131a10", "A": "#3a6a2a", "H": "#5a9a3a", "D": "#24461a",
+                 "N": "#0e1a0a", "M": "#7ab84a", "S": "#918c7c", "O": "#ffb050" },
+      pixels: [
+        "......KKKK......",
+        ".....KHMHHK.....",
+        "....KHMAAAHK....",
+        "...KHANNNNAHK...",
+        "...KHANNNNADK...",
+        "..KHAANNNNAAHK..",
+        "..KHAAAAAAAADK..",
+        ".KHAAAASSAAAAHK.",
+        ".KHAAAAOSAAAADK.",
+        ".KHAMAADAAAAADK.",
+        "KHAAAAADAAAMAAHK",
+        "KHAMAMADAAAAAADK",
+        "KHAAAAADAAMAAADK",
+        ".KHDDDDDDDDDDDK.",
+        "..KKKKKKKKKKKK..",
+        "................"
+      ]
+    },
+
+    // 雷光の羽衣：水色の薄衣に稲妻の筋（ビリムシの色）
+    iconItemStormVeil: {
+      palette: { ".": null, "K": "#123a4a", "A": "#7fd9e8", "H": "#d8f8ff", "D": "#3f8fa8",
+                 "Y": "#ffd75e" },
+      pixels: [
+        "..Y..KK..KK.....",
+        "....KHHKKHHK..Y.",
+        "...KHAADHAAHK...",
+        "..KHAAADAAAAHK..",
+        ".KHAAAADAAAAAHK.",
+        "KHAADAADYAADAAHK",
+        "KHADKHADAYDKHADK",
+        "KHDKKHADYADKKHDK",
+        ".KK.KHADAYDK.KK.",
+        "...KHAADAAAHK...",
+        "...KHAADAAADK...",
+        "..KHAAADAAAAHK..",
+        "..KHAAADAAAADK..",
+        "YKHDDDDDDDDDDHK.",
+        "..KKKKKKKKKKKK..",
+        "................"
+      ]
+    },
+
+    // 精気の指輪：銀の輪に青い石（精気の実の色）
+    iconItemSpiritRing: {
+      palette: { ".": null, "K": "#1a1e26", "A": "#b8c4d0", "H": "#f0f4f8", "D": "#6a7888",
+                 "B": "#4fb0d1", "L": "#e0f8ff", "N": "#2a6a9a" },
+      pixels: [
+        "................",
+        "................",
+        "......KKKK......",
+        ".....KLLBBK.....",
+        "....KBBBBBBK....",
+        "....KBBBBNBK....",
+        "....KHBBNNHK....",
+        "...KHADDDDAHK...",
+        "..KHADKKKKHAHK..",
+        "..KHDK....KHDK..",
+        "..KHDK....KHDK..",
+        "..KHAHKKKKHADK..",
+        "...KHAHHHHADK...",
+        "....KHDAADDK....",
+        ".....KKHDKK.....",
+        ".......KK......."
+      ]
+    },
+
+    // 竜牙の指輪：紫の輪に、白い牙が立つ（ヨミリュウの色）
+    iconItemFangRing: {
+      palette: { ".": null, "K": "#0a0710", "A": "#4a3670", "H": "#8a70b8", "D": "#2a1d48",
+                 "F": "#f0e8d8", "G": "#a89a80", "V": "#8b6fd6" },
+      pixels: [
+        ".......KK.......",
+        "......KFGK......",
+        "......KFFK......",
+        ".....KFFFGK.....",
+        ".....KFFFGK.....",
+        "....KVFFFGVK....",
+        "....KHHAAHHK....",
+        "...KHADDDDAHK...",
+        "..KHADKKKKHAHK..",
+        "..KHDK....KHDK..",
+        "..KHDK....KHDK..",
+        "..KHAHKKKKHADK..",
+        "...KHAHHHHADK...",
+        "....KHDAADDK....",
+        ".....KKHDKK.....",
+        ".......KK......."
+      ]
+    },
+
+    // 王冠の輪：金の輪を斜め上から見たところ。前に青い石（キングスライムの色）
+    iconItemCrownCircle: {
+      palette: { ".": null, "K": "#2a1a08", "A": "#e8b830", "H": "#fff0a0", "D": "#a87818",
+                 "B": "#5b9fd8", "L": "#8fc7ee", "N": "#2f66a8" },
+      pixels: [
+        "................",
+        "................",
+        "................",
+        ".......KK.......",
+        "...K..KHHK..K...",
+        "..KHK.KHDK.KHK..",
+        "..KHKKHAAHKKHK..",
+        "..KHHHDDDDHHDK..",
+        ".KHADKKKKKKHAHK.",
+        "KHADK......KHAHK",
+        "KHADK......KHADK",
+        ".KHAHKKKKKKHADK.",
+        "..KHDHHLBHHDDK..",
+        "...KKKHBNDKKK...",
+        "......KKKK......",
+        "................"
+      ]
+    },
+
+    // 毒沼の冠：沼の緑の冠に、紫の毒嚢がはまる（ヌシガエルの色）
+    iconItemVenomCrown: {
+      palette: { ".": null, "K": "#0a1008", "A": "#4a6b1e", "H": "#6f9128", "D": "#2c4416",
+                 "Q": "#c050f0", "L": "#e090ff", "N": "#5a2080" },
+      pixels: [
+        "................",
+        "................",
+        ".......KK.......",
+        "......KHHK......",
+        "..KK..KHDK..KK..",
+        ".KHHK.KHDK.KHHK.",
+        ".KHDKKKHDKKKHDK.",
+        ".KHAHHHAAHHHADK.",
+        ".KHAAAAAAAAAADK.",
+        ".KHAAALQQQAAADK.",
+        ".KHAAAQQQQAAADK.",
+        ".KHAAANQQNAAADK.",
+        ".KHDDDDDDDDDDDK.",
+        "..KKKKKKKKKKKK..",
+        "................",
+        "................"
+      ]
+    },
+
+    // 旅人の護符：革ひもに木の札。白い印と赤い点
+    iconItemTravelerCharm: {
+      palette: { ".": null, "K": "#1e120a", "C": "#8a5a30", "A": "#c8a070", "H": "#e8c898",
+                 "D": "#8a6a40", "W": "#f8f0e0", "R": "#c84a3a" },
+      pixels: [
+        "...K........K...",
+        "..KCK......KCK..",
+        "...KCK....KCK...",
+        "...KCK....KCK...",
+        "....KCK..KCK....",
+        "....KCK..KCK....",
+        ".....KCKKCK.....",
+        ".....KCKKCK.....",
+        "......KHHK......",
+        ".....KHAAHK.....",
+        "....KHAWWAHK....",
+        "....KHAWRADK....",
+        "....KHAWAADK....",
+        ".....KHAADK.....",
+        "......KHDK......",
+        ".......KK......."
+      ]
+    },
+
+    // 毒よけの護符：毒の針を束ねて紫のひもで縛ったもの（ドクバチの色）
+    iconItemVenomWard: {
+      palette: { ".": null, "K": "#0d1207", "C": "#7a962a", "I": "#eef0f4", "J": "#a8aab8",
+                 "Q": "#c050f0", "G": "#c8e05a" },
+      pixels: [
+        "...K........K...",
+        "..KCK......KCK..",
+        "...KCK....KCK...",
+        "...KCK....KCK...",
+        "....KCK..KCK....",
+        "....KCK..KCK....",
+        ".....KCKKCK.....",
+        ".....KCKKCK.....",
+        ".....KIGGJK.....",
+        ".....KIJIJK.....",
+        ".....KQQQQK.....",
+        ".....KIJIJK.....",
+        ".....KIJIJK.....",
+        ".....KIJIJK.....",
+        ".....KIJIJK.....",
+        "......KKKK......"
+      ]
+    },
+
+    // 髑髏の護符：小さな頭骨。眼窩が青く光る（ヌマボネの青い眼光）
+    iconItemBoneCharm: {
+      palette: { ".": null, "K": "#0a0d10", "C": "#3d4a52", "A": "#c8d4d0", "H": "#eef4f0",
+                 "D": "#7a8a90", "N": "#1c2430", "E": "#4fb0d1" },
+      pixels: [
+        "...K........K...",
+        "..KCK......KCK..",
+        "...KCK....KCK...",
+        "...KCK....KCK...",
+        "....KCK..KCK....",
+        "....KCK..KCK....",
+        ".....KCKKCK.....",
+        ".....KCKKCK.....",
+        ".....KHHHHK.....",
+        "....KHAAAAHK....",
+        "....KHNAANDK....",
+        "....KHEAAEDK....",
+        "....KHAAAADK....",
+        ".....KHNADK.....",
+        ".....KHDNDK.....",
+        "......KKKK......"
+      ]
+    },
+
+    // 炎よけの札：殻色の札に赤い炎の印（マグマガニの殻）
+    iconItemEmberWard: {
+      palette: { ".": null, "K": "#180b09", "A": "#c8946a", "H": "#e8b88a", "D": "#8a5a40",
+                 "R": "#e8542a", "O": "#ff9a3c", "C": "#7a4a2a", "N": "#5c3a30" },
+      pixels: [
+        "......KCCK......",
+        "....KKKCKKKK....",
+        "...KHHHHHHHHK...",
+        "...KHAAAAAADK...",
+        "...KHAARAAADK...",
+        "...KHAAARAADK...",
+        "...KHAAOAAADK...",
+        "...KHARARAADK...",
+        "...KHAROORADK...",
+        "...KHARRRRADK...",
+        "...KHAAAAAADK...",
+        "...KHNNNNNNDK...",
+        "...KHAAAAAADK...",
+        "...KHDDDDDDDK...",
+        "....KKKKKKKK....",
+        "................"
+      ]
+    },
+
+    // 宵よけの札：宵色の札に淡い紫の輪の印（ヨドミの色）
+    iconItemDuskWard: {
+      palette: { ".": null, "K": "#0e0a18", "A": "#3d3060", "H": "#6b57a0", "D": "#1c1530",
+                 "V": "#c8b8ff", "C": "#8b6fd6", "N": "#8b6fd6" },
+      pixels: [
+        "......KCCK......",
+        "....KKKCKKKK....",
+        "...KHHHHHHHHK...",
+        "...KHAAAAAADK...",
+        "...KHAAAAAADK...",
+        "...KHAVVVVADK...",
+        "...KHAVAAVADK...",
+        "...KHAVAAVADK...",
+        "...KHAVVVVADK...",
+        "...KHAAAAAADK...",
+        "...KHANNNNADK...",
+        "...KHAAAAAADK...",
+        "...KHANNNNADK...",
+        "...KHDDDDDDDK...",
+        "....KKKKKKKK....",
+        "................"
+      ]
+    },
+
+    // 光る提灯：鱗粉が黄色く光る丸い提灯（ヒカリムシの色）
+    iconItemGlowLantern: {
+      palette: { ".": null, "K": "#1a1608", "A": "#ffe36e", "H": "#fff8d0", "D": "#c9a83e",
+                 "N": "#6b5a2e", "M": "#3a2a14", "W": "#ffffff" },
+      pixels: [
+        "................",
+        ".......NN.......",
+        "......N..N......",
+        ".....KN..NK.....",
+        "....KMMMMMMK....",
+        ".....KHDADK.....",
+        "....KHADAAHK....",
+        "...KHAWDAAAHK...",
+        "...KHAWDAAADK...",
+        "...KHAADAAADK...",
+        "...KHAADAAADK...",
+        "....KHADAADK....",
+        ".....KHDADK.....",
+        "....KMMMMMMK....",
+        ".....KKKKKK.....",
+        "................"
+      ]
+    },
+
+    // 風切りの羽根：灰の羽根3枚を扇に束ね、赤いひもで結ぶ（ハイバネの色）
+    iconItemSwiftPlume: {
+      palette: { ".": null, "K": "#1c1613", "A": "#9a938d", "H": "#ded8d0", "D": "#5e5650",
+                 "R": "#c84a3a", "r": "#8a2a20", "Q": "#ded8d0" },
+      pixels: [
+        ".......KK.......",
+        "......KHHK......",
+        "..KK.KHDAHK.KK..",
+        ".KHHKKHDADKKHHK.",
+        "KHADHKHDADKHDAHK",
+        "KHADDKHDADKHDADK",
+        ".KHADKHDADKDADK.",
+        "..KHDHKDDKHDDK..",
+        "...KHDKDDKDDK...",
+        "....KHKDDKHK....",
+        ".....KRRRrK.....",
+        ".....KRRRrK.....",
+        "......KQQK......",
+        "......KQQK......",
+        ".......KK.......",
+        "................"
+      ]
+    },
+
+    // 風乗りの羽飾り：白い羽根2枚を金の留め具で挿した飾り。赤い玉つき
+    iconItemWindCrest: {
+      palette: { ".": null, "K": "#1c1613", "A": "#bdb6ae", "H": "#f0ece4", "D": "#7a726a",
+                 "G": "#e8b830", "g": "#a87818", "R": "#d84a4a" },
+      pixels: [
+        "...........KK...",
+        "..........KHHK..",
+        ".........KHADHK.",
+        "........KHADADK.",
+        ".......KHADADK..",
+        "......KHADADK...",
+        ".....KHAADDKKK..",
+        "....KHAADKKHHHK.",
+        "...KHAADKHHADDHK",
+        "...KHADKHDDDDDK.",
+        "..KGGGADDDDKKK..",
+        "..KGGGgKKKK.....",
+        ".KRGggK.........",
+        ".KRRKK..........",
+        "..KK............",
+        "................"
+      ]
+    },
+
+    // 帯電の芯：金具で挟んだ黄色く光る芯。まわりに火花（ビリムシの色）
+    iconItemChargedCore: {
+      palette: { ".": null, "K": "#150f06", "A": "#ffd75e", "H": "#fff2b0", "D": "#c8891a",
+                 "M": "#5a5a6a", "m": "#9a9aaa", "C": "#7fd9e8" },
+      pixels: [
+        ".......C........",
+        ".....KKKKKK.....",
+        "....KmmmmmmK....",
+        "....KMMMMMMK....",
+        ".....KHHHHK.....",
+        "..C..KHAADK.....",
+        "...C.KHAADK.....",
+        "..C..KHAADK.....",
+        ".....KHAADK..C..",
+        ".....KHAADK.C...",
+        ".....KHAADK..C..",
+        ".....KHDDDK.....",
+        "....KmmmmmmK....",
+        "....KMMMMMMK....",
+        ".....KKKKKK.....",
+        "................"
+      ]
+    },
+
+    // --- スライムのかけらで作る装備（RC-1）。どれもスライムの緑の結晶 ---
+
+    // 粘晶の剣：透きとおった緑の刃に、青みのつばと握り
+    iconItemSlimeBlade: {
+      palette: { ".": null, "K": "#071a12", "H": "#e0fff0", "B": "#86e5ad", "D": "#2f8a5d",
+                 "G": "#3a6a8a", "g": "#6a9ac0", "A": "#2a4a5a", "a": "#16303c", "O": "#5fd18c" },
+      pixels: [
+        ".............K..",
+        "............KHK.",
+        "...........KHBK.",
+        "..........KHBDK.",
+        ".........KHBDK..",
+        "........KHBDK...",
+        ".....K.KHBDK....",
+        "....KgKHBDK.....",
+        "....KggBDK......",
+        "...KKAGGK.......",
+        "..KOAaKggK......",
+        "..KOOK.KK.......",
+        "...KOK..........",
+        "....K...........",
+        "................",
+        "................"
+      ]
+    },
+
+    // 粘晶の鎧：緑の結晶を十字の継ぎ目で組んだ胴。左胸に照り
+    iconItemSlimeMail: {
+      palette: { ".": null, "K": "#071a12", "A": "#5fd18c", "H": "#a8f0c4", "D": "#2f8a5d",
+                 "N": "#16402c", "W": "#e0fff0" },
+      pixels: [
+        "....KK....KK....",
+        "..KKHHK..KHHKK..",
+        ".KHHAAHKKHAAHHK.",
+        "KHAAAAANHAAAAAHK",
+        "KHAWAAANAAAAAADK",
+        "KHAAWAANAAAAAADK",
+        ".KHAAWANAAAAADK.",
+        "..KNNNNNNNNNNK..",
+        "..KHAAANAAAADK..",
+        "..KHAAANAWAADK..",
+        "..KHAAANAAAADK..",
+        "..KHAAANAAAADK..",
+        "...KHDDDDDDDK...",
+        "....KKKKKKKK....",
+        "................",
+        "................"
+      ]
+    },
+
+    // 粘晶のネックレス：小さな粒を連ねた銀の鎖に、しずく形の結晶
+    iconItemSlimeNecklace: {
+      palette: { ".": null, "K": "#071a12", "C": "#c8d4d0", "c": "#86e5ad", "A": "#5fd18c",
+                 "H": "#a8f0c4", "D": "#2f8a5d", "W": "#ffffff" },
+      pixels: [
+        "...K........K...",
+        "..KCK......KCK..",
+        "...KCK....KCK...",
+        "...KcK....KcK...",
+        "....KCK..KCK....",
+        "....KcK..KcK....",
+        ".....KCKKCK.....",
+        ".....KCKKCK.....",
+        "......KHHK......",
+        ".....KHWAHK.....",
+        "....KHWAAAHK....",
+        "....KHAAAADK....",
+        "....KHAAAADK....",
+        ".....KHAADK.....",
+        "......KHDK......",
+        ".......KK......."
       ]
     }
   });

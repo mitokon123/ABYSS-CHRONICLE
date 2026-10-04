@@ -76,8 +76,9 @@
       result.push({
         item: item,
         price: this.getBuyPrice(item, entry),
-        // どのステージで手に入るものか（data/shop.js の from）。素材を場所ごとに分けて並べる
-        from: entry.from || null,
+        // どのステージで手に入るものか（data/items.js の from。図鑑と同じ）。素材を場所ごとに分けて並べる。
+        // 店だけ別の見出しにしたいときは、data/shop.js の品に from を書けばそちらが勝つ
+        from: entry.from || item.from || null,
         // 同じ分類・同じ値段のときに、書いた順を保つための控え
         listed: i
       });
@@ -91,7 +92,7 @@
   /**
    * 店に並べる順番。
    *   1. 分類（data/categories.js の item.order）… 回復 → 装備 → 素材 → 重要
-   *   2. 手に入る場所（data/shop.js の from）のステージ順 … 素材をステージごとにまとめる
+   *   2. 手に入る場所（data/items.js の from）のステージ順 … 素材をステージごとにまとめる
    *      （from を書いていない品は、その分類の先頭）
    *   3. 値段の安い順 … 手が届くものから目に入る
    *   4. data/shop.js に書いた順 … 上が同じときだけ

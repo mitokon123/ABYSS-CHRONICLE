@@ -63,7 +63,7 @@
 
     this.messageLog = new NS.MessageLog(this.panel, this.layout.message, this.layout.messageLines);
     this.commandMenu = new NS.CommandMenu(this.panel, this.layout.command);
-    this.subMenu = new NS.ScrollList(this.panel, this.layout.subMenu);
+    this.subMenu = new NS.ScrollList(this.panel, this.layout.subMenu, { sprites: this.spriteRenderer });
 
     // 演出（HPバーの動き・ダメージ表示・画面効果）
     var animation = this.layout.animation || {};
@@ -113,6 +113,12 @@
     // 仲間になったが、パーティがいっぱいで行き先が決まっていない個体
     this.pendingScout = null;
     this._scoutError = null;  // 行き先へ入れられなかった理由
+
+    // 何ターン目か（_resolveTurn で数える）。誘いの香が「次のターンから」効くのに使う
+    this._turnCount = 0;
+    // 誘いの香（data/items.js の effect.type "scoutBoost"）。{ multiplier, fromTurn }。
+    // その戦闘のあいだ続き、重ねて使っても上がらない（作者の指定）
+    this.scoutBoost = null;
 
     // 画面に出しているバフ／デバフの印。
     // 実際の効果（monster.modifiers）より遅れて増減する（_shownModifiersFor を参照）
@@ -370,10 +376,13 @@
       var slots = inventory.getSlots();
       for (var i = 0; i < slots.length; i++) {
         if (!this.itemUsage.isUsableIn(slots[i].itemId, "battle")) continue;
+        // スカウトできない戦い（主の初戦など）では、誘いの香は出さない（使っても意味がない）
+        if (!this.allowScout && this._isScoutBoostItem(slots[i].itemId)) continue;
         var item = this.game.data.getItem(slots[i].itemId);
         rows.push({
           type: "entry",
           label: item ? item.name : slots[i].itemId,
+          icon: item ? item.icon : null,
           right: "x" + slots[i].count,
           value: slots[i].itemId
         });
@@ -445,6 +454,41 @@
     return table[level - 1] || 1;
   };
 
+  /**
+   * 戦っている全員の現在PPを控える。
+   * PPはターンの計算のときに一気に払われるので、そのまま描くと技を見せる前に減ってしまう。
+   * 演出のあいだは控えた値で描き、技を使う出来事を見せた瞬間に減らす（HPと同じ見せ方）
+   */
+  BattleScene.prototype._capturePp = function () {
+    var list = [];
+    var everyone = this.allies.concat(this.enemies);
+    for (var i = 0; i < everyone.length; i++) {
+      list.push({ monster: everyone[i], pp: everyone[i].currentPp });
+    }
+    return list;
+  };
+
+  /** 画面に出してよいPP。演出中でなければ実際の値 */
+  BattleScene.prototype._shownPpOf = function (monster) {
+    var list = this.shownPp;
+    if (list) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].monster === monster) return list[i].pp;
+      }
+    }
+    return monster.currentPp;
+  };
+
+  /** 出来事を見せた瞬間に、PPバーをその値にする */
+  BattleScene.prototype._revealPp = function (monster, pp) {
+    var list = this.shownPp;
+    if (!list || !monster || typeof pp !== "number") return;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].monster === monster) { list[i].pp = pp; return; }
+    }
+    list.push({ monster: monster, pp: pp });
+  };
+
   /** 戦っている全員の現在HPを控える */
   BattleScene.prototype._captureHp = function () {
     var list = [];
@@ -469,6 +513,8 @@
     for (var i = 0; i < snapshot.length; i++) {
       this.animator.hold(snapshot[i].monster, snapshot[i].hp);
     }
+    // PPも同じ。減るのは技を使う出来事を見せる瞬間（_revealPp）
+    this.shownPp = this.snapshotPp || null;
 
     this.playbackEvents = events || [];
     this.playbackIndex = 0;
@@ -498,6 +544,13 @@
     if (this.playbackIndex < this.playbackEvents.length) {
       var event = this.playbackEvents[this.playbackIndex];
 
+      // 同時に見せる組の頭で、組の文がこのページに収まらなければ、先に送り待ちにする
+      // （組の途中でページが切れると、同時に出るはずのダメージが送り待ちで分かれてしまう）
+      if (this._simulNeedsPage(this.playbackIndex)) {
+        this.playbackWaiting = true;
+        return;
+      }
+
       // 表示欄が埋まっていたら、古い行を消さずに送り待ちにする
       // （そうしないと味方の行動が流れて消えてしまう）
       if (this.messageLog.isFull() && this.formatter.formatOne(event)) {
@@ -507,6 +560,15 @@
 
       this._playEvent(event, quick);
       this.playbackIndex++;
+
+      // 同時に見せる組の残りは、同じフレームのうちに続けて見せる（1フレームずつずれないように）
+      while (event.simul && this.playbackIndex < this.playbackEvents.length) {
+        var next = this.playbackEvents[this.playbackIndex];
+        if (next.simul !== event.simul) break;
+        if (this.messageLog.isFull() && this.formatter.formatOne(next)) break;
+        this._playEvent(next, quick);
+        this.playbackIndex++;
+      }
       return;
     }
 
@@ -514,6 +576,26 @@
     if (!this._animationSettled()) return;
 
     this._endPlayback();
+  };
+
+  /**
+   * その出来事が「同時に見せる組」の頭で、組の文が今のページに入りきらないか。
+   * ページが空なら（入りきらなくても）待たない。組が1ページより長いときは、ふつうの送り待ちに任せる
+   */
+  BattleScene.prototype._simulNeedsPage = function (index) {
+    var events = this.playbackEvents;
+    var event = events[index];
+    if (!event || !event.simul) return false;
+    var prev = events[index - 1];
+    if (prev && prev.simul === event.simul) return false;
+    var used = this.messageLog.current.length;
+    if (used === 0) return false;
+
+    var lines = 0;
+    for (var i = index; i < events.length && events[i].simul === event.simul; i++) {
+      if (this.formatter.formatOne(events[i])) lines++;
+    }
+    return used + lines > this.messageLog.linesPerPage;
   };
 
   BattleScene.prototype._animationSettled = function () {
@@ -540,6 +622,9 @@
     if (event.revealTarget) {
       this.animator.revealTo(event.revealTarget, event.revealHp);
     }
+    // PPも同じ。技を使った（払った）瞬間と、PPを戻す道具を使った瞬間
+    if (event.type === "useSkill" && event.actor) this._revealPp(event.actor, event.ppAfter);
+    if (event.ppTarget) this._revealPp(event.ppTarget, event.ppValue);
     // 状態異常の印も、この瞬間に増やす・消す（_shownStatusesFor）
     if (event.type === "status" || event.type === "statusEnd" || event.statusIds) {
       this._revealStatusMark(event);
@@ -551,6 +636,12 @@
     switch (event.type) {
       case "damage":
         this.animator.revealTo(event.target, event.currentHp);
+        // 0ダメージは「効かない」と同じ見せ方（揺れも光りもしない「0」と、外れの音）
+        if (event.amount <= 0) {
+          this._applyStyle("immune", event.target, "0");
+          this.game.audio.playSe("miss");
+          break;
+        }
         // クリティカルのときはクリティカル用の見た目にする
         this._applyStyle(event.critical ? "critical" : "damage",
           event.target, String(event.amount));
@@ -577,8 +668,10 @@
         this._applyStyle("immune", event.target, "0");
         this.game.audio.playSe("miss");
         break;
+      // 状態異常が入らなかった（確率で外れた・効かない相手）。攻撃が外れたときと同じ「MISS」を出す（作者の指定）
       case "statusImmune":
       case "statusMiss":
+        this._applyStyle("miss", event.target, "MISS");
         this.game.audio.playSe("miss");
         break;
       case "faint":
@@ -631,8 +724,14 @@
       // 勝ったら戦闘曲をやめて、勝利の曲を流す（繰り返さない。data/audio.js）。
       // 探索へ戻ると探索曲に置き換わる
       case "battleEnd":
-        if (event.result === "win") this.game.audio.playBgm("victory");
-        else if (event.result === "lose") this.game.audio.playBgm("lose");
+        if (event.result === "win") {
+          this.game.audio.playBgm("victory");
+          // 経験値・レベルアップはこのあとに続く。勝利の曲が鳴り始めてから少し間を置く（作者の指定）
+          // 決定キーで早送りしているときは待たない
+          if (!quick) wait = Math.max(wait, this.animation.victoryPause || 1200);
+        } else if (event.result === "lose") {
+          this.game.audio.playBgm("lose");
+        }
         break;
       // 逃げる音は「逃げようとした」音。失敗しても鳴る
       case "fleeSuccess":
@@ -651,6 +750,26 @@
           wait = Math.max(wait, this.animator.drainTime(event.healAmount));
         }
         break;
+    }
+
+    // 同じ状態異常の結果が続く（どくのいきで3体それぞれに入った／MISS）ときは、待たずに続けて見せる。
+    // 一体ずつ間を空けると、全体にかけたのに順番にかかっていくように見えるため（作者の指定：できれば一度に）
+    var next = this.playbackEvents && this.playbackEvents[this.playbackIndex + 1];
+    if (next && isStatusResultEvent(event.type) && isStatusResultEvent(next.type) &&
+        next.statusId === event.statusId) {
+      wait = 0;
+    }
+
+    // 全体の技で「同時に見せる」組（BattleSystem._pushSimultaneous の simul）。
+    // 組の途中は待たずに続けて見せ、組の最後で、組の中でいちばん長い待ち（HPバーが減りきるまで等）をまとめて待つ
+    if (event.simul) {
+      this._simulWait = Math.max(this._simulWait || 0, wait);
+      if (next && next.simul === event.simul) {
+        wait = 0;
+      } else {
+        wait = this._simulWait;
+        this._simulWait = 0;
+      }
     }
 
     this.playbackTimer = wait;
@@ -862,8 +981,13 @@
     // ふだんの動きの時計。麻痺で鈍く、眠りで止まる（_motionClockFor）
     var clock = this._motionClockFor(monster);
 
-    var transform = NS.Motion.forSprite(this.game.data, sprite,
-      monster.getMotionId(), clock, monster.getMotionPhase());
+    // 状態異常が「ふだんの動き」を差し替えることがある（眠り：目を閉じて脱力し、寝息を立てる）。
+    // data/statuses.js の idleMotion。こちらは止まった時計ではなく、ふつうの時計で動かす
+    var statusIdle = this._statusIdleMotion(monster);
+    var transform = statusIdle
+      ? NS.Motion.of(this.game.data, statusIdle, this.game.clock, monster.getMotionPhase())
+      : NS.Motion.forSprite(this.game.data, sprite,
+          monster.getMotionId(), clock, monster.getMotionPhase());
 
     // 防御中は構えた姿勢を重ねる（_defending は BattleSystem が立てる）
     if (monster._defending && monster.getActionMotionId) {
@@ -874,8 +998,73 @@
       }
     }
 
-    this.spriteRenderer.drawMotion(sprite, x, y, size, size,
-      NS.Motion.combine(transform, action));
+    var combined = NS.Motion.combine(transform, action);
+
+    // 姿（squash / stretch / sleep など）が指定されていて、その種族がその絵を持っていれば差し替える。
+    // 持っていない種族は、ふつうの絵のまま動き（伸び縮み・ずれ）だけが付く
+    var poseSprite = combined.pose ? monster.getPoseSpriteId(combined.pose) : null;
+    if (poseSprite) {
+      sprite = poseSprite;
+      combined.frame = 0;
+    } else if (statusIdle && Object.prototype.toString.call(sprite) === "[object Array]") {
+      // 眠っているのに眠りの絵が無い種族は、コマ絵の最初の1枚で止める（跳ねたりしない）
+      combined.frame = 0;
+    }
+
+    this.spriteRenderer.drawMotion(sprite, x, y, size, size, combined);
+
+    // 眠っている印（Zzz）。小さな z が頭の上へふわっと昇って消える（data/ui.js の sleepZzz）
+    if (statusIdle) this._renderSleepZzz(monster, x, y, size);
+  };
+
+  /**
+   * 見えている状態異常のうち、ふだんの動きを差し替えるもの（眠りの idleMotion）。無ければ null。
+   * 種族が同じ名前の場面を motions に書いていれば、そちらを使う
+   * （スライムは motions: { sleeping: "slimeSleeping" } で、ほかより深く潰れて眠る）
+   */
+  BattleScene.prototype._statusIdleMotion = function (monster) {
+    var defs = this._shownStatusesFor(monster);
+    for (var i = 0; i < defs.length; i++) {
+      if (!defs[i].idleMotion) continue;
+      var own = monster.getActionMotionId ? monster.getActionMotionId(defs[i].idleMotion) : null;
+      return own || defs[i].idleMotion;
+    }
+    return null;
+  };
+
+  /**
+   * 眠っている仲間・敵の頭の上に、小さな「z」を順番に昇らせる。
+   * 位置は絵の右上。個体ごとに位相をずらして、並んで眠っても揃わないようにする
+   */
+  BattleScene.prototype._renderSleepZzz = function (monster, x, y, size) {
+    var Z = this.layout.sleepZzz;
+    if (!Z) return;
+
+    var ctx = this.game.ctx;
+    var count = Z.count || 3;
+    var period = Z.period || 1800;
+    var phase = monster.getMotionPhase ? monster.getMotionPhase() : 0;
+
+    ctx.save();
+    ctx.font = Z.font || "bold 12px monospace";
+    ctx.textAlign = "center";
+    for (var i = 0; i < count; i++) {
+      // 0〜1 を繰り返す進み具合。1つずつ少し遅れて出る
+      var t = ((this.game.clock / period) + phase + i / count) % 1;
+      var alpha = t < 0.2 ? t / 0.2 : (1 - t) / 0.8;
+      var zx = x + size * (Z.fromX || 0.7) + (Z.driftX || 8) * t;
+      var zy = y + size * (Z.fromY || 0.25) - (Z.rise || 22) * t;
+      var scale = (Z.minScale || 0.7) + (1 - (Z.minScale || 0.7)) * t;
+
+      ctx.globalAlpha = Math.max(0, alpha) * (Z.alpha || 0.9);
+      ctx.fillStyle = Z.color || "#c9b8ff";
+      ctx.save();
+      ctx.translate(zx, zy);
+      ctx.scale(scale, scale);
+      ctx.fillText(Z.text || "z", 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
   };
 
   /**
@@ -922,14 +1111,18 @@
 
     if (event.type === "useSkill" && event.actor) {
       var kind = this._skillMotionKind(event.skill);
-      // 自分・味方にかける技は相手の位置と関係がないので、向きを固定する
-      this._startMotion(event.actor, kind, kind === "buff" ? 1 : toward);
+      // 自分・味方にかける技と共鳴は相手の位置と関係がない（その場で出す）ので、向きを固定する
+      var still = (kind === "buff" || kind === "resonance");
+      this._startMotion(event.actor, kind, still ? 1 : toward);
+      // 技の種類ごとの「出した本人のまわり」の演出（共鳴の響き。data/categories.js の casterEffect）
+      this._playCasterEffect(event.skill, event.actor);
       return;
     }
 
-    // 押された相手は、攻撃してきた方向へ飛ぶ（＝踏み込みと同じ向き）
+    // 押された相手は、攻撃してきた方向へ飛ぶ（＝踏み込みと同じ向き）。
+    // 0ダメージ（びくともしなかった）のときは動かない（作者の指定）
     if (event.type === "damage" && event.target) {
-      this._startMotion(event.target, "hit", toward);
+      if (event.amount > 0) this._startMotion(event.target, "hit", toward);
       return;
     }
 
@@ -946,28 +1139,53 @@
       this._startMotion(event.actor, "levelUp", 1);
       return;
     }
+    // 攻撃が外れた相手は、横へ身をかわす（命中しなかったのも、かわしたのも同じ）。
+    // 横へ動くだけなので、向きは敵味方で揃える。眠っている間はかわさない（寝たまま）
+    if (event.type === "miss" && event.target) {
+      if (!this._statusIdleMotion(event.target)) this._startMotion(event.target, "dodge", 1);
+      return;
+    }
+    // 状態異常だけのブレス（どくのいき・眠りの胞子）が入らなかった相手も、息を避けたように身をかわす（作者の指定）。
+    // ダメージのある技や、ブレス以外（青い眼光など）の「MISS」ではかわさない
+    if ((event.type === "statusMiss" || event.type === "statusImmune") && event.target &&
+        this._isStatusOnlyBreath(this._currentSkill)) {
+      if (!this._statusIdleMotion(event.target)) this._startMotion(event.target, "dodge", 1);
+      return;
+    }
+    // スカウトに応じた相手は、レベルアップと同じ動きで喜ぶ（作者の指定。_resolveScoutAction）
+    if (event.recruited) {
+      this._startMotion(event.recruited, "levelUp", 1);
+      return;
+    }
     if (event.healAmount && event.revealTarget) {
       this._startMotion(event.revealTarget, "heal", 1);
+    }
+    // 状態異常を治す技（クレンズ）で治った仲間も、回復と同じ動きをする
+    if (event.type === "cure" && event.target) {
+      this._startMotion(event.target, "heal", 1);
     }
   };
 
   /**
-   * その技をどう出すか（"attack" 踏み込む / "cast" 放つ / "buff" 自分にかける）。
+   * その技をどの動きで出すか（data/motions.js の motionDefaults.action のキー）。
    *
-   * 技ごとに書かなくて済むよう、技の effect から決める。
-   *   殴る・斬る（data/motions.js の meleeEffects）… 踏み込む
-   *   自分・味方が対象                              … その場でかける
-   *   それ以外                                      … 溜めて放つ
-   * 技側で変えたいときは data/skills.js に motion: "cast" と1行足せば上書きできる。
+   * 技の種類（data/skills.js の kind）で決める（RC-1）。
+   *   通常攻撃                  … "attack"     踏み込む
+   *   共鳴                      … "resonance"  その場で響かせる（まわりに共鳴の演出も出る）
+   *   ブレス                    … "breath"     吸い込んでから吐く
+   *   自分・味方にかける（共鳴以外）… "buff"   その場で伸び上がる
+   *   それ以外（体技・斬撃・踊り）… "technique" 勢いをつけて出す
+   * 技側で変えたいときは data/skills.js に motion: "attack" などと1行足せば上書きできる。
    */
   BattleScene.prototype._skillMotionKind = function (skill) {
     if (!skill) return "attack";
     if (skill.motion) return skill.motion;
+    if (skill.id === this._normalAttackId()) return "attack";
 
+    if (skill.kind === "resonance") return "resonance";
+    if (skill.kind === "breath") return "breath";
     if (skill.target === "self" || skill.target === "ally") return "buff";
-
-    var melee = (this.game.data.motionDefaults || {}).meleeEffects || [];
-    return (melee.indexOf(skill.effect) >= 0) ? "attack" : "cast";
+    return "technique";
   };
 
   /**
@@ -1004,6 +1222,8 @@
     // ダメージの無い状態異常の技（青い眼光など）は damage が来ないので、状態異常の出来事も合図にする
     var statusOnly = isStatusResultEvent(event.type) && !NS.BattleSystem.dealsDamage(this._currentSkill);
     if ((!isHitEvent(event.type) && !statusOnly) || !event.target) return;
+    // 威力も持つ弱体の技（ロックスパイク）は、当たった時点でもう演出を出している。弱体で2回目は出さない
+    if (event.type === "modifier" && NS.BattleSystem.dealsDamage(this._currentSkill)) return;
 
     var effectId = this._effectIdFor(this._currentSkill, this._currentSkillActor);
     if (!effectId) return;
@@ -1015,6 +1235,24 @@
       this._skillEffectColor(this._currentSkill, effectId),
       // 強化は下から上へ、弱体は上から下へ流す
       this._effectDirection(this._currentSkill, event));
+  };
+
+  /**
+   * 技を出した本人のまわりに出す演出（技の種類で決まる。data/categories.js の skillKind の casterEffect）。
+   * いまは共鳴だけ：その場で力を響かせる波紋と、まわりを巡る光の粒。
+   * 当たったときの演出（技の effect）とは別で、技を出した瞬間に出る。色は技の属性
+   */
+  BattleScene.prototype._playCasterEffect = function (skill, actor) {
+    var kind = this.game.data.getSkillKind ? this.game.data.getSkillKind(skill) : null;
+    if (!kind || !kind.casterEffect || !actor) return;
+
+    var pos = this._monsterCenter(actor);
+    if (!pos) return;
+    // 回復の共鳴（キュア）は無属性なので、属性の色だと灰色になる。HPの色（緑）にする
+    var color = skill.heal
+      ? (((this.game.data.effects || {}).statColors || {}).hp || null)
+      : this._skillEffectColor(skill, kind.casterEffect);
+    this.skillEffects.play(kind.casterEffect, this.game.clock, pos.x, pos.y, color, 1);
   };
 
   /**
@@ -1036,7 +1274,30 @@
 
     this._centerEffectDone = true;
     this.skillEffects.play(effectId, this.game.clock, pos.x, pos.y,
-      this._skillEffectColor(this._currentSkill, effectId), 1);
+      this._skillEffectColor(this._currentSkill, effectId), 1,
+      this._skillTargetPoints());
+  };
+
+  /**
+   * いま見せている技が届く相手全員の位置（全体の型が、ひとりずつに稲妻やつむじ風を出すのに使う）。
+   * 次の技を出すまでの出来事から、当たった・外れた相手を拾う（すでに倒れていた相手には出さない）
+   */
+  BattleScene.prototype._skillTargetPoints = function () {
+    var events = this.playbackEvents || [];
+    var seen = [];
+    var points = [];
+    for (var i = this.playbackIndex; i < events.length; i++) {
+      var e = events[i];
+      if (i > this.playbackIndex && (e.type === "useSkill" || e.type === "battleEnd")) break;
+      if (!e.target || seen.indexOf(e.target) >= 0) continue;
+      // 特性「放電」などで、出した本人に状態異常が返ってくることがある。本人は技の相手ではない
+      if (e.target === this._currentSkillActor) continue;
+      if (!isHitEvent(e.type) && !isStatusResultEvent(e.type)) continue;
+      seen.push(e.target);
+      var pos = this._monsterCenter(e.target);
+      if (pos) points.push({ x: pos.x, y: pos.y });
+    }
+    return points;
   };
 
   /**
@@ -1053,10 +1314,10 @@
 
   /**
    * 演出の向き。強化なら 1（下から上）、弱体なら -1（上から下）。
-   * 強化・弱体でない技は向きを持たない（1 のまま）。
+   * 強化・弱体でない技と、威力も持つ弱体の技（ロックスパイク。当てる演出なので）は向きを持たない（1 のまま）。
    */
   BattleScene.prototype._effectDirection = function (skill, event) {
-    if (!skill.modifier) return 1;
+    if (!skill.modifier || NS.BattleSystem.dealsDamage(skill)) return 1;
     return event.raised ? 1 : -1;
   };
 
@@ -1124,6 +1385,11 @@
         || type === "immune" || type === "modifier";
   }
 
+  /** 状態異常だけを付けるブレスか（種類が breath で、ダメージを持たない。どくのいき・眠りの胞子） */
+  BattleScene.prototype._isStatusOnlyBreath = function (skill) {
+    return !!(skill && skill.kind === "breath" && skill.status && !NS.BattleSystem.dealsDamage(skill));
+  };
+
   /** 状態異常が入った／入らなかった出来事か */
   function isStatusResultEvent(type) {
     return type === "status" || type === "statusMiss" || type === "statusImmune";
@@ -1188,9 +1454,10 @@
     this.viewAllies = null;
     this.viewEnemies = null;
 
-    // 見せ終わったので、表示HPと印を実際の状態に揃えておく
+    // 見せ終わったので、表示HP・PPと印を実際の状態に揃えておく
     this.animator.snap(this.allies);
     this.animator.snap(this.enemies);
+    this.shownPp = null;
     this._syncModifierMarks();
     // 状態異常の印も個体そのものに戻す（見せきれなかった出来事があってもここで揃う）
     this.shownStatusIds = null;
@@ -1668,8 +1935,15 @@
     if (!selected) return;
 
     var item = this.game.data.getItem(selected.value);
-    this.pending = { type: "item", itemId: selected.value,
-                     itemName: item ? item.name : selected.value };
+    var action = { type: "item", itemId: selected.value,
+                   itemName: item ? item.name : selected.value };
+
+    // 相手を選ばない道具（誘いの香）は、そのまま行動に決める
+    if (!this.itemUsage.needsTarget(selected.value)) {
+      this._commitAction(action);
+      return;
+    }
+    this.pending = action;
     this._beginTargetSelect("ally", "item");   // 回復なので味方を選ぶ
   };
 
@@ -1851,9 +2125,11 @@
     // 計算前のHPも控えておく。計算はここで一気に終わるので、
     // これが無いと攻撃を見せる前にHPバーが減ってしまう
     this.snapshotHp = this._captureHp();
+    this.snapshotPp = this._capturePp();
     // 状態異常の印も同じ（掛かる出来事を見せる前に、印だけ先に出ないように）
     this._captureStatusMarks();
 
+    this._turnCount++;
     var events = this.system.takeTurn(this.actions);
 
     // 勝ったときだけ、報酬（ゴールド・ドロップ）を渡す
@@ -1968,6 +2244,12 @@
 
   BattleScene.prototype._resolveItemAction = function (step, events) {
     var action = step.action;
+
+    // 誘いの香は相手を持たない。この戦闘のスカウトのほうに効く
+    if (this._isScoutBoostItem(action.itemId)) {
+      this._resolveScoutBoost(step, events);
+      return;
+    }
     // 選んだ個体そのものを優先する（番号は枠の番号で、倒れた枠が混ざる）
     var target = action.target
               || this.system.getFieldSlots()[action.targetIndex]
@@ -2004,6 +2286,11 @@
       event.revealHp = target.currentHp;
       event.healAmount = result.amount;
     }
+    // PPを戻す道具（精気の実）は、この文を見せた瞬間にPPバーを増やす
+    if (result.effectType === "healPp") {
+      event.ppTarget = target;
+      event.ppValue = target.currentPp;
+    }
     // 状態異常を治す道具は、この文を見せた瞬間に印を消す（治ったあとの中身をまるごと渡す）
     if (result.effectType === "cureStatus" && target.getStatusDefs) {
       var left = target.getStatusDefs();
@@ -2012,6 +2299,48 @@
       for (var s = 0; s < left.length; s++) event.statusIds.push(left[s].id);
     }
     events.push(event);
+  };
+
+  /** スカウトしやすくする道具か（data/items.js の effect.type "scoutBoost"） */
+  BattleScene.prototype._isScoutBoostItem = function (itemId) {
+    var item = this.game.data.getItem(itemId);
+    return !!(item && item.effect && item.effect.type === "scoutBoost");
+  };
+
+  /**
+   * 誘いの香を使う。次のターンから、この戦闘のあいだスカウトの成功率に倍率が掛かる。
+   * もう漂っているときは使わない（道具も減らない）。
+   */
+  BattleScene.prototype._resolveScoutBoost = function (step, events) {
+    var texts = (this.game.data.messages || {}).scout || {};
+    var item = this.game.data.getItem(step.action.itemId);
+
+    events.push({ type: "custom", text: fill(this.texts.itemUsed,
+      { actor: step.actor.getName(), item: step.action.itemName }) });
+
+    if (this.scoutBoost) {
+      events.push({ type: "custom", text: texts.boostAlready || this.texts.itemNoEffect });
+      return;
+    }
+    if (!this.game.inventory || !this.game.inventory.has(item.id, 1)) {
+      events.push({ type: "custom", text: this.texts.itemNoEffect });
+      return;
+    }
+
+    this.game.inventory.remove(item.id, 1);
+    this.scoutBoost = {
+      multiplier: item.effect.multiplier || 1,
+      // このターンの残りの行動には効かせない（「次のターンから」）
+      fromTurn: this._turnCount + 1
+    };
+    events.push({ type: "custom", text: texts.boostStart || "", se: "heal" });
+  };
+
+  /** いまのスカウトに掛かる道具の倍率（ScoutSystem.roll の item に渡す形）。効いていなければ null */
+  BattleScene.prototype._scoutItemBonus = function () {
+    var boost = this.scoutBoost;
+    if (!boost || this._turnCount < boost.fromTurn) return null;
+    return { scoutMultiplier: boost.multiplier };
   };
 
   /**
@@ -2049,13 +2378,17 @@
 
     // 応じてくれるかどうかは、パーティの空きに関係なく判定する。
     // いっぱいだった場合は、どう扱うかを演出のあとで選んでもらう。
-    var result = this.scoutSystem.roll(target);
+    // 誘いの香が効いていれば、その倍率を道具として渡す（data/scout.js の式の「道具の倍率」）
+    var result = this.scoutSystem.roll(target, { item: this._scoutItemBonus() });
     if (!result.success) {
       events.push({ type: "custom", text: fill(texts.refused, { name: target.getName() }) });
       return;
     }
 
-    events.push({ type: "custom", text: fill(texts.success, { name: target.getName() }) });
+    // recruited … この文を見せる瞬間に、応じた相手がレベルアップと同じ動きで喜ぶ（_playActionMotion）。
+    // 敵の段からはこのあと取り除くが、演出の間は始めの並び（snapshotEnemies）で描くので姿は残っている
+    events.push({ type: "custom", text: fill(texts.success, { name: target.getName() }),
+      recruited: target });
 
     // 仲間になるのは、戦っていた個体そのものとは限らない（ボスはレベルを下げる）。
     // そのことは画面には出さない。仲間の一覧を見ればレベルは分かる
@@ -2167,14 +2500,17 @@
 
     this._renderScenery(ctx, w, h, L);
 
+    // 技の演出のうち「体の後ろ」に回る部分（共鳴の奥の粒など）は、モンスターより先に描く
+    this.skillEffects.render(ctx, this.game.clock, "back");
+
     // 揺れは盤面だけに掛ける（メッセージ欄まで揺れると読みにくいため）
     this.screenEffects.begin(ctx);
     this._renderSide(this._viewEnemies(), L.enemyRow, w, "enemy");
     this._renderSide(this._viewAllies(), L.allyRow, w, "ally");
     this.screenEffects.end(ctx);
 
-    // 技の演出は、モンスターより手前・メッセージ欄より奥に描く
-    this.skillEffects.render(ctx, this.game.clock);
+    // 技の演出は、モンスターより手前・メッセージ欄より奥に描く（奥の層は上で描いた）
+    this.skillEffects.render(ctx, this.game.clock, "front");
 
     if (this.phase === "command") this._renderCommand();
     else if (this.phase === "turnMenu") this._renderTurnMenu();
@@ -2431,12 +2767,14 @@
     this.hpBar.draw(origin.x, origin.y + 18, barW, 6, shownHp, monster.getMaxHp());
 
     if (side === "ally") {
-      // 味方はPPもバーで出す（HPと同じ見方ができるように）
+      // 味方はPPもバーで出す（HPと同じ見方ができるように）。
+      // 演出中は「見せてよいPP」で描く（技を使う出来事を見せるまで減らない）
+      var shownPp = this._shownPpOf(monster);
       this.hpBar.drawPp(origin.x, origin.y + 30, barW, 5,
-        monster.currentPp, monster.getMaxPp());
+        shownPp, monster.getMaxPp());
 
       // 数値は1行にまとめる（左がPP、右がHP）
-      this.panel.drawText("PP " + monster.currentPp + "/" + monster.getMaxPp(),
+      this.panel.drawText("PP " + shownPp + "/" + monster.getMaxPp(),
         origin.x, origin.y + 46,
         { font: t.smallFont, color: t.subTextColor });
       this.panel.drawText(shownHp + "/" + monster.getMaxHp(),
@@ -2713,7 +3051,7 @@
       { font: t.smallFont, color: t.subTextColor });
     y += lh;
     if (isAlly) {
-      this.panel.drawText("PP " + monster.currentPp + "/" + monster.getMaxPp(), x, y,
+      this.panel.drawText("PP " + this._shownPpOf(monster) + "/" + monster.getMaxPp(), x, y,
         { font: t.smallFont, color: t.subTextColor });
       y += lh;
     }

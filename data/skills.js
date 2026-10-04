@@ -28,6 +28,9 @@
  *
  * drain         : 与えたダメージのうち、何割を自分のHPに戻すか（0〜1）。
  *                 書かなければ吸わない。威力を低くして釣り合いを取る
+ * cureStatus    : 状態異常を治す技（クレンズ）。{ statuses: ["poison"] } のように書く
+ *                 （道具の cureStatus と同じ決まり。statuses を省略すると curable のものを全部）。
+ *                 治すものが無ければ「治すものがなかった」になる。探索中にも使える
  * heal          : HPを回復する技。{ min, max } か { amount } を書く
  *                 ★ 攻撃力では変わらない固定値にすること。
  *                   攻撃力に比例させると、育てるほど回復量まで伸びて手がつけられなくなる
@@ -199,9 +202,7 @@
       element: "wind",
       effect: "slash",
       se: "wind",
-      // 見た目は「切る」だが、自分は踏み込まず離れて放つ
-      // （書かないと effect から踏み込みだと判断される）
-      motion: "cast",
+      // 見た目は「切る」が、共鳴なのでその場から放つ（RC-1 から動きは技の種類で決まる）
       description: "鋭い風で切りつける。風に弱い相手によく効く。"
     },
 
@@ -292,6 +293,38 @@
       effect: "aura",
       heal: { min: 35, max: 45 },
       description: "味方1体のHPを回復する。回復する量は使う者の強さでは変わらない。"
+    },
+
+    // キュアの上（RC-1・作者の指定）。回復量はキュアの2倍強、PPは3倍
+    greaterCure: {
+      id: "greaterCure",
+      name: "キュアラ",
+      kind: "resonance",
+      power: 0,
+      pp: 6,
+      accuracy: 1.0,
+      target: "ally",
+      element: "none",
+      effect: "aura",
+      heal: { min: 75, max: 105 },
+      description: "味方1体のHPを大きく回復する。回復する量は使う者の強さでは変わらない。"
+    },
+
+    // 毒を治す（RC-1・作者の指定）。解毒草と同じ働きの技。
+    // cureStatus … 治す状態異常（書き方は道具の cureStatus と同じ。statuses を省略すると治せるものを全部）。
+    // 探索中にも仲間画面から使える（Game.isFieldSkill）
+    cleanse: {
+      id: "cleanse",
+      name: "クレンズ",
+      kind: "resonance",
+      power: 0,
+      pp: 1,
+      accuracy: 1.0,
+      target: "ally",
+      element: "none",
+      effect: "aura",
+      cureStatus: { statuses: ["poison"] },
+      description: "味方1体の毒を治す。探索中にも使える。"
     },
 
     // --- 強化・弱体の技 ---
@@ -459,6 +492,119 @@
       effect: "flash",
       se: "thunder",
       description: "強い電気を落とす。威力は高いが、消費するPPも大きい。"
+    },
+
+    /**
+     * --- 属性技の2段目（tier2。RC-1） ---
+     * 数値は 早見表/技.txt のまま（作者の判断：共鳴の係数が ×1.50 になったあとも見直さない。
+     * 光の2段目のシャインが、もう同じ帯で釣り合っているため）。
+     * 覚えるのは同じ属性の1段目を覚える種族で、Lv18 前後（data/monsters.js の learnset）。
+     * いまの敵（深層 Lv10〜15・毒沼 Lv14〜19）は、ほとんど使ってこない高さに置いてある。
+     * 全体の技は、今の全体技と同じく「よけられない・クリティカルなし」。
+     * 音は2段目専用の se_*_2.wav（data/audio.js の flame〜volt）
+     */
+    flame: {
+      id: "flame",
+      name: "フレイム",
+      kind: "resonance",
+      power: 36,
+      pp: 5,
+      accuracy: 1.0,
+      target: "enemy",
+      element: "fire",
+      effect: "blaze",   // ファイア（burst）の一段上。シャインの radiance と同じ考え方
+      se: "flame",
+      description: "燃えさかる炎を放つ。火に弱い相手を大きく焼く。"
+    },
+
+    wave: {
+      id: "wave",
+      name: "ウェーブ",
+      kind: "resonance",
+      power: 30,
+      pp: 4,
+      accuracy: 1.0,
+      target: "enemy",
+      element: "water",
+      effect: "surge",   // アクア（rain）の一段上
+      se: "wave",
+      description: "大きな波を打ちつける。消費が軽く、水に弱い相手によく効く。"
+    },
+
+    // 風は全体の属性。1体ずつへの威力を下げて、3体に届かせる
+    gale: {
+      id: "gale",
+      name: "ゲイル",
+      kind: "resonance",
+      power: 25,
+      pp: 5,
+      accuracy: 1.0,
+      target: "allEnemies",
+      element: "wind",
+      // 全体の型。並び全体に1回だけ出す（data/effects.js の全体の共鳴）
+      effect: "galeSweep",
+      effectAt: "center",
+      se: "gale",
+      evadable: false,
+      canCritical: false,
+      description: "吹き荒れる風で、相手全体を切り裂く。よけられない。"
+    },
+
+    // 当てたあとに、相手の受けるダメージを2ターン上げる（当てたその一撃には乗らない。BattleSystem._resolveHit）
+    rockSpike: {
+      id: "rockSpike",
+      name: "ロックスパイク",
+      kind: "resonance",
+      power: 30,
+      pp: 6,
+      accuracy: 1.0,
+      target: "enemy",
+      element: "earth",
+      effect: "spikes",   // ストーン（shards）の一段上
+      se: "rockSpike",
+      modifier: {
+        duration: 2,
+        message: "{target} の 守りに ひびが入った!",
+        popup: "被ダメージ上昇",
+        effects: [ { type: "damageTaken", value: 1.10 } ]
+      },
+      description: "岩の棘で突き上げる。当たった相手は2ターンのあいだ、受けるダメージが少し増える。"
+    },
+
+    darkNebula: {
+      id: "darkNebula",
+      name: "ダークネビュラ",
+      kind: "resonance",
+      power: 26,
+      pp: 6,
+      accuracy: 1.0,
+      target: "allEnemies",
+      element: "dark",
+      effect: "darkNebula",
+      effectAt: "center",
+      se: "darkNebula",
+      evadable: false,
+      canCritical: false,
+      description: "闇の雲を広げ、相手全体を呑み込む。よけられない。"
+    },
+
+    // 雷の枠（強いが重い）のまま全体へ。1体ずつ麻痺を判定する（ダメージを見せたあと）
+    volt: {
+      id: "volt",
+      name: "ボルト",
+      kind: "resonance",
+      power: 35,
+      pp: 11,
+      accuracy: 1.0,
+      target: "allEnemies",
+      element: "thunder",
+      effect: "thunderstorm",
+      effectAt: "center",
+      se: "volt",
+      evadable: false,
+      canCritical: false,
+      status: { id: "paralysis", chance: 0.15 },
+      description: "雷を降らせ、相手全体を撃つ。まひさせることがある。PPを大きく使う。"
     },
 
     /**
