@@ -232,13 +232,21 @@
       allyRow:     { y: 250, spriteSize: 96, slotGap: 210, statusY: 350, statusW: 190, statusH: 64 },
 
       // 発動の札（強化・弱体・特性・加護が働いたとき、画面上部の真ん中に出る）
-      //   新しい札が上、古い札は下へ押し出される（max 枚まで）。duration で消える
-      //   ★ 2枚までにしてある。3枚目は敵の絵（y 62〜）に重なってしまうため
+      //   v1.0.0（作者の指定）：右から slideIn ミリ秒で素早く滑り込む。
+      //   同じ行動の中で続けて出た札は、同じ高さで前の札の右 overlap（幅の1/3）に重なって上に乗る。
+      //   並び全体を真ん中に寄せるので、札が増えるほど全体が左へ寄っていく（作者の指定）。
+      //   textX … 札の左端から言葉の真ん中まで（次の札に隠れない左の2/3に収める）
+      //   時間では消えない。次の行動が始まったとき（別の者の技・眠りで動けない番）と、
+      //   ターンの演出が終わったときに、出ている札がまとめて fadeOut ミリ秒で薄れて消える（BattleScene._dismissEffectPopups）。
+      //   maxLife は消し忘れの保険。max 枚を超えたら古い札から消す
+      //   ★ 3枚で横幅 630px（画面は800px）。v1.0.0 で 320 → 270 に狭めた（作者の指定）
       //   colors … 左端の色帯と文字の色。buff 強化／debuff 弱体／ability 特性／blessing 加護／equipment 装備
       effectPopup: {
-        y: 6, w: 320, h: 24, gap: 3, max: 2, rise: 6,
-        duration: 1600, fadeIn: 120, fadeOut: 350,
-        barWidth: 5, textOffsetX: 30,
+        y: 6, w: 270, h: 24, max: 3, overlap: 1 / 3, textX: 118,
+        // chainDelay … 1つの出来事から何枚も出るとき（王の号令の攻撃力上昇・防御力上昇）、2枚目以降を遅らせる量
+        // slideIn は 80 → 180（作者の指定。0.08秒では速すぎた）
+        slideIn: 180, fadeOut: 140, maxLife: 8000, chainDelay: 70,
+        barWidth: 5,
         font: "14px monospace",
         background: "rgba(10,15,28,0.88)",
         colors: {
@@ -283,6 +291,9 @@
       command: { x: 540, y: 428, w: 240, h: 152 },
       // 技・道具の一覧
       subMenu: { x: 280, y: 428, w: 250, h: 152, visibleRows: 5, rowHeight: 26 },
+      // 技を選ぶときの一覧（2026-10-15）。覚える技が増えても見渡せるよう、横に広く・行を詰めて6行にした。
+      // 右に残った幅（メッセージ欄の右端まで）に、並べ方と切り替えの案内を出す（BattleScene._renderSkillSort）
+      skillMenu: { x: 280, y: 428, w: 340, h: 152, visibleRows: 6, rowHeight: 22 },
       // 選んでいる技・道具の内容（メッセージ欄の左側に出す）
       //   kindOffsetX … 技の種類（[共鳴] など）を出す位置。属性の札の右
       skillInfo: { charsPerLine: 16, elementOffsetX: 110, kindOffsetX: 150 },
@@ -529,8 +540,12 @@
       narration: { centerY: 280, lineHeight: 36, font: "20px monospace", color: "#e6ecff", moreGap: 40,
                    shadowColor: "rgba(0,0,0,0.9)", shadowBlur: 8 },
       // 選択肢の枠。会話の窓（dialogue.box）の右上、拠点の夜で立つ人物の頭より上に置く。
-      // bottom は枠の下端の y（人物の頭はおよそ y 350）
-      choice: { x: 590, w: 170, bottom: 336, itemHeight: 34, padY: 10, font: "18px monospace" },
+      // bottom は枠の下端の y（人物の頭はおよそ y 300。v1.0.2 で人物を 128 にしたので 336 から上げた）
+      choice: { x: 590, w: 170, bottom: 292, itemHeight: 34, padY: 10, font: "18px monospace" },
+
+      // 人間の登場人物（主人公・data/story.js で person を書いた人）を、部品を重ねた新しい絵で立たせるときの大きさ（v1.0.2）。
+      // 絵は 64×64 なので 128 でちょうど2倍。新しい絵が使えないときは、actors に書いた size の 32×32 の絵になる
+      personSize: 128,
 
       backdrops: {
         // 何も無い闇
@@ -581,32 +596,35 @@
     },
 
     /**
-     * 主人公の名前と服の色を決める画面（js/scenes/PlayerSetupScene.js）。
+     * 主人公の名前と見た目を決める画面（js/scenes/PlayerSetupScene.js）。
      *
-     * 左に「選んでいる色で歩いている姿」、右に決める項目を縦に並べる。
-     *   preview.x/y  … 絵の**中心**の座標
-     *   rows         … 名前・色・性別・一人称の欄。h+gap ずつ下にずれる
-     *   swatch       … 色見本1つぶんの大きさと間隔（6色ぶん横に並ぶ）
-     *   chip         … 性別・一人称の選択肢1つぶんの札。x は並びの左端（色見本と揃える）。
-     *                  縦は欄の中央に置く
+     * 左に「選んでいる姿で歩いている絵」、右に決める項目を縦に並べる。
+     *   preview.x/y  … 絵の**中心**の座標。新しい絵は 64×64 を data/player.js の rig.previewScale 倍（3倍＝192）。
+     *                  size は新しい絵が使えないときの 32×32 の絵の大きさ。labelY は名前を出す高さ
+     *   rows         … 名前・性別・一人称・髪型・髪の色・ふくの色・ズボンの色・飾り・飾りの色、いちばん下が決定。
+     *                  h+gap ずつ下にずれる（10 × 43 で、決定の下端が y 529）
+     *   swatch       … 色見本1つぶんの大きさと間隔。縦は欄の中央
+     *                  （いちばん多い飾りの色は もとの色＋8色＋じぶんで ＝ 10並び、右に飾りの名前が入る）
+     *   chip         … 札。x は並びの左端（色見本と揃える）。幅は文字に合わせ、w より狭くはしない。
+     *                  髪型の7つ（ポニーテールがいちばん長い）が欄に収まる大きさにしてある
+     *   done.h       … 決定のボタンの高さ（位置は欄の並びのいちばん下）
      */
     playerSetup: {
       background: "#0a0f1c",
-      title:    { x: 48, y: 62, font: "26px monospace", color: "#e6ecff" },
-      subtitle: { x: 48, y: 88, font: "13px monospace", color: "#7f8db8" },
+      title:    { x: 32, y: 52, font: "26px monospace", color: "#e6ecff" },
+      subtitle: { x: 32, y: 78, font: "13px monospace", color: "#7f8db8" },
 
-      preview: { boxX: 48, boxY: 122, boxW: 240, boxH: 300,
-                 x: 168, y: 250, size: 176, labelY: 392 },
+      preview: { boxX: 32, boxY: 100, boxW: 216, boxH: 429,
+                 x: 140, y: 290, size: 176, labelY: 486 },
 
-      rows:   { x: 310, y: 122, w: 442, h: 62, gap: 12 },
-      // 色見本は「色」の欄（rows の2つ目）の中に置く。
-      // 用意した色の右に、もう1つ「じぶんで」の見本が並ぶ（7つ × 46px で欄に収まる）
-      swatch: { x: 420, y: 210, size: 34, gap: 12 },
-      chip:   { x: 420, w: 48, h: 30, gap: 6, font: "13px monospace" },
-      done:   { x: 310, y: 426, w: 442, h: 52 },
+      rows:   { x: 264, y: 100, w: 504, h: 38, gap: 5 },
+      swatch: { x: 352, size: 26, gap: 8 },
+      chip:   { x: 352, w: 40, h: 26, gap: 5, padX: 7, font: "12px monospace",
+                cursorFill: "rgba(255,215,94,0.18)" },   // 飾りの欄で、いま指している札の地
+      done:   { h: 42 },
 
       /**
-       * 服の色を自分で作る窓（「じぶんで」の見本で決定を押すと開く）。
+       * 色を自分で作る窓（ふく・髪・ズボンの「じぶんで」の見本で決定を押すと開く）。
        *   bar     … つまみを動かす横棒。x は窓の左からの位置、y は1本目の上端、gap は棒どうしの間
        *   swatch  … できた色の見本（色コードを横に出す）
        *   buttons … 「決める」「やめる」
@@ -622,7 +640,7 @@
         repeatDelayMs: 320, repeatMs: 45
       },
 
-      hint:   { x: 48, y: 570 }
+      hint:   { x: 32, y: 570 }
     },
 
     /**
@@ -731,20 +749,18 @@
      * 左に一覧、右に詳細を出す。
      */
     /**
-     * 名前をつける文字盤（js/ui/NameInput.js）。
-     * 文字表そのものは data/naming.js。ここは置き場所だけを決める。
-     *   grid … 文字マスの左上。1マスの大きさは naming.js の cell
-     *   name … 入力中の名前を出す位置。charWidth は1文字ぶんの送り幅
+     * 名前をつける入力欄（js/ui/NameInput.js）。2026-10-27 文字盤から作り替えた。
+     *   field   … 文字を打つ欄（Canvas の座標。この上に本物の入力欄が重なる）。fontSize は欄の文字の大きさ
+     *   count   … 「4 / 10」の文字数
+     *   buttons … 「けってい」「やめる」の2つ（左上と1つぶんの大きさ・間）
      */
     nameInput: {
-      // 高さは文字9行＋コマンド1行が収まる大きさ（下に24pxの余白が残る）
-      box:   { x: 200, y: 92, w: 400, h: 446 },
-      title: { x: 220, y: 122 },
-      name:  { x: 236, y: 158, charWidth: 24, font: "18px monospace" },
-      page:  { x: 580, y: 158, align: "right" },
-      grid:  { x: 220, y: 178 },
-      commandGap: 10,
-      hint:  { x: 48, y: 570 }
+      box:     { x: 180, y: 180, w: 440, h: 270 },
+      title:   { x: 200, y: 212 },
+      field:   { x: 200, y: 232, w: 400, h: 44, fontSize: 20 },
+      count:   { x: 600, y: 296, align: "right" },
+      buttons: { x: 270, y: 340, w: 120, h: 34, gap: 20 },
+      hint:    { x: 400, y: 408, align: "center", lineHeight: 18 }
     },
 
     dex: {
@@ -762,6 +778,8 @@
 
       // 収集数。タブが5つに増えて重なったため、タブの上（副題の行）へ移した
       progress: { x: 760, y: 88 },
+      // 技の表の並べ方の札（技の表のときだけ。押すと次の並びに変わる）
+      sort:     { x: 470, y: 88 },
       hint:     { x: 48, y: 570 }
     },
 
@@ -927,6 +945,7 @@
       outcomes: {
         escaped:  { color: "#e6ecff" },
         cleared:  { color: "#ffd75e" },
+        passed:   { color: "#ffd75e" },   // 主のいない区画を出口から抜けた（クリアなので討伐と同じ色）
         scouted:  { color: "#5fd18c" },   // ボスを仲間にして帰ってきた
         defeated: { color: "#e8542a" }
       }
@@ -1026,6 +1045,8 @@
       //   h は最低の高さ。項目が増えたぶんは CommandMenu が自動で伸ばす
       fieldSkillMenu:  { x: 300, y: 180, w: 240, h: 68,  lineHeight: 28 },
       fieldTargetMenu: { x: 300, y: 150, w: 260, h: 110, lineHeight: 28 },
+      // 作戦を選ぶ（v1.0.0）。説明は下の知らせ欄に出る
+      tacticMenu:      { x: 300, y: 130, w: 260, h: 110, lineHeight: 28 },
       // 「逃がしますか?」の窓。拠点の「タイトルに戻りますか?」と同じ見た目
       releaseConfirm: {
         veil:       "rgba(4,6,12,0.72)",

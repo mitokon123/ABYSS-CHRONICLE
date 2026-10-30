@@ -52,6 +52,11 @@
       statusEnd:     "{target} の {status} が治った。",        // target, status
       statusBlocked: "{target} は {status} で動けない",        // target, status
       statusMiss:    "しかし {target} には効かなかった",       // target, status
+      // 弱体が弱体への耐性で入らなかった（2026-10-15）
+      modifierMiss:  "しかし {target} には効かなかった",       // target
+      // 反動（捨て身の体当たり）・力をためる（ちからため）
+      recoil:        "{target} は 反動で {amount} のダメージを受けた!", // target, amount
+      charge:        "{target} は 力をためた!",                // target
       statusImmune:  "{target} には {status} が効かない",      // target, status
       // 与えたダメージの一部を自分のHPに変える技（data/skills.js の drain）
       drained:      "{target} は {amount} 吸い取った!",      // target, amount
@@ -60,9 +65,13 @@
       healFull:     "しかし {target} は 元気なままだ",       // target
       cured:        "{target} の {status}が 治った!",        // target, status（クレンズ）
       cureNone:     "しかし {target} には 治すものがなかった", // target
+      // 相手のPPを減らす技（ミステリーダンス。v1.0.0）
+      ppDamage:     "{target} の PPが {amount} 減った!",      // target, amount
+      ppDamageNone: "しかし {target} の PPは もう残っていない", // target
 
       // 戦闘中に働く特性（data/abilities.js の regen / counterStatus / drain / firstStrike / undying）。
-      //   abilityTriggered … 特性が働いた合図。このあとに毒・麻痺などの文が続く（放電・毒のとげ・先手）
+      //   abilityTriggered … 特性が働いた合図（先手・脱皮など）。
+      //   状態異常を付ける特性・装備（放電・毒のとげ・眠花の杖）は名乗らない（v1.0.0・作者の指定）
       abilityTriggered: "{target} の {ability}!",             // target, ability
       abilityRegen:     "{target} は {ability}で HPが {amount} 回復した", // target, ability, amount
       abilityDrain:     "{target} は {ability}で HPを {amount} 吸い取った", // target, ability, amount
@@ -70,6 +79,13 @@
       undyingEnd:       "{target} の魂が 尽きた…",              // target
       // 加護の「先手」は全員に掛かるので、ターンの頭に1行でまとめて出す
       partyFirstStrike: "{ability}の加護で 仲間が先に動く!",   // ability
+      // v1.0.0。追い風（最初の数ターン素早さが上がる）・芽吹き（仲間の状態異常を1回防ぐ）
+      tailwind:         "{target} は {ability}に乗って 素早くなった!", // target, ability
+      tailwindEnd:      "{target} の {ability}が やんだ。",             // target, ability
+      wardGiven:        "{target} の {ability}! {ally} は 状態異常を1回 防げるようになった", // target, ability, ally
+      wardBlocked:      "{target} は {status}を 防いだ!",               // target, status
+      // 守りを付ける技（芽吹きの加護。技の wardStatus）で、守りが付いた1体ごと
+      wardSkill:        "{target} は 状態異常を1回 防げるようになった",  // target
       expGained:    "{amount} の経験値を獲得!",             // amount
       goldGained:   "{amount}G を手に入れた!",              // amount
       levelUp:      "{actor} はレベル {level} に上がった!", // actor, level
@@ -82,6 +98,9 @@
       lose:         "目の前が真っ暗になった...",
       noSkill:      "{actor} は何もできない!",              // actor
       defend:      "{actor} は身を守っている!",            // actor
+      // 防御と行動できなくなる状態異常（v1.0.0）。眠っていると守れず、防御中に眠る・動けないと解ける
+      defendFailed: "{target} は {status}で 身を守れない",  // target, status
+      defendBroken: "{target} の 防御が解けた!",            // target, status
       itemDropped:  "{name} を {count}個 手に入れた!",      // name, count
       dropLost:     "{name} を持ちきれなかった...",         // name
 
@@ -95,6 +114,8 @@
       success:   "やった! {name} が仲間になった!",           // name
       battleEnd: "スカウトに成功し、戦いは終わった。",
       refused:   "しかし {name} は 応じてくれなかった...",   // name
+      // まだ誘えない相手（シニガミ：ストーリーを全部クリアするまで）。文は仮（v1.0.0）
+      locked:    "{name} は 誘いに 耳を貸さない……",         // name
       partyFull: "しかし これ以上連れていけない!",
       // 誘いの香（スカウトしやすくする道具）
       boostStart:   "甘い香りが漂いはじめた。次のターンから仲間に誘いやすくなる!",
@@ -119,6 +140,7 @@
     command: {
       // ターンの頭の「戦う／逃げる」
       go:      "戦う",
+      tactic:  "作戦",     // 仲間ごとの作戦を変える（v1.0.0。行動にはならない）
       flee:    "逃げる",
       // 仲間ごとのコマンド
       attack:  "攻撃",
@@ -164,6 +186,10 @@
       commandFor:  "{name} は どうする?",                    // name
       selectTarget:"だれに?",
       selectSkill: "どの技?",
+      // 技の並べ方（Q/E で切り替え。2026-10-15）
+      skillSortTitle: "並び",
+      skillSortModes: { learned: "覚えた順", role: "働きごと", kind: "種類ごと", element: "属性ごと" },
+      skillSortHint:  "Q/E: 並び替え",
       skillStats:  "威力{power}　命中{accuracy}%　PP{pp}",   // power, accuracy, pp
       // ダメージを与えない技（回復・バフ／デバフ・状態異常だけ）。威力を並べない
       skillStatsNoPower: "命中{accuracy}%　PP{pp}",          // accuracy, pp
@@ -179,6 +205,7 @@
         healHp:     "{name} の HPが {amount} 回復した!",     // name, amount
         healPp:     "{name} の PPが {amount} 戻った!",       // name, amount
         cureStatus: "{name} の 状態異常が治った!",            // name
+        revive:     "{name} は 起き上がった!",                // name（神鳥の羽。v1.0.0）
         default:    "{name} に効果があった"                  // name
       },
       itemNoEffect:"しかし 効果がなかった",
@@ -192,6 +219,10 @@
       swapped:     "{out} は 下がり {in} が 前に出た!",       // out, in
       swapFailed:  "交代できなかった",
       hintSwap:    "↑↓: 選ぶ    決定: 交代    Esc: 戻る",
+      // 作戦（v1.0.0）。ターンの頭の「作戦」→ 仲間を選ぶ → 作戦を選ぶ
+      selectTacticMember: "だれの作戦を変える?",
+      selectTactic:       "{name} の作戦は?",                 // name
+      tacticCurrent:      "いま",
       hintCommand: "↑↓: 選択    決定: 決定    Esc: 前の仲間へ",
       // 相手は横一列に並んでいるので、左右で選ぶ
       hintTarget:  "←→: 相手を選ぶ    決定: 決定    Esc: 戻る"
@@ -302,6 +333,13 @@
       colorLabel: "ふくの色",
       genderLabel: "性別",
       firstPersonLabel: "一人称",
+      // 新しい絵（v1.0.2）のときだけ出る欄
+      hairLabel: "髪型",
+      hairColorLabel: "髪の色",
+      pantsLabel: "ズボンの色",
+      accLabel: "飾り",
+      accColorLabel: "飾りの色",
+      accColorOriginal: "もとの色",   // 飾りの色のいちばん左の見本の名前
 
       start: "この姿で始める",
       apply: "この内容にする",
@@ -310,6 +348,9 @@
       // 色見本の「じぶんで」（右下に＋の付いた見本）を選んでいるときの案内
       hintCustom:    "↑↓: 選択    ←→: 色を選ぶ    決定: この色を作り直す",
       editorTitle:   "ふくの色を作る",
+      editorTitleHair:  "髪の色を作る",
+      editorTitlePants: "ズボンの色を作る",
+      editorTitleAcc:   "{acc}の色を作る",   // {acc} に飾りの名前が入る
       hueLabel:      "色合い",
       satLabel:      "あざやかさ",
       lightLabel:    "明るさ",
@@ -317,8 +358,13 @@
       editorCancel:  "やめる",
       hintEditor:    "↑↓: 選ぶ    ←→: 動かす（押し続けると速く）    決定: 決める    Esc: やめる",
 
-      hintNew:  "↑↓: 選択    ←→: 色・性別・一人称を選ぶ    決定: 決定",
-      hintEdit: "↑↓: 選択    ←→: 色・性別・一人称を選ぶ    決定: 決定    Esc: 戻る"
+      // 飾りの欄にいるとき（いくつでも着けられる）
+      hintAcc:  "↑↓: 選択    ←→: 飾りを選ぶ    決定: 着ける／外す",
+      // 飾りの色の欄。色を選ぶと、その飾りを着ける
+      hintAccColor: "←→: 色を選ぶ（左端はもとの色）    色を変える飾りは、上の欄で選ぶ",
+
+      hintNew:  "↑↓: 選択    ←→: 選ぶ    決定: 決定",
+      hintEdit: "↑↓: 選択    ←→: 選ぶ    決定: 決定    Esc: 戻る"
     },
 
     /**
@@ -572,12 +618,15 @@
         healHp:     "{name} の HPが {amount} 回復した!",  // name, amount
         healPp:     "{name} の PPが {amount} 戻った!",    // name, amount
         cureStatus: "{name} の 状態異常が治った!",         // name
+        revive:     "{name} は 起き上がった!",             // name（神鳥の羽。v1.0.0）
         default:    "{name} に {item} を使った"           // name, item
       },
       usedAlone:   "{item} を使った",                   // item（相手を選ばないもの）
       noEffect:    "しかし 効果がなかった",
-      // 倒れている仲間には使えない（蘇生は無い）
+      // 倒れている仲間には使えない（蘇生の道具だけは別）
       targetFainted: "{name} は 倒れていて 使えない",       // name
+      // 蘇生の道具を、倒れていない仲間に使おうとした（v1.0.0）
+      notFainted:  "{name} は 倒れていない",               // name
       cannotUse:   "ここでは使えない",
       hintList:    "↑↓: 選択    決定: 使う    Esc: 戻る",
       hintTarget:  "↑↓: 相手を選ぶ    決定: 決定    Esc: やめる"
@@ -587,7 +636,11 @@
     /** 名前をつける文字盤 */
     naming: {
       titleRename: "{name} の名前を決める",   // name（いまの名前・新規につけるときも同じ）
-      hint:        "↑↓←→: 選ぶ    決定: 入れる    Q/E: かな切替    Esc: 1文字消す",
+      // 2026-10-27 キーボードで打つ形にした。{max} は最大文字数
+      hint:        "キーボードで入力（漢字・英字も使える。{max}文字まで）\nEnter: 決める    Esc: やめる    ↓: ボタンへ",
+      fieldLabel:  "名前",
+      done:        "けってい",
+      cancel:      "やめる",
       renamed:     "{old} は {new} になった!", // old, new
       keptName:    "名前はそのままにした。"
     },
@@ -653,7 +706,12 @@
       recordLabel:  "― {stage} ―",
       hint:          "↑↓: 選択    ←→: 切替    Esc: 戻る",
       hintScrollable:"↑↓: 選択    ←→: 切替    決定: 説明を読む    Esc: 戻る",
-      hintDetail:    "↑↓: 説明をスクロール    決定/Esc: 一覧へ戻る"
+      hintDetail:    "↑↓: 説明をスクロール    決定/Esc: 一覧へ戻る",
+      // 技の表の並べ方（Q/E で切り替え。2026-10-15）
+      sortLabel:     "並び：{mode}　Q/E",          // mode
+      sortModes:     { element: "属性ごと", kind: "種類ごと", role: "働きごと", name: "名前順", order: "図鑑の順" },
+      hintSkills:    "↑↓: 選択    ←→: 切替    Q/E: 並び替え    Esc: 戻る",
+      hintSkillsScrollable: "↑↓: 選択    ←→: 切替    Q/E: 並び替え    決定: 説明    Esc: 戻る"
     },
 
     /** ダンジョン選択画面 */
@@ -673,7 +731,20 @@
       noDrops:    "まだ分かっていない",
       bossLabel:  "主",
       unknownBoss:"？？？",
-      hint:       "↑↓: 選択    決定: 挑む    Esc: 戻る"
+      // まだ戦っていないモンスター・まだ手に入れていないもの（出現するモンスター・手に入るもの の欄）
+      unknownEntry:"？？？",
+      hint:       "↑↓: 選択    決定: 挑む    Esc: 穴の一覧へ",
+      // 開いている穴が1つだけのとき（穴を選ぶ段が出ない）
+      hintSingle: "↑↓: 選択    決定: 挑む    Esc: 戻る",
+      // 穴（地方）を選ぶ1段目（v1.0.0）
+      regionSubtitle:   "潜る穴を選ぶ",
+      regionHint:       "↑↓: 選択    決定: 区画を選ぶ    Esc: 戻る",
+      regionProgress:   "{cleared}/{total} 区画",               // cleared, total
+      regionLockedHint: "{region} の主を{count}体記録すると開く", // region, count
+      sectionsLabel:    "区画",
+      comingSoon:       "準備中",
+      comingSoonHint:   "この穴の区画は、まだ準備中。",
+      sectionComingSoonHint: "この区画は、まだ準備中。"
     },
 
     /**
@@ -722,6 +793,7 @@
     result: {
       escaped:     "帰還",
       cleared:     "討伐",
+      passed:      "踏破",     // 主のいない区画を出口から抜けた（蔦這う回廊）
       scouted:     "勧誘",
       defeated:    "全滅",
       reached:     "{name}  B{floor}F まで",              // name, floor
@@ -748,9 +820,13 @@
       choiceFight:   "主に挑む",
       choiceReturn:  "拠点へ戻る",
       choiceStay:    "まだ残る",
+      // 主のいない区画の最深階の階段（出口。2026-10-27。文は私の案）
+      exitPrompt:    "奥から 外の風が吹いてくる。\nどうする?",
+      choiceExit:    "出口から抜ける",
       cannotLeave:   "ここからは戻れない（階段か 帰還の石が要る）",
       descend:   "B{floor}F へ降りた",                      // floor
       bossAhead: "強い気配がする...",
+      exitAhead: "出口が近い...",                           // 主のいない区画の最深階
       // ※ 毒の歩きダメージには知らせを出さない。
       //   5歩ごとに画面中央を遮ってしまうため。左上のパーティ表示で分かる
       // 中断（探索中にセーブは無い。中断して置いておき、タイトルから再開する）
@@ -797,6 +873,11 @@
       actionReorder:"並び替える",
       actionName:    "名前を変える",
       actionEquip:  "装備",
+      // 作戦（v1.0.0。data/battle.js の tactics）
+      actionTactic:  "作戦：{tactic}",                        // tactic
+      tacticCurrent: "（いま）",
+      tacticChanged: "{name} の作戦を「{tactic}」にした。",   // name, tactic
+      hintTactic:    "↑↓: 作戦を選ぶ    決定: この作戦にする    Esc: やめる",
       actionRelease:"逃がす",
       // 探索中に技を使う（回復の技など。攻撃の技は出ない）
       actionFieldSkill: "技を使う",
@@ -837,12 +918,22 @@
       effectLabel: "効果",
       // 戦闘中に働く特性の効果を1行にしたもの（js/systems/EffectSystem.js の describeEffect）
       effectRegen:        "毎ターン HP{percent}%回復",          // percent
+      effectRegenMax:     "毎ターン HP{percent}%回復（上限{max}）", // percent, max
+      // 相手の残りHPで与ダメージが変わる（万全狩り。v1.0.0）。後ろに「100%以上 ×1.2・…」が続く
+      effectByTargetHp:   "相手HP ",
+      // 攻撃を当てたときに相手を状態異常にする（v1.0.0 眠花の杖）
+      effectOnHit:        "攻撃で {percent}%で相手を{status}",   // percent, status
+      effectOnHitNormal:  "通常攻撃で {percent}%で相手を{status}", // percent, status
       effectCounter:      "被弾時 {percent}%で相手を{status}",  // percent, status
       effectCounterNormal:"通常攻撃の被弾時 {percent}%で相手を{status}", // percent, status
       effectDrain:        "与ダメージの{percent}%を吸収",       // percent
       effectDrainNormal:  "通常攻撃の与ダメージの{percent}%を吸収", // percent
       effectFirstStrike:  "最初のターンに必ず先に動く",
       effectUndying:      "倒されてもそのターンは踏みとどまる",
+      // v1.0.0（脱皮・追い風・芽吹き）
+      effectShedStatus:   "ターンの終わりに{percent}%で状態異常を治す",   // percent
+      effectTailwind:     "最初の{turns}ターン 素早さ×{value}",            // turns, value
+      effectWardAlly:     "戦闘の始めに仲間1体の状態異常を1回防ぐ",
 
       // 装備
       equipLabel:   "装備",

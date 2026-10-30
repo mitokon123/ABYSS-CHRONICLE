@@ -135,10 +135,21 @@
       if (!Object.prototype.hasOwnProperty.call(monsters, id)) continue;
       var abilities = this._effectiveAbilities(monsters[id]);
       if (abilities.indexOf(abilityId) < 0) continue;
-      if (caughtOnly && !discovery.isMonsterCaught(id)) continue;
+      if (caughtOnly && !this._dexOpen(id)) continue;
       result.push(monsters[id]);
     }
     return result;
+  };
+
+  /**
+   * そのモンスターの詳しいところを図鑑で見せてよいか。ふつうは仲間にしたら。
+   * 倒すだけで開く種族もある（dexOnDefeat。シニガミ。Discovery.isMonsterDexOpen）
+   */
+  DexScene.prototype._dexOpen = function (id) {
+    var discovery = this.game.discovery;
+    if (!discovery) return false;
+    if (discovery.isMonsterDexOpen) return discovery.isMonsterDexOpen(id, this.game.data.getMonsterData(id));
+    return discovery.isMonsterCaught(id);
   };
 
   /** 実際に効いている特性のidだけを返す（1体あたりの上限を反映する） */
@@ -214,27 +225,62 @@
       // 絆の報酬で覚える技（専用技など）は、レベルではなく「絆」で覚える
       var bond = ((monsters[id].bondReward || {}).skill === skillId);
       if (level === null && !bond) continue;
-      if (caughtOnly && !discovery.isMonsterCaught(id)) continue;
+      if (caughtOnly && !this._dexOpen(id)) continue;
       result.push({ monster: monsters[id], level: level, bond: bond && level === null });
     }
     return result;
   };
 
+  /** 技の並べ方（Q/E で切り替える。2026-10-15）。選んだ並びは図鑑を閉じても覚えておく（セーブはしない） */
+  var SKILL_SORTS = ["element", "kind", "role", "name", "order"];
+
+  DexScene.prototype._skillSort = function () {
+    var mode = this.game.dexSkillSort;
+    return SKILL_SORTS.indexOf(mode) >= 0 ? mode : SKILL_SORTS[0];
+  };
+
+  DexScene.prototype._changeSkillSort = function (direction) {
+    var i = SKILL_SORTS.indexOf(this._skillSort());
+    this.game.dexSkillSort = SKILL_SORTS[(i + direction + SKILL_SORTS.length) % SKILL_SORTS.length];
+    this._rebuildList();
+    this.detailScroll = 0;
+  };
+
   /**
-   * 技を属性ごとに並べる。
-   * 分類を持たないので、属性そのものを見出しに使う（色も属性の色になる）。
+   * 技を並べる。並べ方は属性ごと・種類ごと・働きごと・名前順・図鑑の順（data/skills.js に書いた順）。
+   * 名前順では、まだ判明していない技は最後にまとめる（名前の並びで中身が分かってしまわないように）
    */
   DexScene.prototype._buildSkillRows = function () {
     var data = this.game.data;
+    var self = this;
+    var ids = Object.keys(this._dexSkills());
+    var groups = NS.BattleSystem.groupSkills(data, ids, this._skillSort(), function (id) {
+      return self._isSkillKnown(id) ? data.getSkill(id).name : null;
+    });
 
-    return buildRows(this._dexSkills(), data.elements || {}, "element", function (id, skill) {
-      var known = this._isSkillKnown(id);
-      return {
-        label: known ? skill.name : (this.texts.unknownName || "???"),
-        right: known ? (this.texts.knownLabel || "") : "",
-        value: id
-      };
-    }.bind(this));
+    var rows = [];
+    for (var g = 0; g < groups.length; g++) {
+      if (groups[g].group) {
+        rows.push({ type: "header", label: "- " + groups[g].group.name + " -", color: groups[g].group.color });
+      }
+      for (var i = 0; i < groups[g].ids.length; i++) {
+        var id = groups[g].ids[i];
+        var known = this._isSkillKnown(id);
+        rows.push({
+          type: "entry",
+          label: known ? data.getSkill(id).name : (this.texts.unknownName || "???"),
+          right: known ? (this.texts.knownLabel || "") : "",
+          value: id
+        });
+      }
+    }
+    return rows;
+  };
+
+  /** 並べ方の札の当たり判定（描いたときに覚える） */
+  DexScene.prototype._clickedSortLabel = function (input) {
+    var pointer = input.getPointer ? input.getPointer() : null;
+    return !!(pointer && pointer.clicked && this._sortRect && NS.Panel.containsPoint(this._sortRect, pointer));
   };
 
   /** モンスターを分類（family）ごとに並べる */
@@ -315,6 +361,13 @@
     if (input.isPressed("left")) this._changeTab(-1);
     if (input.isPressed("right")) this._changeTab(1);
     if (this._clickedTab(input)) return;
+
+    // 技の表だけ、Q/E（または並びの札を押す）で並べ方を変えられる
+    if (this.getTab() === "skills") {
+      if (input.isPressed("prevTab")) this._changeSkillSort(-1);
+      if (input.isPressed("nextTab")) this._changeSkillSort(1);
+      if (this._clickedSortLabel(input)) { this._changeSkillSort(1); return; }
+    }
 
     // 説明の上でホイールを回したら、そのままスクロールする
     if (this._scrollDetailByWheel(input)) return;
@@ -466,6 +519,7 @@
     this._renderHeading();
     this._renderTabs();
     this._renderProgress();
+    this._renderSortLabel();
     this.list.render(this.game.clock);
 
     this._renderDetail();
@@ -581,6 +635,26 @@
     }
   };
 
+  /** 技の表の並べ方の札（「並び：属性ごと　Q/E」）。押しても次の並びに変わる */
+  DexScene.prototype._renderSortLabel = function () {
+    this._sortRect = null;
+    if (this.getTab() !== "skills") return;
+    var pos = this.layout.sort;
+    if (!pos) return;
+    var t = this.theme;
+    var modes = this.texts.sortModes || {};
+    var text = (this.texts.sortLabel || "{mode}").replace("{mode}", modes[this._skillSort()] || this._skillSort());
+    var ctx = this.panel.ctx;
+    ctx.save();
+    ctx.font = t.smallFont || "12px monospace";
+    var w = ctx.measureText(text).width;
+    ctx.restore();
+    this._sortRect = { x: pos.x - 6, y: pos.y - 15, w: w + 12, h: 20 };
+    ctx.fillStyle = "rgba(74,107,168,0.25)";
+    ctx.fillRect(this._sortRect.x, this._sortRect.y, this._sortRect.w, this._sortRect.h);
+    this.panel.drawText(text, pos.x, pos.y, { font: t.smallFont, color: t.cursorColor });
+  };
+
   /** 収集率（発見数／総数） */
   DexScene.prototype._renderProgress = function () {
     var pos = this.layout.progress;
@@ -665,8 +739,8 @@
     lines.push({ text: (partyTexts.speedLabel || "") + " " + monster.baseSpeed });
     lines.push({ text: "PP " + (monster.basePp || 0) });
 
-    // 仲間にしたものだけ、より詳しい情報と説明を見せる
-    if (!discovery.isMonsterCaught(selected.value)) {
+    // 仲間にしたもの（倒すだけで開く種族は、倒したもの）だけ、より詳しい情報と説明を見せる
+    if (!this._dexOpen(selected.value)) {
       lines.push({ text: this.texts.notCaught || "", color: t.hintColor });
       return { sprite: monster.sprite, motion: monster.motion,
                sizeScale: monster.sizeScale || 1, lines: lines };
@@ -1158,9 +1232,10 @@
     var pos = this.layout.hint || { x: 48, y: 570 };
     var hint;
 
+    var skills = (this.getTab() === "skills");
     if (this.focus === "detail") hint = this.texts.hintDetail;
-    else if (this._canScrollDetail()) hint = this.texts.hintScrollable;
-    else hint = this.texts.hint;
+    else if (this._canScrollDetail()) hint = skills ? this.texts.hintSkillsScrollable : this.texts.hintScrollable;
+    else hint = skills ? this.texts.hintSkills : this.texts.hint;
 
     this.panel.drawText(hint || "", pos.x, pos.y,
       { font: this.theme.smallFont, color: this.theme.hintColor });

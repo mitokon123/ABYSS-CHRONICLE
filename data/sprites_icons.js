@@ -1908,6 +1908,481 @@
         "......KHDK......",
         ".......KK......."
       ]
+    },
+
+    // --- 萌芽の穴・若葉の洞の素材と装備（v1.0.0）---
+    // 剣・羽飾り・首飾り・鎧は既存のアイコン（探索者の長剣・灼牙の戦刃・風切りの羽根・粘晶のネックレス・厚革の胴着）の形を
+    // そのまま使い、材料の色に塗り替えた（向きと大きさが一覧でそろうように）。ほかは新しく描いた
+
+    // 若葉の抜け殻：脱ぎ捨てた皮。節の筋が入り、右上の裂け目から中が空っぽに見える（フタバムシの色）
+    iconItemShedHusk: {
+      palette: { ".": null, "K": "#2a3214", "N": "#4a5a24", "D": "#8a9a4a", "A": "#c8d48a",
+                 "H": "#eef4c8" },
+      pixels: [
+        "................",
+        "................",
+        "........KKKK....",
+        "......KKNNNNK...",
+        ".....KHAKNNNK...",
+        "....KHHAADKNK...",
+        "...KHHAAADDK....",
+        "...KHADAAADK....",
+        "..KHHAADAADK....",
+        "..KHAAAADADK....",
+        "..KHADAAADK.....",
+        "..KHAADAADK.....",
+        "...KHAAADK......",
+        "....KKDDK.......",
+        ".....KK.........",
+        "................"
+      ]
+    },
+
+    // 眠り花粉：ふわりと固まった桃色の花粉。まわりに黄色い粒（ユラツボミの色）
+    iconItemSleepPollen: {
+      palette: { ".": null, "K": "#4a2238", "D": "#b8607e", "A": "#e89ab8", "H": "#fcd8e6",
+                 "Y": "#fff0a0" },
+      pixels: [
+        "................",
+        "..Y.........Y...",
+        ".......KKK......",
+        "......KHHAK..Y..",
+        "...KKKHHAAKKK...",
+        "..KHHAKAADKHAK..",
+        ".KHHHAAKDKHHAAK.",
+        ".KHHAAAADKHAADK.",
+        ".KHAAAADDKAAADK.",
+        "..KAADDDKKADDK..",
+        "...KKKKK..KKK...",
+        ".....Y......Y...",
+        "................",
+        "...Y......Y.....",
+        "................",
+        "................"
+      ]
+    },
+
+    // 若葉の羽根：灰の羽根と同じ形を、若葉色に（ワカバドリの色）
+    iconItemLeafFeather: {
+      palette: { ".": null, "K": "#16260f", "N": "#2c5a22", "D": "#3f7a2c", "A": "#5fa83f",
+                 "H": "#8dd060", "P": "#c8f0a0", "Q": "#e8ffd0" },
+      pixels: [
+        "................",
+        "............KK..",
+        "..........KKHPK.",
+        ".........KHPHAK.",
+        "........KHPHANK.",
+        ".......KHPHAADK.",
+        "......KHPNAADK..",
+        ".....KHPHAANK...",
+        "....KHPQAADK....",
+        "....KPQANDK.....",
+        "...KHQAADK......",
+        "...KQDDKK.......",
+        "..KQKKK.........",
+        ".KQK............",
+        ".KK.............",
+        "................"
+      ]
+    },
+
+    // 苔むした甲羅：泥甲羅と同じ形のかけらに、上から苔が乗る（コケガメの色）
+    iconItemMossyShell: {
+      palette: { ".": null, "K": "#0e1410", "D": "#2b4a48", "A": "#4f7d78", "H": "#86b0a8",
+                 "P": "#b4d0e2", "M": "#335a58", "G": "#78b24a", "L": "#4f8a33", "F": "#a6d66a" },
+      pixels: [
+        "................",
+        "................",
+        "................",
+        ".....KKKKKK.....",
+        "...KKGGLGGGKK...",
+        "..KGFGLGGLGHAK..",
+        ".KHHHDAHHHADAAK.",
+        ".KHDDDADDDDDAAK.",
+        ".KHAAADAAADAADK.",
+        ".KAAAADAAADAADK.",
+        ".KMAADDDDDDMMDK.",
+        "..KMMMAAAMMMDK..",
+        "...KKKKKKKKKK...",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+
+    // 若芽の種：小さな双葉が出かけた種。そばに光の粒（コダマの色）
+    iconItemSproutSeed: {
+      palette: { ".": null, "K": "#2a1c0e", "N": "#5c4229", "D": "#8a6a3a", "A": "#c8a060",
+                 "H": "#ecd29a", "P": "#fff4d0", "G": "#84c95a", "L": "#4f9637", "S": "#4f7a2c",
+                 "Y": "#fff3a0" },
+      pixels: [
+        "................",
+        "...KKK....KKK...",
+        "..KGGLK..KLGGK..",
+        "...KGGLKKLGGK...",
+        "....KKKLLKKK....",
+        "......KSSK...Y..",
+        ".....KHHAAK.....",
+        "....KHPHAAAK....",
+        "....KHHAAADK....",
+        "...KHHAAAADDK...",
+        "..Y.KHAAAADDK...",
+        "...KHAAAADDDK...",
+        "....KAADDDDK....",
+        ".....KDDDNK.....",
+        "......KKKK......",
+        "................"
+      ]
+    },
+
+    // 若木の芯：輪切りの断面。年輪の真ん中から、若葉色の樹液がにじむ（主の色）
+    iconItemHeartwood: {
+      palette: { ".": null, "K": "#1c130a", "X": "#4a3220", "D": "#8a6a42", "A": "#c8a070",
+                 "H": "#e8c898", "Y": "#b8e07a" },
+      pixels: [
+        "................",
+        "................",
+        ".....KKKKKK.....",
+        "...KKXXXXXXKK...",
+        "..KXHHHHAAAAXK..",
+        ".KXHHAAAAAAADXK.",
+        ".KXHAADDDDAADXK.",
+        "KXHAADAAAADAADXK",
+        "KXHAADAYYADAADXK",
+        "KXHAADAYYADAADXK",
+        "KXHAADAAAADAADXK",
+        ".KXAAADDDDAADXK.",
+        ".KXAAAAAAAADDXK.",
+        "..KXDAAAADDDXK..",
+        "...KKXXXXXXKK...",
+        ".....KKKKKK....."
+      ]
+    },
+
+    // 若枝の剣：探索者の長剣の形。若葉色に光る刃と、葉のつば
+    iconItemSproutBlade: {
+      palette: { ".": null, "K": "#14200e", "H": "#f4ffe8", "B": "#b8e0a0", "D": "#5e9a48",
+                 "G": "#4f9637", "g": "#84c95a", "A": "#6a4a2a", "a": "#4a3018", "O": "#84c95a" },
+      pixels: [
+        ".............K..",
+        "............KHK.",
+        "...........KHBK.",
+        "..........KHBDK.",
+        ".........KHBDK..",
+        "........KHBDK...",
+        ".....K.KHBDK....",
+        "....KgKHBDK.....",
+        "....KggBDK......",
+        "...KKAGGK.......",
+        "..KOAaKggK......",
+        "..KOOK.KK.......",
+        "...KOK..........",
+        "....K...........",
+        "................",
+        "................"
+      ]
+    },
+
+    // 若木の大剣：灼牙の戦刃の形（幅広）。木の刃と、葉のつば
+    iconItemHeartwoodBlade: {
+      palette: { ".": null, "K": "#1c130a", "H": "#e8c898", "B": "#a07a4a", "D": "#5c4229",
+                 "G": "#2c5a22", "g": "#4f9637", "A": "#3a2817", "a": "#1c130a", "O": "#84c95a" },
+      pixels: [
+        "............K...",
+        "...........KHK..",
+        "..........KHBK..",
+        ".........KHBBK..",
+        "........KHBBBK..",
+        ".......KHBBBDK..",
+        "....K.KHBBBDK...",
+        "...KgKHBBBDK....",
+        "...KggBBBDK.....",
+        "....KgGBDK......",
+        "..KKAaGGK.......",
+        ".KOOaKKggK......",
+        "..KOOK.KK.......",
+        "...KK...........",
+        "................",
+        "................"
+      ]
+    },
+
+    // 眠花の杖：木の杖の先に桃色の花。まわりに花粉の粒（ユラツボミの色）
+    iconItemSleepStaff: {
+      palette: { ".": null, "K": "#2a1420", "A": "#e89ab8", "H": "#fcd8e6", "D": "#b8607e",
+                 "Y": "#ffe36e", "g": "#4f9637", "S": "#8f6a42", "s": "#5c4229", "P": "#fff0a0" },
+      pixels: [
+        "...........KKK..",
+        "..........KAHAK.",
+        ".........KAHYHAK",
+        ".........KDAHADK",
+        "....P.....KDDDK.",
+        ".........KgK..P.",
+        "........KSsK....",
+        ".......KSsK.....",
+        "......KSsK......",
+        ".....KSsK.......",
+        "....KSsK........",
+        "...KSsK.........",
+        "..KSsK..........",
+        ".KSsK...........",
+        ".KKK............",
+        "................"
+      ]
+    },
+
+    // 眠りよけの鈴：金の鈴に桃色のひも。舌（中の玉）は花粉の色
+    iconItemSleepWard: {
+      palette: { ".": null, "K": "#3a2410", "H": "#fff0b0", "A": "#e8c060", "D": "#a87828",
+                 "R": "#e89ab8", "r": "#b8607e", "P": "#f4b8cc" },
+      pixels: [
+        "................",
+        "......KKKK......",
+        ".....KRRrrK.....",
+        "......KRrK......",
+        ".....KKHHKK.....",
+        "....KHHAAADK....",
+        "....KHAAAADK....",
+        "...KHHAAAAADK...",
+        "...KHAAAAAADK...",
+        "..KHHAAAAAADDK..",
+        "..KHAAAAAAADDK..",
+        ".KHAAAAAAAADDDK.",
+        ".KKKKKKKKKKKKKK.",
+        "......KPPK......",
+        ".......KK.......",
+        "................"
+      ]
+    },
+
+    // 若葉の羽飾り：風切りの羽根の形を若葉色に。金のひも
+    iconItemLeafPlume: {
+      palette: { ".": null, "K": "#16260f", "A": "#5fa83f", "H": "#c8f0a0", "D": "#2f6a2a",
+                 "R": "#e8c060", "r": "#a87828", "Q": "#c8f0a0" },
+      pixels: [
+        ".......KK.......",
+        "......KHHK......",
+        "..KK.KHDAHK.KK..",
+        ".KHHKKHDADKKHHK.",
+        "KHADHKHDADKHDAHK",
+        "KHADDKHDADKHDADK",
+        ".KHADKHDADKDADK.",
+        "..KHDHKDDKHDDK..",
+        "...KHDKDDKDDK...",
+        "....KHKDDKHK....",
+        ".....KRRRrK.....",
+        ".....KRRRrK.....",
+        "......KQQK......",
+        "......KQQK......",
+        ".......KK.......",
+        "................"
+      ]
+    },
+
+    // 若芽の護符：粘晶のネックレスの形。銀と若葉色の鎖に、芽の出た種
+    iconItemSproutCharm: {
+      palette: { ".": null, "K": "#1a1408", "C": "#c8d4d0", "c": "#84c95a", "A": "#c8a060",
+                 "H": "#ecd29a", "D": "#8a6a3a", "W": "#fff4d0", "G": "#84c95a" },
+      pixels: [
+        "...K........K...",
+        "..KCK......KCK..",
+        "...KCK....KCK...",
+        "...KcK....KcK...",
+        "....KCK..KCK....",
+        "....KcK..KcK....",
+        ".....KCKKCK.....",
+        ".....KCKKCK.....",
+        "......KGGK......",
+        ".....KHWAHK.....",
+        "....KHWAAAHK....",
+        "....KHAAAADK....",
+        "....KHAAAADK....",
+        ".....KHAADK.....",
+        "......KHDK......",
+        ".......KK......."
+      ]
+    },
+
+    // 苔甲の鎧：厚革の胴着の形を甲羅の色に。肩と帯に苔
+    iconItemMossShellArmor: {
+      palette: { ".": null, "K": "#0e1410", "A": "#4f7d78", "H": "#86b0a8", "D": "#2b4a48",
+                 "M": "#4f8a33", "F": "#a6d66a" },
+      pixels: [
+        "....KK....KK....",
+        "..KKMMK..KMMKK..",
+        ".KMFAAHKKHAAFMK.",
+        "KHAAAAAHHAAAAAHK",
+        "KHAAADAAAADAAADK",
+        "KHAAAAAAAAAAAADK",
+        ".KHAADAAAADAADK.",
+        "..KHAAAAAAAADK..",
+        "..KHADAAAADADK..",
+        "..KMMMMFFMMMMK..",
+        "..KHADAAAADADK..",
+        "..KHAAAAAAAADK..",
+        "...KHDDDDDDDK...",
+        "....KKKKKKKK....",
+        "................",
+        "................"
+      ]
     }
   });
+
+  /**
+   * コケ胞子（コケキノコの素材。2026-10-21）：眠り花粉と同じ形を、苔の緑に塗り替えた（仮の絵）。
+   * まわりの粒は、コケキノコの笠のまだらと同じ黄緑
+   */
+  /**
+   * 神鳥の羽（蘇生の道具。2026-10-21）：若葉の羽根と同じ形を、白と金に塗り替えた（仮の絵）
+   */
+  var leaf = (NS.rawData.sprites || {}).iconItemLeafFeather;
+  if (leaf) {
+    NS.extend("sprites", {
+      iconItemDivineFeather: {
+        pixels: leaf.pixels,
+        palette: { ".": null, "K": "#4a3410", "N": "#9a7020", "D": "#c89a30", "A": "#f0d070",
+                   "H": "#fff0b0", "P": "#fffbe8", "Q": "#ffffff" }
+      }
+    });
+  }
+
+  var pollen = (NS.rawData.sprites || {}).iconItemSleepPollen;
+  if (pollen) {
+    NS.extend("sprites", {
+      iconItemMossSpore: {
+        pixels: pollen.pixels,
+        palette: { ".": null, "K": "#142014", "D": "#3f6a3a", "A": "#6f9a52", "H": "#b8d890", "Y": "#d8ec9a" }
+      }
+    });
+  }
+
+  /**
+   * 風鳴りの羽（ツリガネの素材。2026-10-22）：灰の羽根と同じ形を、ツリガネの翼の黒紫に塗り替え、
+   * 軸だけ風の色（薄い青緑）にした（仮の絵）
+   */
+  var ash = (NS.rawData.sprites || {}).iconItemAshFeather;
+  if (ash) {
+    NS.extend("sprites", {
+      iconItemWindChimeFeather: {
+        pixels: ash.pixels,
+        palette: { ".": null, "K": "#07050c", "N": "#1e1830", "D": "#2c2444", "A": "#4a3e66",
+                   "H": "#7a6a9c", "P": "#9a8cc0", "Q": "#d6f4ee" }
+      }
+    });
+  }
+
+  /**
+   * 弔いの小鐘（ツリガネが落とす装備。2026-10-22）：黒紫の紐で吊った、くすんだ金の小さな鐘（仮の絵）
+   */
+  NS.extend("sprites", {
+    iconItemMourningBell: {
+      palette: { ".": null, "K": "#1a1408", "N": "#4a3a1c", "D": "#7a6030", "A": "#a88a48",
+                 "H": "#d8bc78", "P": "#f4e6b8", "R": "#4a3e66" },
+      pixels: [
+        "................",
+        ".......KK.......",
+        "......KRRK......",
+        "......KRRK......",
+        ".....KKNNKK.....",
+        "....KNDAHDNK....",
+        "....KDAHPADK....",
+        "...KNDAHPADNK...",
+        "...KDAAHPAADK...",
+        "...KDAAHHAADK...",
+        "..KNDAAAAAADNK..",
+        "..KDDAAAAAADDK..",
+        ".KNNNNNNNNNNNNK.",
+        ".KHPPHHHHHHPPHK.",
+        "..KKKKKDDKKKKK..",
+        ".......KK......."
+      ]
+    }
+  });
+
+  /**
+   * 蒼雷の鱗（ザンガルドの素材。2026-10-26）：黄泉竜の鱗と同じ形を、ザンガルドの青に塗り替えた（作者が確定）
+   */
+  var scale = (NS.rawData.sprites || {}).iconItemDragonScale;
+  if (scale) {
+    NS.extend("sprites", {
+      iconItemBlueThunderScale: {
+        pixels: scale.pixels,
+        palette: { ".": null, "K": "#0a0d24", "M": "#1d3a8a", "P": "#2a5cc0", "L": "#3f86e0",
+                   "H": "#a8e0fa" }
+      }
+    });
+  }
+
+  /**
+   * 金角のかけら（ザンガルドの素材。2026-10-26）：折れた金の角の先。根元の割れ口に雷の水色がのぞく（作者が確定）。
+   * 色はザンガルドの角（sprites_marsh.js の thunderDragon の Y・G・y・l）
+   */
+  NS.extend("sprites", {
+    iconItemGoldHornShard: {
+      palette: { ".": null, "K": "#2a1606", "y": "#a8610f", "G": "#e09a14", "Y": "#ffc928",
+                 "l": "#ffe35a", "W": "#fff6b8", "A": "#8ae8ff" },
+      pixels: [
+        "................",
+        "..........K.....",
+        ".........KWK....",
+        ".........KlK....",
+        "........KlYK....",
+        "........KlYGK...",
+        ".......KlYYGK...",
+        ".......KlYGGK...",
+        "......KlYYGyK...",
+        "......KlYGGyK...",
+        ".....KlYYGGyK...",
+        ".....KWYGGyyK...",
+        "....KAAWAyAAK...",
+        "....KKAKAKAKK...",
+        "......K.K.K.....",
+        "................"
+      ]
+    }
+  });
+
+  /**
+   * 蔦這う回廊の素材と装備（2026-10-27）。どれも既存の絵の形を借りて塗り替えた仮の絵（作者が見て決める）。
+   *   灯り苔       … 光る鱗粉の形を、光る苔の緑に
+   *   絡み主根     … ねじれ蔦の形を、根の茶色に
+   *   痺れよけの鱗飾り … 毒よけの護符の形を、蒼雷の鱗の青と黄色の火花に
+   *   声守りの鈴   … 眠りよけの鈴の形を、骨の白と風鳴りの羽の黒紫のひもに
+   *   呪いよけの蔦輪 … 竜牙の指輪の形を、蔦の緑の輪と深淵の欠片の紫に
+   *   風鳴りの胴衣 … 厚革の胴着の形を、ツリガネの黒紫と風の青緑に
+   *   蒼雷の剣     … 若枝の剣の形を、青い刃と金のつばに
+   *   蔦断ちの護符 … 若芽の護符の形を、蔦の鎖と灯り苔の光に
+   */
+  var sprites = NS.rawData.sprites || {};
+  var recolor = {
+    iconItemGlowMoss: { from: "iconItemGlowDust",
+      palette: { ".": null, "K": "#0c1a10", "N": "#2f5a32", "D": "#5f9a4a", "Y": "#a8f070",
+                 "H": "#d8ffb0", "W": "#f4fff0" } },
+    iconItemTangledTaproot: { from: "iconItemTwistedVine",
+      palette: { ".": null, "K": "#1a1008", "M": "#6a4424", "L": "#9a6a3a", "H": "#d0a070" } },
+    iconItemParalysisWard: { from: "iconItemVenomWard",
+      palette: { ".": null, "K": "#0a0d24", "C": "#4f7a2c", "I": "#a8e0fa", "J": "#3f86e0",
+                 "Q": "#ffe35a", "G": "#b8d890" } },
+    iconItemSealWard: { from: "iconItemSleepWard",
+      palette: { ".": null, "K": "#14121c", "H": "#f4f4ec", "A": "#c8ccc4", "D": "#7a8080",
+                 "R": "#4a3e66", "r": "#2c2444", "P": "#d6f4ee" } },
+    iconItemCurseWard: { from: "iconItemFangRing",
+      palette: { ".": null, "K": "#0c1410", "A": "#44704e", "H": "#a0d8a0", "D": "#24402c",
+                 "F": "#b890e8", "G": "#6a4a9a", "V": "#8b6fd6" } },
+    iconItemWindChimeVest: { from: "iconItemThickLeatherVest",
+      palette: { ".": null, "K": "#07050c", "A": "#4a3e66", "H": "#7a6a9c", "D": "#2c2444",
+                 "S": "#d6f4ee", "B": "#1e1830", "G": "#8ad8c8" } },
+    iconItemBlueThunderBlade: { from: "iconItemSproutBlade",
+      palette: { ".": null, "K": "#0a0d24", "H": "#e8f8ff", "B": "#a8e0fa", "D": "#2a5cc0",
+                 "G": "#a8610f", "g": "#ffc928", "A": "#3a2817", "a": "#1c130a", "O": "#ffe35a" } },
+    iconItemIvyBreakerCharm: { from: "iconItemSproutCharm",
+      palette: { ".": null, "K": "#0c1410", "C": "#6aa070", "c": "#44704e", "A": "#5f9a4a",
+                 "H": "#a8f070", "D": "#2f5a32", "W": "#f4fff0", "G": "#d8bc78" } }
+  };
+  var ivyIcons = {};
+  for (var iconId in recolor) {
+    var base = sprites[recolor[iconId].from];
+    if (base) ivyIcons[iconId] = { pixels: base.pixels, palette: recolor[iconId].palette };
+  }
+  NS.extend("sprites", ivyIcons);
 })(window.MyGame);

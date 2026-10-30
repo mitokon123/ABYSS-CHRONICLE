@@ -204,10 +204,18 @@
    *
    * ★ 新しいステージの宝箱に素材を入れたいときは、
    *   dungeons.js の featureTables に足すだけでよい（このファイルは変更不要）。
+   * ★ 1件に minFloor / maxFloor を書くと、その階でだけ出る（出現の表と同じ書き方。
+   *   蔦這う回廊の絡み主根は B4F だけ。2026-10-27）
    */
-  FeatureSystem.prototype._effectFor = function (definition, type) {
+  FeatureSystem.prototype._effectFor = function (definition, type, floor) {
     var effect = definition.effect || {};
     var extra = (this.dungeon.featureTables || {})[type];
+    if (extra && floor !== undefined) {
+      extra = extra.filter(function (entry) {
+        return (entry.minFloor === undefined || floor >= entry.minFloor) &&
+               (entry.maxFloor === undefined || floor <= entry.maxFloor);
+      });
+    }
     if (!extra || !extra.length || !effect.table) return effect;
 
     // 元の effect は共有物なので、書き換えずに複製してから足す
@@ -232,13 +240,14 @@
    * 仕掛けを踏んだときの処理を行う。
    * @param {object} feature place() が返した1件
    * @param {MyGame.Game} game
+   * @param {number} [floor] いまの階（featureTables の minFloor / maxFloor に使う）
    * @returns {string[]} 画面に出す文章
    */
-  FeatureSystem.prototype.resolve = function (feature, game) {
+  FeatureSystem.prototype.resolve = function (feature, game, floor) {
     if (!feature || feature.used) return [];
 
     var definition = feature.definition || {};
-    var effect = this._effectFor(definition, feature.type);
+    var effect = this._effectFor(definition, feature.type, floor);
     var messages = [];
 
     // 踏んだこと自体の知らせ（「宝箱を見つけた!」など）

@@ -258,6 +258,63 @@
       unlockedBy: "venomMarsh",
       price: 1000,
       effects: [ { type: "firstStrike" } ]
+    },
+
+    // --- 蔦這う回廊をクリアすると謎の商人が売る加護（作者の指定 2026-10-27）---
+    //
+    // 回廊で味わった「動きを奪われる」への備えと、萌芽の穴の特性（脱皮・放電・追い風）を仲間全員に掛ける版。
+    // 効果・値段は作者が決めたもの。出やすさ（weight）は私の案で作者が確定（2026-10-28。高いものほど出にくくしてある）
+    // ★ 効果が同じ種類の特性を持つ仲間がいるとき：
+    //   逆巻く雷は放電（20%）と別々に判定する（BattleSystem._applyCounterStatus が見つかった効果を全部回す）。
+    //   解き放ち・抜け風は特性と重ならず、どちらか1つだけが働く（_findEffect が最初の1つを返す）
+
+    ivyWard: {
+      id: "ivyWard",
+      name: "蔦払い",
+      description: "仲間全員の麻痺・眠り・封印の耐性が4上がる。",
+      weight: 0.7,
+      locked: true,
+      unlockedBy: "ivyCorridor",
+      price: 750,
+      effects: [
+        { type: "resistBonus", status: "paralysis", value: 4 },
+        { type: "resistBonus", status: "sleep", value: 4 },
+        { type: "resistBonus", status: "seal", value: 4 }
+      ]
+    },
+
+    breakFree: {
+      id: "breakFree",
+      name: "解き放ち",
+      description: "ターンの終わりに状態異常に掛かっていると、35%で自分で治す。",
+      weight: 0.5,
+      locked: true,
+      unlockedBy: "ivyCorridor",
+      price: 1000,
+      effects: [ { type: "shedStatus", chance: 0.35 } ]
+    },
+
+    backlashThunder: {
+      id: "backlashThunder",
+      name: "逆巻く雷",
+      description: "攻撃を受けると、20%で相手を麻痺させる。",
+      weight: 0.5,
+      locked: true,
+      unlockedBy: "ivyCorridor",
+      price: 1200,
+      effects: [ { type: "counterStatus", status: "paralysis", chance: 0.2, trigger: "hit" } ]
+    },
+
+    // 特性「追い風」は2倍。加護は作者の指定で 1.88倍（2倍より少し弱く）
+    slipWind: {
+      id: "slipWind",
+      name: "抜け風",
+      description: "戦闘の最初の2ターン、仲間全員の素早さが1.88倍になる。",
+      weight: 0.35,
+      locked: true,
+      unlockedBy: "ivyCorridor",
+      price: 1500,
+      effects: [ { type: "tailwind", value: 1.88, turns: 2 } ]
     }
   };
 })(window.MyGame);

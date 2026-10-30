@@ -3,7 +3,7 @@
  * 挑めるダンジョン（ステージ）の一覧。拠点の「ダンジョンへ潜る」で選ぶ。
  *
  * order       : 選択画面での並び順
- * region      : どの地方（穴）にあるか。data/regions.js の id（今は全て "cradle"＝揺籃の穴）
+ * region      : どの地方（穴）にあるか。data/regions.js の id（"cradle"＝揺籃の穴・"houga"＝萌芽の穴）
  * name        : 表示名
  * subtitle    : 一覧に出す短い説明
  * description : 詳細に出す説明
@@ -40,9 +40,12 @@
  *   薬草・回復薬・精気の実はどのダンジョンでも出続ける。
  *   ここにはその場所で手に入る素材を並べる。書き方はドロップと同じ：
  *     chest: [{ item, weight, min, max }]
+ *   minFloor / maxFloor を書くと、その階だけで出る（例: 回廊の絡み主根は minFloor: 4 で B4F だけ）
  *   ★ 主が落とす素材（苔むした核・灼熱の牙）は入れない。
  *     倒すこと自体に意味を残すため
  * boss        : 最深階に出るボスのid（data/bosses.js を参照）
+ *   書かない区画は「主なし」。最深階の階段が出口になり、抜けるとクリア（結果は「踏破」。蔦這う回廊 2026-10-27）
+ * ready       : false と書くと「準備中」（名前は選択画面に出るが入れない）。中身を作り終えたら行ごと消す（v1.0.0）
  * events      : 一度きりの出来事（決まった階で必ず起きる戦い）。1件に書けるもの
  *   id               : 識別子。**済ませたかどうかをこのidでセーブに残す**ので変えないこと
  *   floor            : 起きる階
@@ -50,7 +53,7 @@
  *   onlyBeforeClear  : true なら、そのダンジョンをクリアした後は起きない
  *   enemy            : 相手の種族id。その階の出現表に同じ種族があれば、
  *                      倍率（statMultiplier）と行動の順番（actionPattern）もそこから引く
- *   bgm              : 戦闘の曲（data/audio.js の bgm）。省略で通常の戦闘曲
+ *   bgm              : 戦闘の曲（data/audio.js の bgm）。省略でその穴のふつうの戦闘曲（data/regions.js の battleBgm）
  *   message          : 戦闘の始めの一言（data/messages.js の events のキー）
  *   allowFlee / allowScout : 逃げられるか・誘えるか（省略で可）
  *   keepItemsOnDefeat: true なら、負けても拾ったものを失わない
@@ -88,6 +91,69 @@
  */
 (function (NS) {
   "use strict";
+
+  /**
+   * --- 蔦這う回廊の出現の表の1件ずつ（階ごとの表で使い回すので、先に置いておく） ---
+   * 中身の説明は ivyCorridor の encounter のコメントを参照
+   */
+  // カゲヅタ（作者の指定 2026-10-21）：技を使う確率 55%・PP ×1.25。
+  // 経験値・ゴールドは ×1.5（2026-10-27 作者の指定。種族の 22 / 9 は揺籃の穴の値のままで、回廊のほかの種族の約半分だったため）
+  var IVY_KAGE = { species: "kageZuta", weight: 0.6,
+    skills: ["sapStrength", "cure", "slowDance", "darkNebula"],
+    skillRate: 0.55,
+    statMultiplier: { pp: 1.25 },
+    rewardMultiplier: 1.5 };
+  // ヌマボネ（作者の指定 2026-10-21）：サイレス・不吉な舞を 35%
+  var IVY_BONE = { species: "marshBone", weight: 0.7,
+    skills: ["sealSong", "curseSong"],
+    skillRate: 0.35 };
+  // コケキノコ（作者の指定 2026-10-21）：しびれ粉 60%・堅守の陣 40%、技を使う確率 30%
+  var IVY_MOSS = { species: "mossShroom", weight: 0.6,
+    skills: ["numbPowder", "fortressForm"],
+    skillWeights: { numbPowder: 0.6, fortressForm: 0.4 },
+    skillRate: 0.3 };
+  // ツリガネ（作者の指定 2026-10-22）：デス 80%・ゲイル 20%、技を使う確率 40%。重み 0.4。1体だけの戦いにはしない
+  var IVY_BELL = { species: "tsurigane", weight: 0.4,
+    skills: ["death", "gale"],
+    skillWeights: { death: 0.8, gale: 0.2 },
+    skillRate: 0.4 };
+  // ザンガルド（作者の指定 2026-10-26）：技を使う確率 50%。そのうち稲妻斬り 75%・必ずクリティカルの通常攻撃 25%。重み 0.35。
+  // 二連斬りは使わせない（仲間のときだけ）。criticalAttack は技ではなく「必ずクリティカルの通常攻撃」の選択肢
+  // （skillWeights にだけ書く。BattleSystem._chooseEnemyAction）
+  // ★ PP が尽きて稲妻斬りを撃てなくなったら、毎手番「必ずクリティカルの通常攻撃」だけになる
+  //   （作者の指定 2026-10-27。そこまで長引く戦いはまず無いので、長引かせた側への罰。BattleSystem._outOfSkills）
+  var IVY_ZAN = { species: "thunderDragon", weight: 0.35,
+    skills: ["thunderSlash"],
+    skillWeights: { thunderSlash: 75, criticalAttack: 25 },
+    skillRate: 0.5 };
+  /**
+   * シニガミ（作者の指定 2026-10-21）。深い階ほど出やすい（重み 1階0.067 → 4階0.167。最初の 0.1〜0.25 の 2/3）。
+   *   solo        … 出たら1体だけの戦い（ヨミリュウと同じ）
+   *   Lv1 固定    … どのレベル帯でも同じ能力（種族の上限も Lv1）。経験値266・ゴールド166 そのまま
+   *   行動        … 死神の鎌 80%・死の踊り 15%・通常攻撃 5%（技を使う確率 95% を 80:15 に分ける）
+   *   infinitePp  … 敵のあいだ PP が減らない
+   *   effects     … 敵のあいだだけ耐性を上乗せ（種族の +5 に足して、全属性 +9・全状態異常 +10）
+   */
+  /** 回廊の表の1件を、重みだけ変えて複製する（階ごとに出やすさを変えるため。技などの中身はそのまま） */
+  function ivyAt(entry, weight) {
+    var copy = {};
+    for (var key in entry) {
+      if (Object.prototype.hasOwnProperty.call(entry, key)) copy[key] = entry[key];
+    }
+    copy.weight = weight;
+    return copy;
+  }
+  function ivyReaper(weight) {
+    return { species: "shinigami", weight: weight, solo: true, minLevel: 1, maxLevel: 1,
+      skills: ["deathScythe", "deathDance"],
+      skillWeights: { deathScythe: 80, deathDance: 15 },
+      skillRate: 0.95,
+      infinitePp: true,
+      effects: [
+        { type: "resistBonus", element: "all", value: 4 },
+        { type: "resistBonus", status: "all", value: 5 }
+      ] };
+  }
 
   NS.rawData.dungeons = {
     mossyMine: {
@@ -383,6 +449,226 @@
         ]
       },
       boss: "swampLord"
+    },
+
+    /**
+     * ─────────────────────────────────────────────
+     * 萌芽の穴（2つ目の地方。v1.0.0）
+     *
+     * 区画の名前と数は作者が決めたもの（2026-10-05）。揺籃の穴の主を4体記録すると穴が開く（data/regions.js）。
+     * 階の大きさは 40×28（画面の約1.6×1.5枚。地図が主人公に合わせて動く）。
+     *
+     * ★ ready: false … まだ中身（モンスター・主・素材・説明）が無い。
+     *   ダンジョン選択に名前は出るが「準備中」と出て入れない（DungeonSelectScene）。
+     *   encounter・boss・featureTables・subtitle・description を書いたら ready の行を消す（主なしの区画は boss を書かない）。
+     * ★ 敵のレベル帯は Lv22〜33（〜35）の予定（作者）。
+     *   推奨レベルは「実際に遊んで決める。30くらいに抑えたい」（作者 2026-10-05）。
+     *   floors（4）と recommendedLevel（22・25・27・30）は仮。中身を作るときに決め直す
+     * ─────────────────────────────────────────────
+     */
+    sproutHollow: {
+      id: "sproutHollow",
+      order: 5,
+      region: "houga",
+      name: "若葉の洞",
+      // 一言と説明は作者から「おまかせ」（2026-10-09）で私が書いたもの。差し替えてよい
+      subtitle: "若葉に覆われた洞。甘い花粉が眠りを誘う。",
+      description: "萌芽の穴に入ってすぐの、若葉に覆われた洞。\n" +
+                   "柔らかな緑の奥で、芽吹いたばかりの命がひしめいている。\n" +
+                   "甘い花粉の香りに気を許せば、そのまま眠りに落ちる。",
+      floors: 4,
+      recommendedLevel: 22,
+      unlockedBy: null,          // 穴が開いた時点で挑める（穴の条件は regions.js）
+      theme: "houga",
+      generation: { width: 40, height: 28, roomMin: 4, roomMax: 9, roomCount: 13, attempts: 320 },
+      // 階ごとのレベルと体数は作者が決めたもの（2026-10-09）。
+      // 1歩あたりの遭遇率と種族の重みは仮（作者が見て調整する）
+      encounter: {
+        // 階が揺籃の約2.5倍広く歩数が増えるので、揺籃（0.08〜0.10）より少し下げてある
+        rate: 0.07,
+        groupSize: { min: 1, max: 3 },
+        levelRange: { min: 22, max: 25 },
+        // 種族の重みは monsters.js の spawnRate（1.0/1.0/0.8/0.7/0.25）の比のまま。
+        // 合計を 1.00 にしてあるので、数字がそのまま出現率になる
+        //   フタバムシ 27% / ユラツボミ 27% / ワカバドリ 21% / コケガメ 18% / コダマ 7%（珍しい）
+        table: [
+          { species: "futabaMushi", weight: 0.27 },
+          { species: "yuraTsubomi", weight: 0.27 },
+          { species: "wakabaDori",  weight: 0.21 },
+          { species: "kokeGame",    weight: 0.18 },
+          { species: "kodama",      weight: 0.07 }
+        ],
+        perFloor: {
+          "1": { levelRange: { min: 21, max: 23 } },
+          "2": { levelRange: { min: 22, max: 25 } },
+          "3": { levelRange: { min: 22, max: 25 } },
+          "4": { levelRange: { min: 24, max: 25 } }
+        }
+      },
+      // 1階に置く仕掛けの数（作者の依頼で宝箱を増やした 2026-10-14）。
+      // 階が揺籃の約2.5倍広いので、宝箱は既定（1〜2個）の倍ほど。泉と罠は既定のまま（作者の指定「いつもどおり」）。
+      // ★ ここに書くと既定（data/dungeon.js の featureCounts）と丸ごと入れ替わるので、泉と罠も書いておく
+      features: {
+        chest:  { min: 3, max: 4 },
+        spring: { min: 0, max: 1 },
+        trap:   { min: 1, max: 2 }
+      },
+      // 洞の宝箱。倒して集めるのと同じ素材が、探索でも手に入る。
+      // 若木の心材（主のドロップ）は入れない —— 主を倒すこと自体に意味を残すため。
+      // 芽吹きの種はコダマ（珍しい）の素材なので渋くしてある（深層の黄泉竜の鱗と同じ扱い）。
+      // 回復の道具は共通の中身（薬草・精気の実・回復薬）に、深淵の雫を足してある
+      // （敵が Lv20 を超え、薬草の20回復では追いつかなくなるため）
+      featureTables: {
+        chest: [
+          { item: "shedHusk",    weight: 0.40, min: 1, max: 2 },
+          { item: "sleepPollen", weight: 0.32, min: 1, max: 1 },
+          { item: "leafFeather", weight: 0.30, min: 1, max: 1 },
+          { item: "mossyShell",  weight: 0.26, min: 1, max: 1 },
+          { item: "sproutSeed",  weight: 0.10, min: 1, max: 1 },
+          { item: "elixir",      weight: 0.12, min: 1, max: 1 }
+        ]
+      },
+      // 主（v1.0.0。強さと行動は作者が決めたもの。data/bosses.js）
+      boss: "hollowLord"
+    },
+
+    ivyCorridor: {
+      id: "ivyCorridor",
+      order: 6,
+      region: "houga",
+      name: "蔦這う回廊",
+      // 一言と説明は作者から「おまかせ」（2026-10-27）で私が書いたもの。差し替えてよい
+      subtitle: "光の届かない回廊。蔦が足を、声を絡め取る。",
+      // 1行は句読点こみで20文字まで（詳細欄の幅。超えると途中で折り返す）
+      description: "若葉の洞の奥へ続く、光の届かない回廊。\n" +
+                   "壁も天井も蔦に覆われ、闇から伸びるものが\n" +
+                   "足を、声を、ときには命さえも絡め取る。",
+      floors: 4,
+      recommendedLevel: 25,
+      unlockedBy: "sproutHollow",
+      theme: "ivy",
+      generation: { width: 40, height: 28, roomMin: 3, roomMax: 7, roomCount: 15, attempts: 340 },
+      /**
+       * コンセプト：光の届かない、絡みつく通路。敵が足止め・しびれ・封印・呪いなど「動きを奪う」技を初めて使う（2026-10-21）。
+       * 出るモンスター：カゲヅタ・ヌマボネ（既存）／コケキノコ（キノコンの亜種）／
+       * ツリガネ（即死の共鳴）／ザンガルド（剣を携えた雷の竜）／シニガミ（珍しい・初見殺し）。
+       * ★ 主はいない（作者 2026-10-27）。最深階（B4F）の階段が出口で、抜けるとクリア（boss を書かない）。
+       * ★ 2026-10-28 に ready の行を消して遊べるようにした（v1.0.1 の締め。作者の指定）
+       */
+      encounter: {
+        rate: 0.07,
+        groupSize: { min: 1, max: 3 },
+        // 敵のレベルは Lv24〜27（作者 2026-10-21）。階ごとの分け方は下の perFloor（作者から任された 2026-10-27）
+        levelRange: { min: 24, max: 27 },
+        // 種族ごとの役（重みは perFloor に階ごとに書いてある）
+        //   カゲヅタ：ちからぬき・足止めの舞で弱らせ、キュアで癒やし、ダークネビュラで全体を削る（技55%・PP ×1.25）
+        //   ヌマボネ：サイレス（封印）と不吉な舞（全体に呪い）を35%。呪いは受けるダメージ ×1.3 なので、
+        //             不吉な舞 → 高い攻撃（Lv24〜27 で48〜55）の通常攻撃がつながる
+        //   コケキノコ：しびれ粉（全体に麻痺45%）60%・堅守の陣 40%、技30%。堅守の陣が掛かっているあいだはしびれ粉だけ
+        //   ツリガネ：デス（1体に即死35%）80%・ゲイル 20%、技40%。即死の耐性が無い仲間は、運が悪いと一撃で倒れる
+        //   ザンガルド：技50%。稲妻斬り 75%・必ずクリティカルの通常攻撃 25%（1手番あたり 37.5% / 12.5%）
+        //   中身は このファイルの頭の IVY_KAGE / IVY_BONE / IVY_MOSS / IVY_BELL / IVY_ZAN / ivyReaper（どれも仲間にすると外れる）
+        table: [ IVY_KAGE, IVY_BONE, IVY_MOSS, IVY_BELL, IVY_ZAN ],
+        /**
+         * 階ごとの出方（作者が決めたもの 2026-10-28。前日の私の案を作者が直した）。
+         * 重みは作者の表の % をそのまま書いてある（1体ぶんの枠でその種族が選ばれる割合）。
+         *   浅い階は、弱らせる・縛る相手（カゲヅタ・ヌマボネ・コケキノコ）で「動きを奪われる」に慣れる。
+         *   深い階ほど、即死のツリガネと一撃の重いザンガルドが増え、体数も増える。
+         * シニガミは階ごとの表にだけ入る（深い階ほど出やすい。作者の指定 2026-10-21）。
+         *
+         *   階   Lv     体数（1/2/3体）   カゲヅタ ヌマボネ コケキノコ ツリガネ ザンガルド シニガミ
+         *   B1F 24〜25  50/50/ 0%         30%     30%     20%       8%       8%        4%
+         *   B2F 24〜26  30/50/20%         25%     25%     15%      15%      15%        5%
+         *   B3F 25〜27  20/50/30%         20%     20%     23%      15%      17%        5%
+         *   B4F 26〜27  20/40/40%         16%     12%     15%      20%      29%        7%
+         *   ★ B4F は 2026-10-28 に作者が直した（カゲヅタ +1・ザンガルド +4・シニガミ -1）。合計 99% なので、実際は 99 で割った割合
+         *     （重みは相対なので、ほぼ表のまま）
+         *   （1回の戦闘で会う割合は README の表）
+         */
+        perFloor: {
+          "1": {
+            levelRange: { min: 24, max: 25 },
+            groupSize: [ { count: 1, weight: 0.5 }, { count: 2, weight: 0.5 } ],
+            table: [ ivyAt(IVY_KAGE, 0.30), ivyAt(IVY_BONE, 0.30), ivyAt(IVY_MOSS, 0.20),
+                     ivyAt(IVY_BELL, 0.08), ivyAt(IVY_ZAN, 0.08), ivyReaper(0.04) ]
+          },
+          "2": {
+            levelRange: { min: 24, max: 26 },
+            groupSize: [ { count: 1, weight: 0.3 }, { count: 2, weight: 0.5 }, { count: 3, weight: 0.2 } ],
+            table: [ ivyAt(IVY_KAGE, 0.25), ivyAt(IVY_BONE, 0.25), ivyAt(IVY_MOSS, 0.15),
+                     ivyAt(IVY_BELL, 0.15), ivyAt(IVY_ZAN, 0.15), ivyReaper(0.05) ]
+          },
+          "3": {
+            levelRange: { min: 25, max: 27 },
+            groupSize: [ { count: 1, weight: 0.2 }, { count: 2, weight: 0.5 }, { count: 3, weight: 0.3 } ],
+            table: [ ivyAt(IVY_KAGE, 0.20), ivyAt(IVY_BONE, 0.20), ivyAt(IVY_MOSS, 0.23),
+                     ivyAt(IVY_BELL, 0.15), ivyAt(IVY_ZAN, 0.17), ivyReaper(0.05) ]
+          },
+          "4": {
+            levelRange: { min: 26, max: 27 },
+            groupSize: [ { count: 1, weight: 0.2 }, { count: 2, weight: 0.4 }, { count: 3, weight: 0.4 } ],
+            table: [ ivyAt(IVY_KAGE, 0.16), ivyAt(IVY_BONE, 0.12), ivyAt(IVY_MOSS, 0.15),
+                     ivyAt(IVY_BELL, 0.20), ivyAt(IVY_ZAN, 0.29), ivyReaper(0.07) ]
+          }
+        }
+      },
+      // 1階に置く仕掛けの数。階の広さが若葉の洞と同じなので、数も洞にそろえてある
+      // （★ ここに書くと既定と丸ごと入れ替わるので、泉と罠も書いておく）
+      features: {
+        chest:  { min: 3, max: 4 },
+        spring: { min: 0, max: 1 },
+        trap:   { min: 1, max: 2 }
+      },
+      // 回廊の宝箱（作者の指定 2026-10-27「このステージの素材を出す」）。
+      // 灯り苔・絡み主根は宝箱でしか手に入らない回廊の素材。
+      //   灯り苔はほかの素材と同じくらい、絡み主根は B4F だけ（minFloor: 4。FeatureSystem）で 12%。
+      // 金角のかけら（ザンガルドの珍しいドロップ）は渋くしてある（洞の芽吹きの種と同じ扱い）。
+      // 髑髏の護符・弔いの小鐘・神鳥の羽は装備・貴重品なので入れない
+      featureTables: {
+        chest: [
+          { item: "twistedVine",      weight: 0.30, min: 1, max: 2 },
+          { item: "rustedBone",       weight: 0.28, min: 1, max: 1 },
+          { item: "mossSpore",        weight: 0.28, min: 1, max: 2 },
+          { item: "windChimeFeather", weight: 0.28, min: 1, max: 1 },
+          { item: "blueThunderScale", weight: 0.26, min: 1, max: 1 },
+          { item: "glowMoss",         weight: 0.28, min: 1, max: 2 },
+          { item: "abyssFragment",    weight: 0.14, min: 1, max: 1 },
+          { item: "goldHornShard",    weight: 0.08, min: 1, max: 1 },
+          // 重み 0.48 で B4F の宝箱の 12%（作者の指定 2026-10-27。最初の 0.18 では 4.9% だった）
+          { item: "tangledTaproot",   weight: 0.48, min: 1, max: 1, minFloor: 4 },
+          { item: "elixir",           weight: 0.12, min: 1, max: 1 }
+        ]
+      }
+    },
+
+    sporeBed: {
+      id: "sporeBed",
+      order: 7,
+      region: "houga",
+      name: "胞子煙る菌床",
+      subtitle: "",
+      description: "",
+      floors: 4,
+      recommendedLevel: 27,
+      unlockedBy: "ivyCorridor",
+      theme: "spore",
+      generation: { width: 40, height: 28, roomMin: 4, roomMax: 9, roomCount: 12, attempts: 320 },
+      ready: false
+    },
+
+    ancientRoots: {
+      id: "ancientRoots",
+      order: 8,
+      region: "houga",
+      name: "千年樹の根底",
+      subtitle: "",
+      description: "",
+      floors: 4,
+      recommendedLevel: 30,
+      unlockedBy: "sporeBed",
+      theme: "rootdeep",
+      generation: { width: 40, height: 28, roomMin: 4, roomMax: 10, roomCount: 11, attempts: 320 },
+      ready: false
     }
   };
 })(window.MyGame);

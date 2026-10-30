@@ -241,9 +241,14 @@
       discovery: this.discovery,
       tutorial: this.tutorial,
       story: this.story,
-      // 主人公の名前・服の色・性別・一人称。冒険ごとに違うのでセーブに入れる
+      // 主人公の名前・見た目・性別・一人称。冒険ごとに違うのでセーブに入れる
       playerName: this.playerName,
       playerColor: this.playerColor,
+      playerPants: this.playerPants,
+      playerHair: this.playerHair,
+      playerHairColor: this.playerHairColor,
+      playerAcc: this.playerAcc,
+      playerAccColor: this.playerAccColor,
       playerGender: this.playerGender,
       playerFirstPerson: this.playerFirstPerson,
       // 一度きりの出来事（ヨミリュウの待ち伏せなど）を済ませたか
@@ -320,6 +325,11 @@
       story: this.story,
       playerName: this.playerName,
       playerColor: this.playerColor,
+      playerPants: this.playerPants,
+      playerHair: this.playerHair,
+      playerHairColor: this.playerHairColor,
+      playerAcc: this.playerAcc,
+      playerAccColor: this.playerAccColor,
       playerGender: this.playerGender,
       playerFirstPerson: this.playerFirstPerson,
       doneEvents: this.doneEvents,
@@ -355,6 +365,12 @@
     // 名前と色。古いセーブには無いので、その場合は既定のまま
     this.playerName = state.playerName || null;
     this.playerColor = state.playerColor || null;
+    // 新しい絵の見た目（v1.0.2）。無ければ data/player.js の既定（defaultPants など。飾りは無し）
+    this.playerPants = state.playerPants || null;
+    this.playerHair = state.playerHair || null;
+    this.playerHairColor = state.playerHairColor || null;
+    this.playerAcc = state.playerAcc || null;
+    this.playerAccColor = state.playerAccColor || null;
     // 性別・一人称。古いセーブには無いので、その場合は既定（data/player.js）
     this.playerGender = state.playerGender || null;
     this.playerFirstPerson = state.playerFirstPerson || null;
@@ -849,6 +865,20 @@
     if (target.isFainted && target.isFainted()) return { success: false, reason: "fainted" };
 
     // 状態異常を治す技（クレンズ）。決まりは戦闘と同じ（BattleSystem.cureStatuses）
+    // 味方全体の技（清めの雨）は、選んだ相手に関係なく連れている全員を治す
+    if (skill.cureStatus && !skill.heal && skill.target === "allAllies") {
+      var names = [];
+      var members = (this.party && this.party.getMembers) ? this.party.getMembers() : [];
+      for (var m = 0; m < members.length; m++) {
+        if (members[m].isFainted && members[m].isFainted()) continue;
+        NS.BattleSystem.cureStatuses(members[m], skill.cureStatus).forEach(function (def) {
+          if (names.indexOf(def.name) < 0) names.push(def.name);
+        });
+      }
+      if (names.length === 0) return { success: false, reason: "nothingToCure" };
+      if (skill.pp && user.payPp) user.payPp(skill.pp);
+      return { success: true, cured: names };
+    }
     if (skill.cureStatus && !skill.heal) {
       var cured = NS.BattleSystem.cureStatuses(target, skill.cureStatus);
       if (cured.length === 0) return { success: false, reason: "nothingToCure" };
@@ -1073,6 +1103,16 @@
     for (var i = 0; i < skills.length; i++) {
       this.discovery.markSkillLearned(skills[i]);
     }
+  };
+
+  /**
+   * ストーリーを全部クリアしたか（v1.0.0。シニガミを誘える条件。種族の scoutableWhen.storyComplete）。
+   * 最後の物語の場面（data/story.js の id "ending"）を見たら true。
+   * ★ いまは最後の物語が無いので、いつも false（シニガミはまだ誘えない）。
+   *   最後の物語を足すときは、その場面の id を "ending" にする（違う id にするなら、ここも直す）
+   */
+  Game.prototype.isStoryComplete = function () {
+    return !!(this.story && this.story.seen && this.story.seen.ending);
   };
 
   /**

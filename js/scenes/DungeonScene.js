@@ -402,6 +402,9 @@
       return;
     }
 
+    // 押した方を向く（壁で進めなくても向きは変わる。v1.0.2 の4方向の絵で使う）
+    this._facing = dRow < 0 ? "up" : (dRow > 0 ? "down" : (dCol < 0 ? "left" : "right"));
+
     if (this._moveTimer <= 0) {
       var moved = this.player.tryMove(dCol, dRow, this.dungeon);
       this._moveTimer = MOVE_DELAY;
@@ -468,7 +471,7 @@
 
   /** 仕掛けを実行し、結果を通知する */
   DungeonScene.prototype._resolveFeature = function (feature) {
-    var messages = this.features.resolve(feature, this.game);
+    var messages = this.features.resolve(feature, this.game, this.floor);
     if (messages.length > 0) this._showNotice(messages.join("　"));
 
     // 仕掛けごとの音（data/features.js の se）。書いていない仕掛けは無音
@@ -583,6 +586,20 @@
       return;
     }
 
+    // 主のいない区画（data/dungeons.js に boss を書いていない。蔦這う回廊）は、
+    // 最深階の階段が出口になる。抜けたらクリア（2026-10-27 作者の指定）
+    if (this.floor >= this.getFinalFloor()) {
+      this._openPrompt(texts.exitPrompt, [
+        { label: texts.choiceExit || "抜ける", value: "go" },
+        { label: texts.choiceReturn || "戻る", value: "home" },
+        { label: texts.choiceStay || "やめる", value: "stay" }
+      ], function (choice) {
+        if (choice === "go") self._passThrough();
+        else if (choice === "home") self._returnToHome(true);
+      });
+      return;
+    }
+
     this._openPrompt(texts.stairsPrompt, [
       { label: texts.choiceDescend || "降りる", value: "go" },
       { label: texts.choiceReturn || "戻る", value: "home" },
@@ -607,9 +624,11 @@
       ? texts.descend.replace("{floor}", this.floor)
       : null;
 
-    // 次がボス階なら知らせる
-    if (this._getBossForFloor(this.floor) && texts.bossAhead) {
-      notice = notice ? (notice + "   " + texts.bossAhead) : texts.bossAhead;
+    // 次がボス階なら知らせる。主のいない区画では、出口のある階だと知らせる
+    var ahead = this._getBossForFloor(this.floor) ? texts.bossAhead
+      : (this.floor >= this.getFinalFloor() ? texts.exitAhead : null);
+    if (ahead) {
+      notice = notice ? (notice + "   " + ahead) : ahead;
     }
     this._showNotice(notice);
 
@@ -645,9 +664,20 @@
       group,
       this,                 // 戦闘後に戻るシーン
       // 戻り値をそのまま返すことで、遷移を自前で行ったかどうかを BattleScene へ伝える
-      function (result) { return self._onBattleFinished(result); }
+      function (result) { return self._onBattleFinished(result); },
+      { bgm: this._regionBattleBgm() }
     );
     this._enterBattle(battle);
+  };
+
+  /**
+   * この区画がある穴の、ふつうの戦闘曲（data/regions.js の battleBgm）。
+   * 書いていない穴では null を返し、BattleScene の既定（battle）になる
+   */
+  DungeonScene.prototype._regionBattleBgm = function () {
+    var regionId = this.definition && this.definition.region;
+    var region = regionId ? (this.game.data.regions || {})[regionId] : null;
+    return (region && region.battleBgm) || null;
   };
 
   /**
@@ -715,7 +745,7 @@
         allowFlee: ev.allowFlee !== false,
         allowScout: ev.allowScout !== false,
         introMessage: template ? template.replace("{name}", enemy.getName()) : null,
-        bgm: ev.bgm || null
+        bgm: ev.bgm || this._regionBattleBgm()
       }
     );
     this._enterBattle(battle);
@@ -745,6 +775,8 @@
     var enemy = NS.MonsterInstance.create(boss.species, boss.level, this.game.data, this.random);
     if (!enemy) return;
 
+    // 敵のときだけ使う技（data/monsters.js の enemySkills）があれば入れ替える
+    if (enemy.useEnemySkills) enemy.useEnemySkills();
     // 主としての補正。仲間にすると外れるので、基礎値を上げずに強くできる
     if (enemy.setEncounterMultipliers) enemy.setEncounterMultipliers(boss.statMultiplier);
     // 決まった順番で動く主は、ここで手順を渡す
@@ -753,6 +785,11 @@
     // 全ボス共通のぶん（data/battle.js の bossImmuneToStatus）に、その主だけのぶんを足す
     if (enemy.setBossStatusImmunity) {
       enemy.setBossStatusImmunity(this._bossImmunities(boss));
+    }
+    // 弱体への耐性。主ごとの値（bosses.js の debuffResist）が無ければ全主共通の値（battle.js の bossDebuffResist）
+    if (enemy.setDebuffResist) {
+      enemy.setDebuffResist(typeof boss.debuffResist === "number"
+        ? boss.debuffResist : (this.game.data.battle || {}).bossDebuffResist);
     }
 
     var texts = (this.game.data.messages || {}).boss || {};
@@ -849,6 +886,16 @@
   };
 
   /**
+   * 主のいない区画を、最深階の出口から抜けた。
+   * 主に勝ったときと同じく、その区画はクリア扱いになり次が開く。はじめてならその場でセーブする。
+   * 結果画面の見出しは「討伐」ではなく「踏破」（outcome "passed"）
+   */
+  DungeonScene.prototype._passThrough = function () {
+    var newlyCleared = this.game.markDungeonCleared(this.definition && this.definition.id);
+    this._returnToHome(true, "passed", newlyCleared);
+  };
+
+  /**
    * 戦闘終了後の処理。
    * @returns {boolean} 遷移を自前で行った場合 true（BattleScene 側の復帰処理を抑止する）
    */
@@ -869,7 +916,7 @@
    * 何を持ち帰れたかは endRun の前に控えておく（endRun で記録が消えるため）。
    *
    * @param {boolean} survived 無事に帰れたか（false なら拾ったものを失う）
-   * @param {string} [outcome] "escaped" / "cleared" / "defeated"。省略時は生死から決める
+   * @param {string} [outcome] "escaped" / "cleared" / "passed" / "defeated"。省略時は生死から決める
    * @param {boolean} [autoSave] 帰り着いた時点でセーブするか（はじめてのクリアのとき）
    */
   DungeonScene.prototype._returnToHome = function (survived, outcome, autoSave) {
@@ -914,24 +961,30 @@
 
     this.renderer.clear(this.theme.background || L.background || "#05070d", w, h);
 
-    // タイル描画
-    for (var r = 0; r < this.dungeon.height; r++) {
-      for (var c = 0; c < this.dungeon.width; c++) {
-        var tile = this.dungeon.tileAt(c, r);
-        if (!tile) continue;
+    // 地図は「カメラ」の分だけずらして描く（画面より大きい階を、主人公に合わせて見せる。v1.0.0）。
+    // 画面ちょうどの大きさの階（25×18）では、ずれは 0 で今までと同じ
+    var viewH = h - ((L.infoBar || {}).height || 24);
+    var cam = this._camera(w, viewH, ts);
+    // ずらすのは、タイルや絵を描く道具（renderer / sprites）と同じ game.ctx
+    var mapCtx = this.game.ctx;
+    mapCtx.save();
+    mapCtx.translate(-cam.x, -cam.y);
 
-        this.renderer.rect(c * ts, r * ts, ts, ts, tileColors[tile.name] || tile.color);
+    // タイル（色と模様）は階ごとに一度だけ描いておき、毎フレームはそれを貼るだけ（_tileLayer）
+    var layer = this._tileLayer(ts, tileColors);
+    mapCtx.drawImage(layer.canvas, 0, 0);
 
-        // 階段はひと目で分かるように重ねて描く。
-        // 絵が用意されていれば絵、無ければ今までどおり記号
-        if (tile.stairs) this._drawStairs(c, r, ts, mark);
-      }
+    // 階段はひと目で分かるように重ねて描く。
+    // 絵が用意されていれば絵、無ければ今までどおり記号
+    for (var s = 0; s < layer.stairs.length; s++) {
+      this._drawStairs(layer.stairs[s].col, layer.stairs[s].row, ts, mark);
     }
 
     this._renderDecorations(ts);
     this._renderFeatures(ts, L.featureMark || {});
 
     this._renderPlayer(ts);
+    mapCtx.restore();
 
     this._renderInfoBar(w, h, L.infoBar || {});
     this._renderPartyStatus(L.partyStatus || {});
@@ -944,6 +997,148 @@
     this.tutorial.render();   // 説明は地図の上に重ねる
     this.fade.render(ctx);    // 階の切り替えの暗幕は、すべての上に重ねる
   };
+
+  /**
+   * カメラの位置（地図の左上から、画面の左上までのずれ。px）。
+   *
+   * 主人公の「見た目の位置」（viewCol / viewRow）を画面の真ん中に置き、地図の端では止める
+   * （地図の外の余白を見せない）。主人公はマス間を滑って動くので、カメラも一緒に滑る。
+   * 地図のほうが画面より小さい向きは、真ん中に寄せる。
+   * 下の情報の帯の裏に主人公が隠れないよう、高さは帯を除いた範囲（viewH）で考える。
+   * 整数に丸めて、ドット絵がにじまないようにする。
+   */
+  DungeonScene.prototype._camera = function (viewW, viewH, ts) {
+    var mapW = this.dungeon.width * ts;
+    var mapH = this.dungeon.height * ts;
+    return {
+      x: Math.round(follow(this.player.viewCol * ts + ts / 2, viewW, mapW)),
+      y: Math.round(follow(this.player.viewRow * ts + ts / 2, viewH, mapH))
+    };
+
+    function follow(center, view, size) {
+      if (size <= view) return (size - view) / 2;
+      return Math.max(0, Math.min(size - view, center - view / 2));
+    }
+  };
+
+  /**
+   * その階のタイル（色と模様）を描いた絵。階が変わったときだけ描き直す。
+   *
+   * 色はテーマの tiles（無ければ data/dungeon.js の色）、模様はテーマの tilePatterns（v1.0.0）。
+   * 模様を書いていないテーマは色だけになる（今までと同じ見た目）。
+   * 模様の書き方は data/dungeonThemes.js の説明を参照。
+   * 乱数は使わず、マスの位置から決めた値で散らすので、何度描いても同じ模様になる。
+   *
+   * @returns {{canvas: HTMLCanvasElement, stairs: {col, row}[]}}
+   */
+  DungeonScene.prototype._tileLayer = function (ts, tileColors) {
+    if (this._tileCache && this._tileCache.dungeon === this.dungeon) return this._tileCache;
+
+    var d = this.dungeon;
+    var canvas = document.createElement("canvas");
+    canvas.width = d.width * ts;
+    canvas.height = d.height * ts;
+    var c2 = canvas.getContext("2d");
+    var patterns = this.theme.tilePatterns || {};
+    var stairs = [];
+
+    for (var r = 0; r < d.height; r++) {
+      for (var c = 0; c < d.width; c++) {
+        var tile = d.tileAt(c, r);
+        if (!tile) continue;
+        c2.fillStyle = tileColors[tile.name] || tile.color;
+        c2.fillRect(c * ts, r * ts, ts, ts);
+        if (tile.stairs) stairs.push({ col: c, row: r });
+
+        var list = patterns[tile.name] || [];
+        for (var i = 0; i < list.length; i++) {
+          var draw = TILE_PATTERNS[list[i].type];
+          if (draw) draw(c2, list[i], c * ts, r * ts, ts, c, r, i, function (dc, dr) {
+            var next = d.tileAt(c + dc, r + dr);
+            return next ? next.name : null;
+          }, tile.name);
+        }
+      }
+    }
+
+    this._tileCache = { dungeon: d, canvas: canvas, stairs: stairs };
+    return this._tileCache;
+  };
+
+  /**
+   * タイルの模様の描き方（data/dungeonThemes.js の tilePatterns の type）。
+   * どれも fillRect だけで、整数の位置に描く（ドット絵がにじまないように）。
+   *   (ctx, spec, x, y, ts, col, row, index, neighborName(dc, dr), selfName)
+   */
+  var TILE_PATTERNS = {
+    // 粒を散らす。colors から1色ずつ選び、count 個・size 四方
+    speckle: function (ctx, spec, x, y, ts, col, row, index) {
+      var colors = spec.colors || ["#000000"];
+      var size = spec.size || 2;
+      for (var k = 0; k < (spec.count || 4); k++) {
+        ctx.fillStyle = colors[Math.floor(hash(col, row, index * 31 + k) * colors.length)];
+        ctx.fillRect(x + Math.floor(hash(col, row, index * 31 + k + 7) * (ts - size)),
+                     y + Math.floor(hash(col, row, index * 31 + k + 13) * (ts - size)), size, size);
+      }
+    },
+
+    // 隣が別の種類のタイル（壁から見た床など）の側の縁に、ぎざぎざの帯を描く（草の生え際など）。
+    //   side … "top" / "bottom" / "left" / "right"   width … 帯の太さの最大   color / tipColor … 帯と先端の色
+    edge: function (ctx, spec, x, y, ts, col, row, index, neighborName, selfName) {
+      var side = spec.side || "bottom";
+      var dc = side === "left" ? -1 : side === "right" ? 1 : 0;
+      var dr = side === "top" ? -1 : side === "bottom" ? 1 : 0;
+      var other = neighborName(dc, dr);
+      if (!other || other === selfName) return;
+
+      var width = spec.width || 4;
+      for (var p = 0; p < ts; p += 2) {
+        var len = 1 + Math.floor(hash(col, row, index * 53 + p) * width);
+        ctx.fillStyle = spec.color || "#5fa83a";
+        var tip = spec.tipColor || spec.color || "#5fa83a";
+        if (side === "bottom") { ctx.fillRect(x + p, y + ts - len, 2, len); ctx.fillStyle = tip; ctx.fillRect(x + p, y + ts - len, 2, 1); }
+        if (side === "top")    { ctx.fillRect(x + p, y, 2, len); ctx.fillStyle = tip; ctx.fillRect(x + p, y + len - 1, 2, 1); }
+        if (side === "left")   { ctx.fillRect(x, y + p, len, 2); ctx.fillStyle = tip; ctx.fillRect(x + len - 1, y + p, 1, 2); }
+        if (side === "right")  { ctx.fillRect(x + ts - len, y + p, len, 2); ctx.fillStyle = tip; ctx.fillRect(x + ts - len, y + p, 1, 2); }
+      }
+    },
+
+    // 細い筋がくねくね伸びる（根・ひびなど）。count 本、長さ length マス目ぶん
+    roots: function (ctx, spec, x, y, ts, col, row, index) {
+      ctx.fillStyle = spec.color || "#000000";
+      for (var k = 0; k < (spec.count || 1); k++) {
+        if (hash(col, row, index * 71 + k) > (spec.chance === undefined ? 1 : spec.chance)) continue;
+        var px = Math.floor(hash(col, row, index * 71 + k + 3) * ts);
+        var py = Math.floor(hash(col, row, index * 71 + k + 5) * ts);
+        for (var step = 0; step < (spec.length || 10); step++) {
+          ctx.fillRect(x + px, y + py, 1, 2);
+          py += 2;
+          px += Math.floor(hash(col, row, index * 71 + k * 17 + step) * 3) - 1;
+          if (px < 0 || px >= ts || py >= ts) break;
+        }
+      }
+    },
+
+    // 小さな芽（茎と二枚の葉）を chance の確率で1つ置く
+    sprout: function (ctx, spec, x, y, ts, col, row, index) {
+      if (hash(col, row, index * 97) > (spec.chance || 0.1)) return;
+      var colors = spec.colors || ["#5fa83a", "#8fd45a"];
+      var px = x + 4 + Math.floor(hash(col, row, index * 97 + 1) * (ts - 10));
+      var py = y + 6 + Math.floor(hash(col, row, index * 97 + 2) * (ts - 12));
+      ctx.fillStyle = colors[0];
+      ctx.fillRect(px + 2, py + 2, 1, 4);         // 茎
+      ctx.fillRect(px, py + 1, 2, 2);             // 左の葉
+      ctx.fillStyle = colors[1] || colors[0];
+      ctx.fillRect(px + 3, py, 2, 2);             // 右の葉（明るい）
+      ctx.fillRect(px + 2, py + 1, 1, 1);
+    }
+  };
+
+  /** マスの位置と番号から 0〜1 の決まった値を作る（同じ入力なら必ず同じ値） */
+  function hash(col, row, salt) {
+    var v = Math.sin(col * 127.1 + row * 311.7 + salt * 74.7) * 43758.5453;
+    return v - Math.floor(v);
+  }
 
   /**
    * 階段を1マス分描く。
@@ -975,6 +1170,23 @@
    */
   DungeonScene.prototype._renderPlayer = function (ts) {
     var look = (this.game.data.player || {}).appearance || {};
+
+    // 部品を重ねて作る新しい絵（v1.0.2）。4方向を向き、歩きの上下と腕の振りは絵の中に入っている。
+    // 足をマスの下にそろえ、マスより大きいぶんは上へはみ出す。
+    // 位置は整数にそろえる（小数だと点がにじむ）
+    if (NS.PlayerLook && NS.PlayerLook.usesRig && NS.PlayerLook.usesRig(this.game.data)) {
+      var size = look.rig.mapSize || 40;
+      var frames = NS.PlayerLook.rigFrames(this.game, size);
+      var dir = this._facing || "down";
+      var img = this.player.isSettled()
+        ? frames.idle[dir][NS.CharaRig.idleFrame(this.game.clock)]
+        : frames.walk[dir][NS.CharaRig.walkFrame(this.game.clock)];
+      var x = Math.round(this.player.viewCol * ts + (ts - size) / 2);
+      var y = Math.round(this.player.viewRow * ts + ts - size);
+      this.game.ctx.drawImage(img, x, y);
+      return;
+    }
+
     // 選んだ服の色の絵を使う（決めていなければ既定の色になる）
     var sprite = NS.PlayerLook
       ? NS.PlayerLook.spritesFor(this.game.data, this.game.getPlayerColor())

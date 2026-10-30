@@ -32,6 +32,42 @@
       return ((gameData && gameData.dungeons) || {})[id] || null;
     },
 
+    /**
+     * 地方（穴。data/regions.js）を order 順に並べて返す。
+     * @returns {object[]}
+     */
+    listRegions: function (gameData) {
+      var regions = (gameData && gameData.regions) || {};
+      var result = [];
+      for (var id in regions) {
+        if (Object.prototype.hasOwnProperty.call(regions, id)) result.push(regions[id]);
+      }
+      result.sort(function (a, b) { return (a.order || 999) - (b.order || 999); });
+      return result;
+    },
+
+    /** その地方の区画（ダンジョン）を order 順に返す */
+    dungeonsInRegion: function (gameData, regionId) {
+      var list = this.list(gameData);
+      var result = [];
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].region === regionId) result.push(list[i]);
+      }
+      return result;
+    },
+
+    /** その地方が開いているか（書き方はダンジョンの unlockedBy と同じ） */
+    isRegionUnlocked: function (region, cleared, gameData) {
+      if (!region) return false;
+      return this.isConditionMet(region.unlockedBy, cleared, gameData);
+    },
+
+    /** その地方の区画のうち、クリアした数と全体の数 { cleared, total } */
+    regionProgress: function (gameData, regionId, cleared) {
+      var ids = this.idsInRegion(gameData, regionId);
+      return { cleared: this._countCleared(ids, cleared), total: ids.length };
+    },
+
     /** その地方に属するダンジョンのidを並べて返す */
     idsInRegion: function (gameData, regionId) {
       var list = this.list(gameData);
@@ -204,6 +240,17 @@
           seen[id] = true;
           result.push(items[id]);
         }
+      }
+
+      // 宝箱でしか出ないその場所の素材（回廊の灯り苔・絡み主根）も並べる。
+      // 薬や他の場所の素材まで並ぶと一覧が埋まるので、from がこの場所の素材だけにしてある
+      var chest = ((dungeon && dungeon.featureTables) || {}).chest || [];
+      for (var k = 0; k < chest.length; k++) {
+        var chestItem = items[chest[k].item];
+        if (!chestItem || seen[chestItem.id]) continue;
+        if (chestItem.category !== "material" || chestItem.from !== dungeon.id) continue;
+        seen[chestItem.id] = true;
+        result.push(chestItem);
       }
       return result;
     }

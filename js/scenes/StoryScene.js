@@ -556,6 +556,11 @@
   /** 立ち絵の絵・動き・大きさを決める */
   StoryScene.prototype._actorLook = function (actor) {
     var data = this.game.data;
+    // 人間の登場人物は、部品を重ねた新しい絵（v1.0.2）。使えなければ下の 32×32 の絵
+    if ((actor.player || actor.person) && NS.PlayerLook && NS.PlayerLook.personSpriteIds) {
+      var ids = NS.PlayerLook.personSpriteIds(this.game, actor.player ? "player" : actor.person);
+      if (ids) return { sprite: ids, person: true };
+    }
     if (actor.player) {
       var look = NS.PlayerLook.appearanceOf(data);
       return { sprite: NS.PlayerLook.spritesFor(data, this.game.getPlayerColor()),
@@ -577,10 +582,12 @@
     var look = this._actorLook(actor);
     if (!look.sprite) return;
 
-    var size = actor.size || 96;
-    var motion = NS.Motion.forSprite(this.game.data, look.sprite, look.motion,
-      this.game.clock, index * 0.37) || NS.Motion.still();
+    // 新しい絵の人物は、息とまばたきが絵のコマに入っているので、動きは付けずにコマだけ選ぶ
+    var size = look.person ? (this.layout.personSize || 128) : (actor.size || 96);
+    var motion = look.person ? NS.Motion.still() : (NS.Motion.forSprite(this.game.data, look.sprite, look.motion,
+      this.game.clock, index * 0.37) || NS.Motion.still());
     var t = copy(motion);
+    if (look.person) t.frame = NS.CharaRig.idleFrame(this.game.clock + index * 1100);
 
     var enter = actor.enter || "fade";
     var dist = (this.layout.actorDistance || 60);
@@ -593,7 +600,8 @@
       * (fading === undefined ? 1 : fading);
 
     var x = actor.x - size / 2;
-    var y = actor.y - size;
+    // 新しい絵は足の下に1点ぶん空きがあるので、そのぶん下げて足元をそろえる
+    var y = actor.y - size + (look.person ? size / 64 : 0);
 
     if (actor.glow) this._drawGlow(ctx, actor, size, p * (fading === undefined ? 1 : fading));
 

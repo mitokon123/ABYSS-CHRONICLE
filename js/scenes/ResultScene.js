@@ -16,7 +16,7 @@
   /**
    * @param {MyGame.Game} game
    * @param {object} summary
-   *   outcome  : "escaped"（無事帰還）/ "cleared"（主を倒した）/ "defeated"（全滅）
+   *   outcome  : "escaped"（無事帰還）/ "cleared"（主を倒した）/ "passed"（主のいない区画を出口から抜けた）/ "defeated"（全滅）
    *   dungeon  : 挑んだダンジョンの定義
    *   floor    : 到達した階
    *   gold     : その挑戦で得たゴールド

@@ -27,6 +27,15 @@
  *
  * "regen" … ターンの終わりに、最大HPの value の割合だけ回復する
  *     value : 割合（0.06 なら6%。最低1は戻る）
+ *     max   : 1ターンに戻る量の上限（書かなければ上限なし）
+ *
+ * "damageByTargetHp" … 相手の残りHPの割合で、与えるダメージに倍率を掛ける（v1.0.0。万全狩り）
+ *     tiers : [{ atLeast: 割合, value: 倍率 } / { atMost: 割合, value: 倍率 }] を上から順に見て、最初に当てはまったもの。
+ *             どれにも当てはまらなければ等倍
+ *
+ * "onHitStatus" … 攻撃を当てた相手を、確率で状態異常にする（v1.0.0。装備の眠花の杖）
+ *     status / chance : 技の status と同じ。相手の耐性が掛かる。入らなかったときは何も出さない
+ *     normalAttackOnly : true なら通常攻撃のときだけ
  *
  * "counterStatus" … 攻撃を受けたとき、攻撃してきた相手を状態異常にすることがある
  *     status  : 状態異常id（data/statuses.js）
@@ -44,6 +53,18 @@
  * "undying" … 攻撃で倒されても、そのターンの終わりまでHP0のまま踏みとどまる。
  *     ターンの終わりに倒れる（回復はできない。まだ動いていなければ動ける）。
  *     同じ側で1ターンに1体まで。毒・即死では働かない
+ *
+ * "shedStatus" … ターンの終わりに、状態異常に掛かっていれば chance の確率で全部治す（v1.0.0 脱皮）
+ *     chance : 確率（0.6 なら60%）。道具で治せない封印も治す
+ *
+ * "tailwind" … 戦闘が始まってから turns ターンのあいだ、行動順を決める素早さに value を掛ける（v1.0.0 追い風）
+ *     value : 倍率 / turns : 何ターン目まで効くか（戦闘の1ターン目から数える。途中で出ても延びない）
+ *     能力値そのものは変えないので、仲間画面の素早さには出ない
+ *
+ * "wardAlly" … 1ターン目の頭に、場に出ている自分以外の仲間1体（ランダム）へ
+ *     「状態異常を1回だけ防ぐ」守りをつける（v1.0.0 芽吹き）。
+ *     仲間がいなければ働かない。1回防ぐか戦闘が終わると消える。
+ *     防ぐのは、確率の判定を通って本当に掛かるときだけ（外れた分では減らない）
  *
  * ▼ 条件（condition。省略すると常に効く）
  *     hpBelow : 自分のHP割合がこの値以下のときだけ効く（0.25 なら1/4以下）
@@ -111,8 +132,7 @@
       ]
     },
 
-    // 雷を扱えるのはビリムシだけ。α-9 でビリムシが「放電」になったので、今は持つ種族がいない
-    // （図鑑では「？？？」のまま。雷の種族が増えたら持たせる）
+    // α-9 でビリムシが「放電」になってから持つ種族がいなかったが、v1.0.1 でザンガルド（蔦這う回廊の雷の竜の子）が持つ
     charged: {
       id: "charged",
       name: "帯電",
@@ -224,14 +244,14 @@
       ]
     },
 
-    // 作者の指定は「最大HPの5〜10%程度」。まずは真ん中より少し下の6%から
+    // 作者の指定は「最大HPの5〜10%程度」。α-9 は6%から始め、v1.0.0 で 10%・1ターン50まで（作者の指定）
     regen: {
       id: "regen",
       name: "再生",
       category: "special",
-      description: "傷がみるみるふさがる。毎ターンの終わりにHPが少し回復する。",
+      description: "傷がみるみるふさがる。毎ターンの終わりにHPが回復する。",
       effects: [
-        { type: "regen", value: 0.06 }
+        { type: "regen", value: 0.10, max: 50 }
       ]
     },
 
@@ -284,6 +304,80 @@
                    "ターンの終わりに倒れる（1ターンに1体まで）。",
       effects: [
         { type: "undying" }
+      ]
+    },
+
+    // --- v1.0.0 で足したもの（萌芽の穴・若葉の洞。作者が決めたもの） ---
+
+    // フタバムシ
+    shedSkin: {
+      id: "shedSkin",
+      name: "脱皮",
+      category: "special",
+      description: "古い皮を脱ぎ捨てる。ターンの終わりに状態異常に掛かっていると、ときどき自分で治す。",
+      effects: [
+        { type: "shedStatus", chance: 0.6 }
+      ]
+    },
+
+    // ワカバドリ
+    tailwind: {
+      id: "tailwind",
+      name: "追い風",
+      category: "special",
+      description: "追い風に乗って飛び出す。戦闘が始まってから2ターンのあいだ、素早さが2倍になる。",
+      effects: [
+        { type: "tailwind", value: 2, turns: 2 }
+      ]
+    },
+
+    // 若葉の洞の主（作者が決めたもの）。元気な相手ほど強く打ち、弱った相手には手を緩める
+    fullHunt: {
+      id: "fullHunt",
+      name: "万全狩り",
+      category: "damage",
+      description: "万全な獲物ほど好んで狩る。残りHPが多い相手ほど与えるダメージが増え、弱った相手には減る。",
+      effects: [
+        { type: "damageByTargetHp", tiers: [
+          { atLeast: 1.00, value: 1.20 },
+          { atLeast: 0.75, value: 1.10 },
+          { atMost: 0.50,  value: 0.90 }
+        ] }
+      ]
+    },
+
+    // コダマ
+    sprouting: {
+      id: "sprouting",
+      name: "芽吹き",
+      category: "special",
+      description: "仲間に芽吹きの力を分ける。戦闘が始まると、自分以外の仲間1体が状態異常を1回だけ防げるようになる。",
+      effects: [
+        { type: "wardAlly" }
+      ]
+    },
+
+    // コケキノコ（蔦這う回廊。名前と効果は作者が決めたもの 2026-10-21）。
+    // 受けるダメージに、当たるたびに 0.75〜1.25 のどれかが掛かる（EffectSystem.getDamageTakenRandomMultiplier）
+    gamble: {
+      id: "gamble",
+      name: "ギャンブル",
+      category: "damage",
+      description: "受けるダメージが、毎回 -25%〜+25% のあいだで増えたり減ったりする。",
+      effects: [
+        { type: "damageTakenRandom", min: 0.75, max: 1.25 }
+      ]
+    },
+
+    // シニガミ（蔦這う回廊。名前と効果は作者が決めたもの 2026-10-21）。
+    // 即死を付ける技（デス・デスラ・死の踊り）を使っても PP が減らない（BattleSystem.ppCostOf）
+    reaper: {
+      id: "reaper",
+      name: "死神",
+      category: "special",
+      description: "死を司る。即死を付ける技を使っても、PPが減らない。",
+      effects: [
+        { type: "freeDeathSkills" }
       ]
     }
   };

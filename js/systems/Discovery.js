@@ -33,7 +33,30 @@
     // 図鑑の記録（data/monsters.js の records）をどこまで読めるかに使う。
     // その個体を預けても失っても、記録は残る（図鑑は「これまでに見たもの」の本なので）
     this.affectionStages = {};
+    // 倒したことのあるモンスター（v1.0.0）。種族に dexOnDefeat がある者（シニガミ）は、
+    // 倒すだけで図鑑の詳しいところまで開く（仲間にできるのはストーリーを全部クリアしたあとなので）
+    this.monstersDefeated = {};
   }
+
+  /** 倒した。図鑑で「見た」も満たす */
+  Discovery.prototype.markMonsterDefeated = function (speciesId) {
+    if (!speciesId) return;
+    this.monstersSeen[speciesId] = true;
+    this.monstersDefeated[speciesId] = true;
+  };
+
+  Discovery.prototype.isMonsterDefeated = function (id) { return !!this.monstersDefeated[id]; };
+
+  /**
+   * 図鑑の詳しいところ（説明・耐性・特性・技）を見せてよいか。
+   * ふつうは仲間にしたら。種族に dexOnDefeat: true があれば、倒しただけでも開く（シニガミ）
+   * @param {string} id 種族id
+   * @param {object} [species] 種族データ（dexOnDefeat を見る）
+   */
+  Discovery.prototype.isMonsterDexOpen = function (id, species) {
+    if (this.monstersCaught[id]) return true;
+    return !!(species && species.dexOnDefeat && this.monstersDefeated[id]);
+  };
 
   /** その種族の愛情度の段階を残す。下がることはない（いちばん深いものだけ残す） */
   Discovery.prototype.markAffectionStage = function (speciesId, stageIndex) {
@@ -87,7 +110,8 @@
       monstersCaught: Object.keys(this.monstersCaught),
       itemsObtained: Object.keys(this.itemsObtained),
       skillsLearned: Object.keys(this.skillsLearned),
-      affectionStages: this.affectionStages
+      affectionStages: this.affectionStages,
+      monstersDefeated: Object.keys(this.monstersDefeated)
     };
   };
 
@@ -101,6 +125,8 @@
     // 古いセーブにはこの記録が無い。
     // Game._recordInitialDiscoveries が、いま連れている仲間の技を拾い直す
     fill(discovery.skillsLearned, saved.skillsLearned);
+    // 倒した記録（v1.0.0）。古いセーブには無いので空から
+    fill(discovery.monstersDefeated, saved.monstersDefeated);
     // 愛情度の段階。古いセーブには無いので空から（Game が連れている仲間から拾い直す）
     var stages = saved.affectionStages || {};
     for (var id in stages) {

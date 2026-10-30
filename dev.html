@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>開発用の目次 - ABYSS CHRONICLE</title>
+  <!--
+    ▼ このファイルについて（開発用。ゲーム本体ではない）
+
+    開発用のページをまとめた目次（v1.0.2）。開発用サーバー（tools/devserver.py。ふつうは 8124 番）で開くと、
+    最初にこのページが出る。
+    ・8124 番はふだん遊ぶ 8123 番とセーブが別（ブラウザがセーブを番号ごとに分けて持つため）。
+      ここから開いたゲームは、空のセーブから始まる試し遊び用になる
+    ・動きの見本で調整した動きは data/motions.js へ保存できる。表の編集・効果音の一覧からも data/ の数字を書ける。
+      書き込む前の写しは backup/ に残り、ここから戻せる
+    8123 番（ふつうのサーバー）で開いても目次としては使えるが、保存と写しの一覧は出ない。
+  -->
+  <style>
+    body { margin: 0; background: #05070d; color: #c8d0e8; font-family: sans-serif; }
+    main { max-width: 860px; margin: 0 auto; padding: 24px 16px 40px; }
+    h1 { font-size: 22px; color: #ffd75e; margin: 0 0 4px; }
+    .sub { color: #6b7590; font-size: 13px; margin-bottom: 18px; }
+    #status { font-size: 13px; padding: 8px 12px; border: 1px solid #2a3350; background: #0a0f1c; margin-bottom: 18px; }
+    #status.ok { border-color: #3f7a52; color: #9adfaa; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+    a.card { display: block; padding: 14px 16px; background: #0a0f1c; border: 1px solid #2a3350; border-radius: 8px;
+             color: #e8ecf8; text-decoration: none; }
+    a.card:hover { border-color: #ffd75e; background: #101830; }
+    a.card b { display: block; color: #ffd75e; font-size: 16px; margin-bottom: 6px; }
+    a.card span { font-size: 13px; color: #9aa4c0; line-height: 1.6; }
+    h2 { font-size: 15px; color: #ffd75e; margin: 28px 0 8px; }
+    #backups { font-size: 13px; }
+    #backups li { margin: 4px 0; }
+    #backups button { margin-left: 8px; padding: 2px 10px; background: #141b2e; color: #e8ecf8;
+                      border: 1px solid #2a3350; border-radius: 4px; cursor: pointer; }
+    .note { font-size: 12px; color: #6b7590; line-height: 1.7; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>開発用の目次</h1>
+    <div class="sub">ABYSS CHRONICLE の開発用ページ。ゲーム本体ではない。</div>
+    <div id="status">サーバーを確かめています…</div>
+
+    <div class="grid">
+      <a class="card" href="motion-viewer.html">
+        <b>動きの見本と調整</b>
+        <span>モンスターの動きと技の演出を再生する。動きの数字をつまみで変えて、data/motions.js へ保存できる。</span>
+      </a>
+      <a class="card" href="chara-viewer.html">
+        <b>人物の見本</b>
+        <span>主人公と登場人物の新しい絵。男女・髪型・色・飾りを選んで、地図と物語の大きさで見る。</span>
+      </a>
+      <a class="card" href="table-editor.html">
+        <b>表の編集</b>
+        <span>モンスター・道具・技・主などの数字を表で直して、data/ へ書き込む。書き込む前に「前 → 後」の一覧が出る。</span>
+      </a>
+      <a class="card" href="data-check.html">
+        <b>データの点検</b>
+        <span>無い id を指している所・書き忘れ・使っていない動きや絵などを一覧にする。何も書き換えない。</span>
+      </a>
+      <a class="card" href="sound-list.html">
+        <b>効果音の一覧</b>
+        <span>BGM と効果音をその場で鳴らす。どこで使っているかが分かり、音量を変えて data/audio.js へ書ける。</span>
+      </a>
+      <a class="card" href="balance-sim.html">
+        <b>強さの試算</b>
+        <span>主との戦いの勝率などを、何度も戦わせて数える。</span>
+      </a>
+      <a class="card" href="app.html">
+        <b>ゲーム（試し遊び）</b>
+        <span>このサーバーで開くと、ふだんのセーブとは別の空のセーブで始まる。</span>
+      </a>
+    </div>
+
+    <h2>書き込む前の写し（backup/）</h2>
+    <div class="note">
+      動きの保存・表の編集・音量の書き込みのたびに、その直前のファイルがここに残る（ファイルごとに新しい方から 40 個）。
+      「この時点に戻す」を押すと、そのファイルが写しの中身になる（戻す前の状態も写しとして残る）。
+    </div>
+    <ul id="backups"><li class="note">（開発用サーバーで開いたときだけ出る）</li></ul>
+  </main>
+
+  <script>
+  (function () {
+    "use strict";
+    var status = document.getElementById("status");
+    var list = document.getElementById("backups");
+
+    fetch("/api/ping").then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) throw new Error();
+      status.className = "ok";
+      status.textContent = "開発用サーバー（" + location.host + "）で開いています。動き・表・音量を書き込めます。セーブはふだんのもの（8123）とは別です。";
+      loadBackups();
+    }).catch(function () {
+      status.textContent = "ふつうのサーバーで開いています。見るだけで、保存はできません（保存したいときは開発用サーバー abyss-tools から開く）。";
+    });
+
+    function loadBackups() {
+      fetch("/api/backups").then(function (r) { return r.json(); }).then(function (d) {
+        list.innerHTML = "";
+        if (!d.backups.length) { list.innerHTML = "<li class='note'>まだ無い</li>"; return; }
+        d.backups.forEach(function (name) {
+          var li = document.createElement("li");
+          var m = name.match(/^(\w+)-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
+          var file = m ? "data/" + m[1] + ".js" : name;
+          li.textContent = m ? (m[2] + "/" + m[3] + "/" + m[4] + " " + m[5] + ":" + m[6] + ":" + m[7] + "　" + file) : name;
+          var b = document.createElement("button");
+          b.textContent = "この時点に戻す";
+          b.onclick = function () {
+            if (!confirm(li.firstChild.textContent + " に戻します。よろしいですか？")) return;
+            fetch("/api/restore", {
+              method: "POST", headers: { "Content-Type": "application/json", "X-Dev-Tool": "1" },
+              body: JSON.stringify({ name: name })
+            }).then(function (r) { return r.json(); }).then(function (res) {
+              alert(res.ok ? "戻しました。" : "戻せませんでした：" + res.error);
+              loadBackups();
+            });
+          };
+          li.appendChild(b);
+          list.appendChild(li);
+        });
+      });
+    }
+  })();
+  </script>
+</body>
+</html>

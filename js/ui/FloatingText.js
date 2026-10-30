@@ -41,9 +41,24 @@
     var offsetX = spreadX ? (this.random.next() * 2 - 1) * spreadX : 0;
     var driftX = (p.driftX || 0) * (this.random.next() * 2 - 1);
 
+    // 同じ場所にまだ前の文字が残っていたら（二連斬りのように続けて当たったとき）、
+    // 右・少し下へずらして重ねない（前の文字は上へ昇っていくので、下にずらすと離れる。
+    // 上の段の敵は画面の上端に近く、上へずらすと切れてしまう）。2つ目・3つ目と段をずらしていく
+    var stack = 0;
+    var duration = p.duration || 700;
+    for (var i = 0; i < this.items.length; i++) {
+      var it = this.items[i];
+      if (Math.abs(it.baseX - x) < 40 && Math.abs(it.baseY - y) < 40 && it.elapsed < duration * 0.8) {
+        stack = Math.max(stack, it.stack + 1);
+      }
+    }
+
     this.items.push({
-      x: x + offsetX,
-      y: y,
+      baseX: x,
+      baseY: y,
+      stack: stack,
+      x: x + offsetX + stack * (p.stackX === undefined ? 30 : p.stackX),
+      y: y + stack * (p.stackY === undefined ? 14 : p.stackY),
       driftX: driftX,
       text: text,
       color: options.color || "#ffffff",

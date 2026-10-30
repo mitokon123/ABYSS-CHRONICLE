@@ -10,8 +10,9 @@
     gameTitle: "ABYSS CHRONICLE", // ゲーム名
     worldName: "Monstoria",       // 世界名
     // バージョン表記（履歴は data/patchnotes.js）。RC はリリース前（Release Candidate）の仕上げ版。
-    // α-10 のあと、予定していた α-11 を RC-1 と呼ぶことにした（2026-09-29）。その次が v1.0.0
-    version: "RC-1",
+    // α-10 → RC-1（2026-10-05 に締めた）→ 1.0.0（新しい地方と地方選択。若葉の洞までで 2026-10-22 に締めた）
+    // → 1.0.1（蔦這う回廊。2026-10-28 に締めた）→ 1.0.2（主人公の見た目。2026-10-29 から）
+    version: "1.0.2",
     canvasWidth: 800,   // 画面の横幅（px）
     canvasHeight: 600,  // 画面の縦幅（px）
     tileSize: 32,       // 1タイルの大きさ（px）

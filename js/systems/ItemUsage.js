@@ -86,6 +86,24 @@
      */
     scoutBoost: function () {
       return { applied: true, amount: 0 };
+    },
+
+    /**
+     * 蘇生（神鳥の羽。v1.0.0）。倒れた仲間を、最大HPの hpRatio（0.55 なら55%）で起こす。
+     * 倒れていない相手には効かない（持ち物も減らない）。亡者の魂で踏みとどまっている者（HP0）も対象外。
+     * 掛かっていた状態異常は、倒れたときのまま残さず消す（倒れたときに外れているはずだが、念のため）
+     * @returns amount は戻ったHP
+     */
+    revive: function (effect, target) {
+      if (!target || !target.isFainted || !target.isFainted() || target._undying) {
+        return { applied: false, amount: 0 };
+      }
+      var hp = Math.max(1, Math.floor(target.getMaxHp() * (effect.hpRatio || 0.5)));
+      if (target.clearAllStatuses) target.clearAllStatuses();
+      // 倒れる前に掛かっていた強化・弱体も持ち越さない
+      if (Array.isArray(target.modifiers)) target.modifiers = [];
+      target.currentHp = hp;
+      return { applied: true, amount: hp };
     }
   };
 
@@ -147,12 +165,15 @@
     if (!item || !item.effect) return fail("unknown");
     if (inventory && !inventory.has(itemId, 1)) return fail("noItem");
 
-    // 倒れている仲間には使えない（このゲームに蘇生は無い）。
+    // 倒れている仲間には使えない（蘇生の道具だけは別。v1.0.0 神鳥の羽）。
     // 戦闘では「選んだときは立っていたが、使う番までに倒された」ことがあり、
     // ここで止めないと回復薬で生き返っていた。亡者の魂で踏みとどまっている者（HP0）も同じ
-    // ★ 蘇生の道具を足すときは、その効果の種類だけここを通すようにする
-    if (target && ((target.isFainted && target.isFainted()) || target._undying)) {
+    if (type !== "revive" && target && ((target.isFainted && target.isFainted()) || target._undying)) {
       return fail("fainted");
+    }
+    // 蘇生の道具は、倒れていない相手には使えない（「立っている仲間には効かない」と出す）
+    if (type === "revive" && target && target.isFainted && !target.isFainted()) {
+      return fail("notFainted");
     }
 
     var handler = EFFECT_HANDLERS[type];
@@ -167,9 +188,15 @@
              itemName: itemName, effectType: type };
   };
 
-  /** その効果はHPを回復するものか（画面側が回復の演出を出すかの判断に使う） */
+  /** その効果はHPを回復するものか（画面側が回復の演出を出すかの判断に使う。蘇生もHPが戻る） */
   ItemUsage.healsHp = function (effectType) {
-    return effectType === "healHp";
+    return effectType === "healHp" || effectType === "revive";
+  };
+
+  /** 倒れた仲間に使う道具か（戦闘で、倒れた仲間を選べるようにするのに使う） */
+  ItemUsage.prototype.isRevive = function (itemId) {
+    var item = this.data.getItem(itemId);
+    return !!(item && item.effect && item.effect.type === "revive");
   };
 
   NS.ItemUsage = ItemUsage;

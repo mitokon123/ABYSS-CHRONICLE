@@ -65,6 +65,8 @@
     this.fieldSkillMenu = new NS.CommandMenu(this.panel, this.layout.fieldSkillMenu || this.layout.actionMenu);
     this.fieldTargetMenu = new NS.CommandMenu(this.panel, this.layout.fieldTargetMenu || this.layout.actionMenu);
     this.fieldSkillId = null;
+    // 作戦を選ぶ（v1.0.0）
+    this.tacticMenu = new NS.CommandMenu(this.panel, this.layout.tacticMenu || this.layout.fieldTargetMenu || this.layout.actionMenu);
     // 「逃がしますか?」の はい／いいえ。元に戻せないので、既定は「やめる」
     this.releaseMenu = new NS.CommandMenu(this.panel, (this.layout.releaseConfirm || {}).menu);
     this.releaseMenu.setItems([
@@ -72,7 +74,7 @@
       { label: this.texts.releaseYes || "yes", value: "yes" }
     ]);
     this.backButton = new NS.BackButton(this.panel, game.data);
-    // 名前をつける文字盤（Canvas では日本語入力が使えないため）
+    // 名前をつける入力欄（Canvas の上に本物の入力欄を重ねる。漢字・英字も打てる）
     this.nameInput = new NS.NameInput(this.panel, game.data);
     this._notice = null;
   }
@@ -106,7 +108,7 @@
   PartyScene.prototype.update = function () {
     var input = this.game.input;
 
-    // 名前をつけている間は、他の操作を受け付けない（文字盤に集中させる）
+    // 名前をつけている間は、他の操作を受け付けない（入力欄に集中させる）
     if (this.mode === "naming") { this._updateNamingMode(input); return; }
 
     // 「戻る」ボタン。何かを選んでいる途中なら一覧へ戻す
@@ -119,6 +121,7 @@
 
     if (this.mode === "affection") { this._updateAffectionMode(input); return; }
     if (this.mode === "release") { this._updateReleaseMode(input); return; }
+    if (this.mode === "tactic")      { this._updateTacticMode(input); return; }
     if (this.mode === "fieldSkill")  { this._updateFieldSkillMode(input); return; }
     if (this.mode === "fieldTarget") { this._updateFieldTargetMode(input); return; }
     if (this.mode === "equip")   { this._updateEquipMode(input); return; }
@@ -249,6 +252,9 @@
     }
 
     items.push({ label: this.texts.actionEquip || "equip", value: "equip" });
+    // 作戦（v1.0.0）。いまの作戦を項目に添える
+    var tactic = selected && selected.getTactic ? selected.getTactic() : null;
+    items.push({ label: fill(this.texts.actionTactic || "tactic", { tactic: tactic ? tactic.name : "" }), value: "tactic" });
     items.push({ label: this.texts.actionName || "name", value: "name" });
     // 逃がすのは拠点でだけ（探索中に連れている仲間を手放すと、挑戦の記録と食い違うため）
     if (this.allowStorage) {
@@ -455,7 +461,53 @@
       case "name":    this._beginNaming(); break;
       case "release": this._beginRelease(); break;
       case "fieldSkill": this._beginFieldSkill(); break;
+      case "tactic":  this._beginTactic(); break;
     }
+  };
+
+  // --- 作戦（v1.0.0。data/battle.js の tactics） ---
+
+  /** 作戦の一覧を出す。カーソルはいまの作戦に置き、説明を下の知らせ欄に出す */
+  PartyScene.prototype._beginTactic = function () {
+    var monster = this._selected();
+    if (!monster || !monster.getTactic) return;
+    var tactics = (this.game.data.battle || {}).tactics || { order: [], list: {} };
+    var current = monster.getTactic();
+    var items = [], at = 0;
+    for (var i = 0; i < (tactics.order || []).length; i++) {
+      var tactic = tactics.list[tactics.order[i]];
+      if (!tactic) continue;
+      var isCurrent = current && current.id === tactic.id;
+      if (isCurrent) at = items.length;
+      items.push({ label: tactic.name + (isCurrent ? "  " + (this.texts.tacticCurrent || "") : ""), value: tactic.id });
+    }
+    this.tacticMenu.setItems(items);
+    this.tacticMenu.index = at;
+    this.mode = "tactic";
+    this._showTacticNotice();
+  };
+
+  /** カーソルの作戦の説明を知らせ欄に出す */
+  PartyScene.prototype._showTacticNotice = function () {
+    var selected = this.tacticMenu.items ? this.tacticMenu.items[this.tacticMenu.index] : null;
+    var tactics = (this.game.data.battle || {}).tactics || { list: {} };
+    var tactic = selected ? tactics.list[selected.value] : null;
+    this._notice = tactic ? tactic.description : null;
+  };
+
+  PartyScene.prototype._updateTacticMode = function (input) {
+    var result = this.tacticMenu.handleInput(input);
+    this._showTacticNotice();
+    if (!result) return;
+    if (result.type === "cancel") { this.mode = "list"; this._notice = null; return; }
+    if (result.type !== "confirm") return;
+
+    var monster = this._selected();
+    if (!monster) return;
+    monster.setTactic(result.value);
+    var tactic = monster.getTactic();
+    this._notice = fill(this.texts.tacticChanged, { name: monster.getName(), tactic: tactic ? tactic.name : "" });
+    this.mode = "list";
   };
 
   // --- 様子を見る ---
@@ -816,11 +868,12 @@
     if (this.mode === "release") this._renderReleaseConfirm(ctx);
     // 探索中に使う技と、その相手
     if (this.mode === "fieldSkill") this.fieldSkillMenu.render(this.game.clock);
+    if (this.mode === "tactic") this.tacticMenu.render(this.game.clock);
     if (this.mode === "fieldTarget") this.fieldTargetMenu.render(this.game.clock);
 
-    // 名前をつけている間は、文字盤を画面の手前に重ねる。
-    // 案内は文字盤が自分で出すので、ここのヒントと「戻る」は出さない
-    // （文字盤の間は他の操作を受け付けないため、押せるものを見せない）
+    // 名前をつけている間は、入力欄を画面の手前に重ねる。
+    // 案内は入力欄が自分で出すので、ここのヒントと「戻る」は出さない
+    // （入力欄の間は他の操作を受け付けないため、押せるものを見せない）
     if (this.mode === "naming") {
       this.nameInput.render(this.game.clock);
       return;
@@ -1015,6 +1068,7 @@
     else if (this.mode === "action") hint = this.texts.hintAction;
     else if (this.mode === "release") hint = this.texts.hintRelease;
     else if (this.mode === "fieldSkill") hint = this.texts.hintFieldSkill;
+    else if (this.mode === "tactic") hint = this.texts.hintTactic;
     else if (this.mode === "fieldTarget") hint = this.texts.hintFieldTarget;
     else if (this.mode === "reorder") hint = this.texts.hintReorder;
     else if (this.tab === "storage" && this.game.storage.isEmpty()) {

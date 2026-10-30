@@ -1,25 +1,25 @@
 /**
  * NameInput.js
- * 名前をつけるための文字盤。
+ * 名前をつけるための入力欄。
  *
- * ▼ なぜ文字盤なのか
- * ゲーム画面は Canvas なので、日本語入力（IME）が使えない。
- * キーを直接拾う方法だと英数字しか打てないため、
- * 画面に文字を並べて1文字ずつ選ぶ形にしている。
+ * ▼ しくみ（2026-10-27 文字盤から作り替えた。作者の指定）
+ * ゲーム画面は Canvas なので、そのままでは日本語入力（IME）が使えない。
+ * そこで、Canvas の上にふつうの文字入力欄（<input>）を重ねて置く。
+ * キーボードで打てて、漢字・英字・記号も使える（スマホでは画面のキーボードが出る）。
+ * 欄の位置と大きさは、画面が拡大縮小されても Canvas に合わせて毎フレーム置き直す。
  *
- * 文字表・面（ひらがな／カタカナ）・最大文字数は data/naming.js、
- * 置き場所と色は data/ui.js の nameInput が持つ。ここは操作と描画だけを行う。
+ * 入力欄に文字を打っているあいだ、ゲームのキー操作は止まる（js/core/Input.js が入力欄のキーを拾わない）。
+ *
+ * 最大文字数は data/naming.js、置き場所と色は data/ui.js の nameInput が持つ。
  *
  * ▼ 操作
- *   上下左右 … カーソル移動（下端は「けす／かな／けってい」の並び）
- *   決定     … その文字を足す。ボタンの上ならそのボタンを押す
- *   取り消し … 1文字消す。空のときは名前つけそのものをやめる
- *   Q / E    … 面を切り替える（ひらがな ⇄ カタカナ）
- *   マウス   … マスを直接押せる
+ *   Enter          … 決める（変換中の Enter は変換の確定に使われ、決めない）
+ *   Esc / 右クリック … やめる
+ *   「けってい」「やめる」のボタンはマウスでも押せる
  *
  * 使い方
  *   this.nameInput = new MyGame.NameInput(panel, game.data);
- *   this.nameInput.open("スライム");
+ *   this.nameInput.open("スライム", "見出し", 10);
  *   update: var r = this.nameInput.handleInput(input);
  *           r && r.type === "done"   → r.name が決まった名前
  *           r && r.type === "cancel" → やめた
@@ -39,60 +39,134 @@
     this.layout = ((gameData.ui || {}).nameInput) || {};
     this.texts = ((gameData.messages || {}).naming) || {};
 
-    this.pageIndex = 0;
-    this.row = 0;
-    this.col = 0;
     this.text = "";
     this.title = "";
+    this.maxLength = this.config.maxLength || 10;
+    this.isOpen = false;
+    this._result = null;
+    this._field = null;
+    this._composing = false;
+    this._focusRow = 0;   // キーボードで欄の外にいるとき：0 けってい / 1 やめる
   }
 
+  /** 文字数（漢字・絵文字も1文字と数える） */
+  NameInput.countChars = function (text) {
+    return charsOf(text).length;
+  };
+
+  /** 長すぎるぶんを切る */
+  NameInput.clip = function (text, max) {
+    var chars = charsOf(text);
+    return chars.length > max ? chars.slice(0, max).join("") : String(text || "");
+  };
+
   /**
-   * 文字盤を開く。
+   * 入力欄を開く。
    * @param {string} [initialName] 最初から入れておく名前
    * @param {string} [title] 上に出す見出し
+   * @param {number} [maxLength] 最大文字数（省略すると naming.js の maxLength）
    */
-  NameInput.prototype.open = function (initialName, title) {
-    this.text = initialName || "";
+  NameInput.prototype.open = function (initialName, title, maxLength) {
+    this.maxLength = maxLength || this.config.maxLength || 10;
+    this.text = NameInput.clip(initialName || "", this.maxLength);
     this.title = title || "";
-    this.pageIndex = 0;
-    this.row = 0;
-    this.col = 0;
+    this.isOpen = true;
+    this._result = null;
+    this._composing = false;
+
+    var field = this._ensureField();
+    field.value = this.text;
+    field.style.display = "block";
+    this._place();
+    // 開いた直後のキー（名前を変えるを選んだ決定キー）を拾わないよう、1拍おいてから入れる
+    setTimeout(function () {
+      field.focus();
+      try { field.setSelectionRange(field.value.length, field.value.length); } catch (e) { /* 古い環境 */ }
+    }, 0);
   };
 
-  // --- 文字表の読み取り ---
-
-  NameInput.prototype._page = function () {
-    return (this.config.pages || [])[this.pageIndex] || { rows: [] };
+  /** 入力欄を閉じる（結果を返したときに自分で呼ぶ） */
+  NameInput.prototype.close = function () {
+    this.isOpen = false;
+    if (this._field) {
+      this._field.blur();
+      this._field.style.display = "none";
+    }
   };
 
-  NameInput.prototype._rows = function () {
-    return this._page().rows || [];
+  // --- 入力欄（<input>）---
+
+  NameInput.prototype._ensureField = function () {
+    if (this._field) return this._field;
+
+    var self = this;
+    var field = document.createElement("input");
+    field.type = "text";
+    field.autocomplete = "off";
+    field.spellcheck = false;
+    field.setAttribute("aria-label", this.texts.fieldLabel || "名前");
+    field.style.cssText = "position:fixed;display:none;box-sizing:border-box;margin:0;" +
+      "padding:0 8px;border:2px solid #ffd75e;border-radius:0;outline:none;" +
+      "background:#080a14;color:#e8eaf0;font-family:monospace;z-index:10;";
+
+    field.addEventListener("compositionstart", function () { self._composing = true; });
+    field.addEventListener("compositionend", function () {
+      self._composing = false;
+      self._syncFromField();
+    });
+    field.addEventListener("input", function () {
+      if (!self._composing) self._syncFromField();
+      else self.text = field.value;
+    });
+    field.addEventListener("keydown", function (e) {
+      // 変換中の Enter / Esc は IME のもの（keyCode 229 は変換中の印。古いブラウザ向け）
+      if (e.isComposing || self._composing || e.keyCode === 229) return;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        self._syncFromField();
+        self._result = { type: "done", name: self.text };
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        self._result = { type: "cancel" };
+      } else if (e.key === "ArrowDown" || e.key === "Tab") {
+        // 欄から下のボタンへ移る（キーボードだけでも「やめる」を選べるように）
+        e.preventDefault();
+        self._focusRow = 0;
+        field.blur();
+      }
+    });
+
+    document.body.appendChild(field);
+    this._field = field;
+    return field;
   };
 
-  NameInput.prototype._commands = function () {
-    return this.config.commands || [];
+  /** 欄の中身を最大文字数に収めて、this.text に写す */
+  NameInput.prototype._syncFromField = function () {
+    var field = this._field;
+    if (!field) return;
+    var clipped = NameInput.clip(field.value.replace(/[\r\n\t]/g, ""), this.maxLength);
+    if (clipped !== field.value) field.value = clipped;
+    this.text = clipped;
   };
 
-  /** 文字の行数（コマンドの並びは含まない） */
-  NameInput.prototype._charRowCount = function () {
-    return this._rows().length;
-  };
+  /** Canvas 上の欄の矩形を、画面（CSS）の位置に直して欄を置く */
+  NameInput.prototype._place = function () {
+    var field = this._field;
+    var F = this.layout.field;
+    var canvas = this.panel.ctx && this.panel.ctx.canvas;
+    if (!field || !F || !canvas) return;
 
-  /** いまカーソルがコマンドの並びにいるか */
-  NameInput.prototype._onCommandRow = function () {
-    return this.row >= this._charRowCount();
-  };
+    var rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    var sx = rect.width / canvas.width;
+    var sy = rect.height / canvas.height;
 
-  /** その行に何マスあるか */
-  NameInput.prototype._colCount = function (row) {
-    if (row >= this._charRowCount()) return this._commands().length;
-    return (this._rows()[row] || "").length;
-  };
-
-  /** いま選んでいる文字（コマンドの上なら null） */
-  NameInput.prototype._selectedChar = function () {
-    if (this._onCommandRow()) return null;
-    return (this._rows()[this.row] || "").charAt(this.col) || null;
+    field.style.left = (rect.left + F.x * sx) + "px";
+    field.style.top = (rect.top + F.y * sy) + "px";
+    field.style.width = (F.w * sx) + "px";
+    field.style.height = (F.h * sy) + "px";
+    field.style.fontSize = Math.round((F.fontSize || 20) * sy) + "px";
   };
 
   // --- 入力 ---
@@ -101,140 +175,54 @@
    * @returns {null | {type:"done", name:string} | {type:"cancel"}}
    */
   NameInput.prototype.handleInput = function (input) {
-    // 面の切り替え（左右は文字を選ぶのに使うので、別のキーを割り当てる）
-    if (input.isPressed("prevTab") || input.isPressed("nextTab")) this._turnPage();
+    if (!this.isOpen) return null;
 
-    this._moveCursor(input);
+    var result = this._result;
+    this._result = null;
 
-    var clicked = this._clickedCell(input);
-    if (clicked) {
-      this.row = clicked.row;
-      this.col = clicked.col;
-      return this._commit();
-    }
+    var focused = this._field && document.activeElement === this._field;
+    var pointer = input.getPointer ? input.getPointer() : null;
 
-    if (input.isPressed("confirm")) return this._commit();
-
-    if (input.isPressed("cancel")) {
-      // 何も入っていなければ、名前つけそのものをやめる
-      if (this.text.length === 0) return { type: "cancel" };
-      this._backspace();
-    }
-    return null;
-  };
-
-  NameInput.prototype._moveCursor = function (input) {
-    var rowMax = this._charRowCount();   // コマンドの並びを足した最後の行番号
-
-    if (input.isPressed("up"))    this.row = (this.row - 1 + rowMax + 1) % (rowMax + 1);
-    if (input.isPressed("down"))  this.row = (this.row + 1) % (rowMax + 1);
-
-    // 行が変わると、その行に無い列を指していることがあるので寄せる
-    var cols = this._colCount(this.row);
-    if (this.col >= cols) this.col = Math.max(0, cols - 1);
-
-    if (input.isPressed("left"))  this.col = (this.col - 1 + cols) % cols;
-    if (input.isPressed("right")) this.col = (this.col + 1) % cols;
-  };
-
-  /** いま選んでいるものを実行する */
-  NameInput.prototype._commit = function () {
-    if (this._onCommandRow()) {
-      var command = this._commands()[this.col];
-      if (!command) return null;
-
-      if (command.value === "done")  return { type: "done", name: this.text };
-      if (command.value === "back")  { this._backspace(); return null; }
-      if (command.value === "page")  { this._turnPage(); return null; }
-      return null;
-    }
-
-    var ch = this._selectedChar();
-    if (!ch || ch === " ") return null;
-
-    var max = this.config.maxLength || 8;
-    if (this.text.length >= max) return null;   // いっぱいなら何も起きない
-
-    this.text += ch;
-    return null;
-  };
-
-  NameInput.prototype._backspace = function () {
-    this.text = this.text.slice(0, -1);
-  };
-
-  NameInput.prototype._turnPage = function () {
-    var pages = this.config.pages || [];
-    if (pages.length <= 1) return;
-
-    this.pageIndex = (this.pageIndex + 1) % pages.length;
-    // 面によって行の長さが違うことがあるので、はみ出していたら寄せる
-    this.row = Math.min(this.row, this._charRowCount());
-    var cols = this._colCount(this.row);
-    if (this.col >= cols) this.col = Math.max(0, cols - 1);
-  };
-
-  // --- マス目の位置 ---
-
-  NameInput.prototype._cellSize = function () {
-    var c = this.config.cell || {};
-    return { w: c.w || 34, h: c.h || 30, gap: c.gap || 2 };
-  };
-
-  /** 文字1マスの矩形 */
-  NameInput.prototype._charRect = function (row, col) {
-    var g = this.layout.grid || { x: 0, y: 0 };
-    var s = this._cellSize();
-    return {
-      x: g.x + col * (s.w + s.gap),
-      y: g.y + row * (s.h + s.gap),
-      w: s.w, h: s.h
-    };
-  };
-
-  /** コマンド1つぶんの矩形（span のぶんだけ横に広い） */
-  NameInput.prototype._commandRect = function (index) {
-    var g = this.layout.grid || { x: 0, y: 0 };
-    var s = this._cellSize();
-    var commands = this._commands();
-
-    var col = 0;
-    for (var i = 0; i < index; i++) col += (commands[i].span || 1);
-
-    var span = commands[index] ? (commands[index].span || 1) : 1;
-    return {
-      x: g.x + col * (s.w + s.gap),
-      y: g.y + this._charRowCount() * (s.h + s.gap) + (this.layout.commandGap || 8),
-      w: span * (s.w + s.gap) - s.gap,
-      h: s.h
-    };
-  };
-
-  NameInput.prototype._rectOf = function (row, col) {
-    return (row >= this._charRowCount()) ? this._commandRect(col) : this._charRect(row, col);
-  };
-
-  /** カーソルが乗っているマス（乗っていなければ null） */
-  NameInput.prototype._hoveredCell = function (input) {
-    if (!input.getPointer) return null;
-
-    var pointer = input.getPointer();
-    if (!pointer.inside) return null;
-
-    var rows = this._charRowCount();
-    for (var r = 0; r <= rows; r++) {
-      var cols = this._colCount(r);
-      for (var c = 0; c < cols; c++) {
-        if (NS.Panel.containsPoint(this._rectOf(r, c), pointer)) return { row: r, col: c };
+    if (!result && pointer && pointer.inside) {
+      if (pointer.moved) {
+        if (NS.Panel.containsPoint(this._buttonRect(0), pointer)) this._focusRow = 0;
+        else if (NS.Panel.containsPoint(this._buttonRect(1), pointer)) this._focusRow = 1;
+      }
+      if (pointer.clicked) {
+        if (NS.Panel.containsPoint(this._buttonRect(0), pointer)) {
+          this._syncFromField();
+          result = { type: "done", name: this.text };
+        } else if (NS.Panel.containsPoint(this._buttonRect(1), pointer)) {
+          result = { type: "cancel" };
+        } else if (this._field) {
+          // 欄の外を押して入力が外れたら、欄へ戻す
+          this._field.focus();
+        }
       }
     }
-    return null;
+
+    // 欄の外にいるとき（↓/Tab で抜けた・ほかを押した）は、ゲームのキーでボタンを選ぶ
+    if (!result && !focused) {
+      if (input.isPressed("left") || input.isPressed("right")) this._focusRow = 1 - this._focusRow;
+      if (input.isPressed("up") && this._field) this._field.focus();
+      if (input.isPressed("confirm")) {
+        result = (this._focusRow === 0) ? { type: "done", name: this.text } : { type: "cancel" };
+      }
+    }
+    // 右クリック（取り消し）は欄の中にいても効く
+    if (!result && pointer && pointer.right) result = { type: "cancel" };
+    if (!result && !focused && input.isPressed("cancel")) result = { type: "cancel" };
+
+    if (result) this.close();
+    return result;
   };
 
-  /** 押されたマス（押されていなければ null） */
-  NameInput.prototype._clickedCell = function (input) {
-    if (!input.getPointer || !input.getPointer().clicked) return null;
-    return this._hoveredCell(input);
+  // --- ボタンの位置 ---
+
+  /** 0 けってい / 1 やめる */
+  NameInput.prototype._buttonRect = function (index) {
+    var B = this.layout.buttons || { x: 0, y: 0, w: 120, h: 32, gap: 16 };
+    return { x: B.x + index * (B.w + B.gap), y: B.y, w: B.w, h: B.h };
   };
 
   // --- 描画 ---
@@ -242,108 +230,91 @@
   NameInput.prototype.render = function (clock) {
     var t = this.panel.theme;
     var L = this.layout;
+
+    // 画面の大きさが変わっても欄がずれないよう、毎フレーム置き直す
+    if (this.isOpen) this._place();
+
+    // 後ろの画面を暗くして、入力欄だけが目に入るようにする（窓は半透明なので、後ろの文字と重なって読みにくい）
     var ctx = this.panel.ctx;
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     if (L.box) this.panel.drawBox(L.box);
 
-    // 見出し
     if (this.title && L.title) {
       this.panel.drawText(this.title, L.title.x, L.title.y,
         { font: t.font, color: t.textColor });
     }
 
-    this._renderTypedName(clock);
-    this._renderPageLabel();
-    this._renderGrid();
+    this._renderFieldFrame();
+    this._renderCount();
+    this._renderButtons();
     this._renderHint();
   };
 
-  /** いま入っている名前。空きマスを下線で見せて、あと何文字入るか分かるようにする */
-  NameInput.prototype._renderTypedName = function (clock) {
-    var t = this.panel.theme;
-    var N = this.layout.name;
-    if (!N) return;
-
+  /** 欄の後ろの枠（<input> が出るまでの一瞬や、欄が外れたときにも場所が分かるように） */
+  NameInput.prototype._renderFieldFrame = function () {
+    var F = this.layout.field;
+    if (!F) return;
     var ctx = this.panel.ctx;
-    var max = this.config.maxLength || 8;
-    var step = N.charWidth || 20;
+    ctx.fillStyle = "rgba(8,10,20,0.9)";
+    ctx.fillRect(F.x, F.y, F.w, F.h);
+    ctx.strokeStyle = this.panel.theme.panelBorder || "#3a4266";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(F.x + 0.5, F.y + 0.5, F.w - 1, F.h - 1);
+  };
 
-    for (var i = 0; i < max; i++) {
-      var x = N.x + i * step;
-      var ch = this.text.charAt(i);
+  /** あと何文字入るか（「4 / 10」） */
+  NameInput.prototype._renderCount = function () {
+    var C = this.layout.count;
+    if (!C) return;
+    var t = this.panel.theme;
+    var n = NameInput.countChars(this.text);
+    var full = n >= this.maxLength;
+    this.panel.drawText(n + " / " + this.maxLength, C.x, C.y,
+      { align: C.align || "right", font: t.smallFont,
+        color: full ? (t.cursorColor || "#ffd75e") : t.subTextColor });
+  };
 
-      // 空きマスの下線
-      ctx.fillStyle = (i === this.text.length) ? (t.cursorColor || "#ffd75e")
-                                               : (t.panelBorder || "#3a4266");
-      ctx.fillRect(x, N.y + 4, step - 4, 2);
-
-      if (ch) {
-        this.panel.drawText(ch, x, N.y, { font: N.font || t.font, color: t.textColor });
-      }
+  NameInput.prototype._renderButtons = function () {
+    var labels = [this.texts.done || "けってい", this.texts.cancel || "やめる"];
+    var focused = this._field && document.activeElement === this._field;
+    for (var i = 0; i < labels.length; i++) {
+      this._drawButton(this._buttonRect(i), labels[i], !focused && this._focusRow === i);
     }
   };
 
-  /** いまどの面を見ているか */
-  NameInput.prototype._renderPageLabel = function () {
-    var P = this.layout.page;
-    if (!P) return;
-
-    this.panel.drawText(this._page().label || "", P.x, P.y,
-      { align: P.align || "right", font: this.panel.theme.smallFont,
-        color: this.panel.theme.subTextColor });
-  };
-
-  NameInput.prototype._renderGrid = function () {
-    var rows = this._charRowCount();
-    var r, c;
-
-    for (r = 0; r < rows; r++) {
-      var line = this._rows()[r] || "";
-      for (c = 0; c < line.length; c++) {
-        var ch = line.charAt(c);
-        if (ch === " ") continue;
-        this._drawCell(this._charRect(r, c), ch, r === this.row && c === this.col, true);
-      }
-    }
-
-    var commands = this._commands();
-    for (c = 0; c < commands.length; c++) {
-      this._drawCell(this._commandRect(c), commands[c].label,
-        this.row === rows && c === this.col, false);
-    }
-  };
-
-  /**
-   * マスを1つ描く。
-   * @param {boolean} isChar 文字のマスか（コマンドは少し色を変える）
-   */
-  NameInput.prototype._drawCell = function (rect, label, selected, isChar) {
+  NameInput.prototype._drawButton = function (rect, label, selected) {
     var t = this.panel.theme;
     var ctx = this.panel.ctx;
 
-    ctx.fillStyle = selected ? (t.buttonHoverBg || "rgba(74,107,168,0.45)")
-                             : (isChar ? "rgba(8,10,20,0.55)" : "rgba(8,10,20,0.8)");
+    ctx.fillStyle = selected ? (t.buttonHoverBg || "rgba(74,107,168,0.45)") : "rgba(8,10,20,0.8)";
     ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-
     ctx.strokeStyle = selected ? (t.cursorColor || "#ffd75e") : (t.panelBorder || "#3a4266");
     ctx.lineWidth = 1;
     ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.w - 1, rect.h - 1);
 
     this.panel.drawText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 5, {
-      align: "center",
-      font: isChar ? (t.font || "14px monospace") : (t.smallFont || "12px monospace"),
-      color: selected ? (t.cursorColor || "#ffd75e")
-                      : (isChar ? t.textColor : t.subTextColor)
+      align: "center", font: t.font || "14px monospace",
+      color: selected ? (t.cursorColor || "#ffd75e") : t.textColor
     });
   };
 
   NameInput.prototype._renderHint = function () {
     var H = this.layout.hint;
     if (!H) return;
-
-    this.panel.drawText(this.texts.hint || "", H.x, H.y,
-      { font: this.panel.theme.smallFont, color: this.panel.theme.hintColor });
+    var lines = String(this.texts.hint || "").replace("{max}", this.maxLength).split("\n");
+    for (var i = 0; i < lines.length; i++) {
+      this.panel.drawText(lines[i], H.x, H.y + i * (H.lineHeight || 18),
+        { align: H.align || "left", font: this.panel.theme.smallFont, color: this.panel.theme.hintColor });
+    }
   };
+
+  /** 文字列を1文字ずつに分ける（サロゲートペアの漢字・絵文字を2文字と数えないように） */
+  function charsOf(text) {
+    var s = String(text || "");
+    return Array.from ? Array.from(s) : s.split("");
+  }
 
   NS.NameInput = NameInput;
 })(window.MyGame);

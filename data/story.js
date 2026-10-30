@@ -3,7 +3,9 @@
  * 物語の場面。決まった場面に来たとき、1度だけ流れる。
  *
  * 中身の決まりごとは ストーリー構成.md。**そこに書かれていない固有名詞・設定は足さない。**
- * 本文の元は scenario_yoran.md（揺籃の穴 場面1〜8）。直すときは両方をそろえる。
+ * 本文の元は scenario_yoran_改訂版.md（揺籃の穴 場面1〜8。2026-10-21 に作者が話を根本から変えた版）。直すときは両方をそろえる。
+ *   改訂版の筋：主人公はモンスターが好きで、年に一度の大会「クロニクル杯」を目指して認定試験を受ける。
+ *   前の版の「燃える村・親が消えた夜・小さな青い影・天蓋会」は外した（天蓋会は第2部で扱う）
  *
  * scenes : 場面のひとつひとつ
  *   id       : 識別子。**見たかどうかをこのidでセーブに残す**ので、
@@ -81,16 +83,13 @@
   "use strict";
 
   // --- 拠点の夜（背景 camp）で人物が立つ位置。たき火は x 664〜716 ---
-  //   たき火の左に、右から 主人公・スライム・オルド・イレーネ・探索者 と並ぶ
+  //   たき火の左に、右から 主人公・スライム・オルド・イレーネ と並ぶ
   var PLAYER = { player: true, x: 596, y: 414, size: 64, enter: "fade" };
   var SLIME  = { monster: "slime", x: 534, y: 414, size: 46, enter: "fade" };
-  var ORD    = { id: "ord", sprite: "npcOrd", motion: "breathe", x: 462, y: 414, size: 68, enter: "fade" };
-  var IRENE  = { id: "irene", sprite: "npcIrene", motion: "breathe", x: 388, y: 414, size: 66, enter: "fade" };
-  var SCOUT  = { id: "scout", sprite: "npcScout", motion: "breathe", x: 300, y: 414, size: 64, enter: "left" };
-
-  // 「小さな、青い影」（あの夜、主人公の前に立った何か。正体は見せない）
-  var BLUE_SHADOW = { id: "blueShadow", monster: "slime", x: 400, y: 520, size: 64,
-                      enter: "fade", silhouette: "#2a4a9a" };
+  //   person は data/sprites_story.js の charaLooks のid（v1.0.2。部品を重ねた新しい絵で、大きさは data/ui.js の story.personSize）。
+  //   新しい絵が使えないときは sprite・size の 32×32 の絵で描く
+  var ORD    = { id: "ord", person: "ord", sprite: "npcOrd", motion: "breathe", x: 462, y: 414, size: 68, enter: "fade" };
+  var IRENE  = { id: "irene", person: "irene", sprite: "npcIrene", motion: "breathe", x: 388, y: 414, size: 66, enter: "fade" };
 
   // 拠点に連れて帰ったヨミリュウ（場面4-誘う・場面7）。人物の左に立つ
   var DRAGON_CAMP = { id: "dragonCamp", monster: "abyssDragon", x: 210, y: 414, size: 170, enter: "fade" };
@@ -111,22 +110,22 @@
   };
   // 暗転して拠点の夜。イレーネが立つ
   var YOMI_ASK = { transition: "black", bg: "camp", style: "dialogue", speaker: "イレーネ",
-                   actors: [ PLAYER, SLIME, IRENE ], lines: [ "竜、ですか。揺籃の穴に。" ] };
+                   actors: [ PLAYER, SLIME, IRENE ], lines: [ "竜……ですか？　揺籃の穴に。" ] };
   var YOMI_NO_RECORD = { style: "dialogue", speaker: "イレーネ", lines: [
     "揺籃は、探索者が最初に潜る穴です。",
     "竜が出たという記録は、協会に一つもありません。"
   ] };
   var YOMI_SHADOW = { style: "dialogue", speaker: "イレーネ", lines: [
     "暗い深層では、影が大きく見えるものです。",
-    "初めての試験なら、なおさら。"
+    "初めての試験ならなおさら。"
   ] };
   var YOMI_INSIST = { style: "dialogue", speaker: "{player}", lines: [
     "見間違いじゃありません。",
     "{me}は、この目で見ました。記録にも残しています。"
   ] };
-  var YOMI_RECEIVE = { style: "dialogue", speaker: "イレーネ", lines: [ "記録は、受け取りますよ。" ] };
+  var YOMI_RECEIVE = { style: "dialogue", speaker: "イレーネ", lines: [ "記録は……受け取りますよ。" ] };
   // 前の台詞から少し間を置く
-  var YOMI_REJECT = { style: "dialogue", speaker: "イレーネ", delay: 900, lines: [ "受理はしませんが。" ] };
+  var YOMI_REJECT = { style: "dialogue", speaker: "イレーネ", delay: 900, lines: [ "受理はしませんがね。" ] };
   // イレーネが下がり、オルドが立つ
   var YOMI_ORD_SILENT = { actors: [ PLAYER, SLIME, ORD ], lines: [
     "オルドは何も言わなかった。",
@@ -136,7 +135,7 @@
   // 場面8（初めて全滅したとき）の本文。場面4-負けにも差し込むので、ここに置く
   var FIRST_DEFEAT_LINES = [
     "気がつくと、たき火のそばだった。",
-    "持っていたはずの素材は、",
+    "持っていたはずの素材は",
     "どこにもない。"
   ];
 
@@ -148,53 +147,53 @@
         id: "opening",
         trigger: "newGame",
         order: 1,
-        letterbox: true,
-        bgm: "none",          // 曲なし（炎の音だけ）
+        bgm: "home",
         style: "narration",
-        bg: "burning",
+        bg: "camp",
         pages: [
-          { se: "fire", lines: [
-            "あの夜のことを、今も覚えている。",
-            "村が燃えていた。",
-            "深淵から溢れたモンスターが",
-            "すべてを踏み潰していった。"
+          { actors: [ PLAYER ], lines: [
+            "深淵のほとりに、今夜もたき火が灯っている。",
+            "明日、{me}はクロニクラーの認定試験を受ける。"
           ] },
-          { fx: ["shake"], se: "bodyPress", lines: [
-            "クロニクラーだった親は、",
-            "{me}を背に庇い、",
-            "炎の向こう――深淵へと消えた。"
+          { lines: [
+            "記録を重ねた者だけが出られる、",
+            "年に一度の大会がある。",
+            "{me}は、その舞台に立ちたかった。"
           ] },
-          { actors: [ BLUE_SHADOW ], lines: [
-            "最後に見たのは、",
-            "{me}の前に立ちはだかる、",
-            "小さな、青い影だった。"
-          ] },
-          { transition: "black", bg: "camp", bgm: "home", actors: [ PLAYER ], lines: [
-            "それから、何年かが過ぎた。",
-            "{me}は今、深淵のほとりにいる。",
-            "あの夜の続きを、記録するために。"
+          { lines: [
+            "ただ勝ちたいのではない。",
+            "モンスターと並んで、",
+            "一緒に強くなりたかった。"
           ] },
           { style: "dialogue", speaker: "オルド", actors: [ PLAYER, ORD ], lines: [
             "お前が{player}か。",
-            "明日の試験は揺籃の穴だ。",
+            "明日からの試験は揺籃の穴だ。",
             "四つの区画を抜け、主を記録して戻れ。"
           ] },
           { style: "dialogue", speaker: "オルド", actors: [ PLAYER, SLIME, ORD ], lines: [
             "同行するモンスターを一体、連れていく決まりだ。",
             "協会で預かっていたスライムだ。"
           ] },
+          // スライムが主人公の足元へ寄ってくる（位置を変えて出し直す）
+          { actors: [ PLAYER, { id: "slimeNear", monster: "slime", x: 562, y: 414, size: 46, enter: "left" }, ORD ], lines: [
+            "スライムは、{me}の足元に寄ってきた。",
+            "{me}がそっと手を伸ばすと、",
+            "ひんやりと、柔らかかった。"
+          ] },
           { style: "dialogue", speaker: "{player}", lines: [
-            "……"
+            "よろしく……"
           ] },
           { style: "dialogue", speaker: "オルド", lines: [
-            "怖いか？",
-            "……それでいい。",
-            "怖がれる奴は、生きて戻る。"
+            "モンスターを好きなのは悪くない。",
+            "だが好きだからといって、",
+            "向こうも同じとは限らん。"
           ] },
-          { lines: [
-            "スライムは、{me}の足元から離れなかった。",
-            "{me}は、その体に触れることが",
-            "できなかった。"
+          { style: "dialogue", speaker: "オルド", lines: [
+            "穴は、優しい場所じゃない。",
+            "覚えておけ。"
+          ] },
+          { style: "dialogue", speaker: "{player}", lines: [
+            "はい……わかってます。"
           ] },
           { style: "title", bg: "night", actors: [], lines: [
             "揺籃の穴",
@@ -224,14 +223,15 @@
           // 1行目はスライムの図鑑の説明文の引用（早見表/図鑑説明文.txt）。図鑑を変えたらここも揃える
           { speaker: "オルド", lines: [
             "「人を襲う可能性はある」か。",
-            "……そいつは今日、何度お前の前に出た？"
+            "……そのスライムは今日、お前を襲ったか？"
           ] },
           { speaker: "{player}", lines: [
-            "数えきれないくらい……"
+            "……いえ。",
+            "前に出て、守ってくれました。"
           ] },
           { speaker: "オルド", lines: [
             "……そうか。記録は見たとおりに書け。",
-            "怖いなら怖いと書けばいい。",
+            "危険も、優しさもだ。",
             "それが、クロニクラーの仕事だ。"
           ] }
         ]
@@ -274,17 +274,17 @@
               ] }
             ] }
           ] },
-          // スライムはたき火のそばで丸くなり、主人公は少し離れて腰を下ろす
+          // スライムはたき火のそばで丸くなり、主人公はその隣に腰を下ろす
           { style: "narration",
             actors: [
-              { id: "playerApart", player: true, x: 548, y: 414, size: 64, enter: "fade" },
+              { id: "playerBeside", player: true, x: 596, y: 414, size: 64, enter: "fade" },
               { monster: "slime", x: 640, y: 420, size: 40, enter: "fade" },
               ORD
             ],
             lines: [
               "スライムは、たき火のそばで丸くなっていた。",
-              "{me}は、少し離れて腰を下ろした。",
-              "それでも、昨日よりは近かった。"
+              "{me}は隣に腰を下ろし、",
+              "揺れるスライムを、そっと撫でた。"
             ] }
         ]
       },
@@ -341,7 +341,7 @@
           YOMI_OPEN,
           { lines: [
             "{me}たちは、振り返らずに走った。",
-            "背中を、闇の気配が追ってきた。"
+            "背中を闇の気配が追ってきた。"
           ] },
           YOMI_ASK,
           { style: "dialogue", speaker: "{player}", lines: [
@@ -372,15 +372,15 @@
           { lines: [
             "何度も倒れかけ、",
             "それでも、{me}たちは立っていた。",
-            "竜は、深淵の闇へと崩れていった。"
+            "竜は深淵の闇へと崩れていった。"
           ] },
           YOMI_ASK,
           { style: "dialogue", speaker: "{player}", lines: [
             "深層の四階です。黒い鱗の竜が、闇を吐いて……。",
-            "なんとか、倒しました。"
+            "なんとか倒しましたが……"
           ] },
           { style: "dialogue", speaker: "イレーネ", lines: [
-            "試験中の新人が、竜種を。",
+            "試験中の新人が竜種を。",
             "……ますます、信じがたいですね。"
           ] },
           YOMI_INSIST,
@@ -403,9 +403,9 @@
         pages: [
           YOMI_OPEN,
           { lines: [
-            "闇の中で、竜はこちらを見ていた。",
+            "闇の中で竜はこちらを見ていた。",
             "そして――{me}たちの後ろに、",
-            "静かに、ついてきた。"
+            "静かについてきた。"
           ] },
           // ここで初めて竜の姿を見せる
           { transition: "black", bg: "camp", actors: [ DRAGON_CAMP, PLAYER, SLIME ], lines: [
@@ -416,17 +416,17 @@
           ] },
           { style: "dialogue", speaker: "{player}", lines: [
             "深層の四階にいました。",
-            "揺籃の穴に、竜がいたんです。"
+            "揺籃の穴に竜がいたんです。"
           ] },
           { style: "dialogue", speaker: "イレーネ", lines: [
             "……ええ。"
           ] },
           { style: "dialogue", speaker: "イレーネ", delay: 900, lines: [
-            "このことは、しばらく伏せておいてください。",
-            "探索者たちが、騒ぎますから。"
+            "このことはしばらく伏せておいてください。",
+            "探索者たちが騒ぎますから。"
           ] },
           { actors: [ DRAGON_CAMP, PLAYER, SLIME, ORD ], lines: [
-            "オルドが、喉の奥で小さく笑った。"
+            "オルドが喉の奥で小さく笑った。"
           ] },
           { style: "dialogue", speaker: "オルド", lines: [
             "誰も信じない竜を、連れて帰ってきたか。"
@@ -449,27 +449,24 @@
             "この小さな一体は、{me}の前から",
             "一歩も退かなかった。"
           ] },
-          // 燃える村を一瞬だけ重ねる／小さな青い影
-          { fx: [{ type: "memory", bg: "burning" }],
-            actors: [ { id: "blueShadow", monster: "slime", x: 400, y: 410, size: 60,
-                        enter: "fade", silhouette: "#2a4a9a" } ],
-            lines: [
-              "あの夜と、同じように。"
-            ] },
-          { style: "dialogue", speaker: "オルド", actors: [ PLAYER, ORD ], lines: [
+          { actors: [ PLAYER, SLIME ], lines: [
+            "モンスターに守られる。",
+            "それが不思議と誇らしかった。"
+          ] },
+          { style: "dialogue", speaker: "オルド", actors: [ PLAYER, SLIME, ORD ], lines: [
             "いい相棒を持ったな。"
           ] },
           { style: "dialogue", speaker: "{player}", lines: [
-            "……相棒じゃ、ありません。"
+            "はい。"
           ] },
           { style: "dialogue", speaker: "オルド", lines: [
-            "そうか。",
-            "なら、記録にはそう書いておけ。"
+            "その気持ちも記録に書いておけ。",
+            "見たとおりに、感じたとおりにな。"
           ] },
-          { actors: [ PLAYER, SLIME, ORD ], lines: [
-            "その夜、{me}は初めて、",
-            "スライムの頭にそっと触れた。",
-            "思っていたより、ずっと温かく、柔らかかった。"
+          // スライムが主人公の膝に乗って眠る（主人公に重ねて小さく出し直す）
+          { actors: [ PLAYER, { id: "slimeLap", monster: "slime", x: 600, y: 420, size: 36, enter: "fade" }, ORD ], lines: [
+            "その夜、スライムは{me}の膝に乗って眠った。",
+            "思っていたより、ずっと重く、温かかった。"
           ] }
         ]
       },
@@ -490,43 +487,39 @@
           ] },
           { speaker: "イレーネ", se: "levelUp", lines: [
             "{player}、合格です。",
-            "今日から、あなたはクロニクラーです。"
+            "今日からあなたはクロニクラーです。"
           ] },
           { speaker: "イレーネ", lines: [
             "竜の記録は……まあ、保管しておきましょう。"
           ] },
           { speaker: "オルド", lines: [
-            "……よく戻った。"
+            "よく戻った。"
           ] },
-          { style: "narration", bgm: "none", lines: [
-            "その夜のことだった。"
-          ] },
-          // 駆け込む足音の音源が無いので、いまは逃げる音で代わりにしている
-          { speaker: "探索者", fx: [{ type: "shake", power: 4 }], se: "flee",
-            actors: [ PLAYER, SLIME, IRENE, ORD, SCOUT ],
-            lines: [
-              "支部長！穴が……穴がひとつ、塞がれました！"
-            ] },
+          // 年に一度の大会「クロニクル杯」（名前は作者が確定）。参加権は穴の主を記録した数で決まる
           { speaker: "イレーネ", lines: [
-            "……落ち着いて。状況を報告してください。"
+            "クロニクラーには、もうひとつ道が開かれます。",
+            "年に一度の大会、クロニクル杯への参加です。"
           ] },
-          { speaker: "探索者", lines: [
-            "天蓋会です。",
-            "塞いだ穴のあたりで、モンスターが暴れていると……"
+          { speaker: "イレーネ", lines: [
+            "参加権を得るには、各地の穴の主を記録していくこと。",
+            "焦らず、穴を巡って、仲間と力をつけなさい。"
           ] },
-          { style: "narration", fx: [{ type: "memory", bg: "burning" }], lines: [
-            "モンスターが、溢れる。",
-            "あの夜と、同じだった。"
+          { style: "narration", lines: [
+            "スライムが、{me}の足元で小さく跳ねた。",
+            "大会……この子と一緒に。"
           ] },
-          { style: "narration", bg: "abyss",
-            actors: [ { monster: "slime", x: 400, y: 520, size: 64, enter: "fade" } ],
-            lines: [
-              "天蓋会。",
-              "その名を聞いたのは、この夜が初めてだった。"
-            ] },
+          { speaker: "{player}", lines: [
+            "出たいです。"
+          ] },
+          { speaker: "オルド", lines: [
+            "よく言った。"
+          ] },
+          // 少し間を置いてから
+          { speaker: "オルド", delay: 700, lines: [
+            "出るなら穴で本気を磨いてこい。"
+          ] },
           { style: "title", bg: "night", actors: [], lines: [
-            "記録は、",
-            "ここから始まる"
+            "記録はここから始まる"
           ] }
         ]
       },
@@ -578,10 +571,10 @@
             "……先日の報告ですが。"
           ] },
           { style: "dialogue", speaker: "イレーネ", delay: 900, lines: [
-            "受理、しておきます。"
+            "受理しておきます。"
           ] },
           { actors: [ DRAGON_CAMP, PLAYER, SLIME, IRENE, ORD ], lines: [
-            "オルドが、喉の奥で小さく笑った。"
+            "オルドが喉の奥で小さく笑った。"
           ] }
         ]
       },

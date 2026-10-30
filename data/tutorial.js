@@ -12,7 +12,7 @@
  *   lines   : 本文。1要素が1行。**折り返さないので、長すぎる行は自分で分ける**
  *   pointAt : 画面のどこを指すか（省略すると指さない）。
  *             いまは戦闘のコマンドだけに対応していて、コマンドの value を書く
- *             （ターンの頭：go / flee、仲間ごと：attack / fight / defend / item / inspect / scout / swap）。
+ *             （ターンの頭：go / tactic / flee、仲間ごと：attack / fight / defend / item / inspect / scout / swap）。
  *             指し先が画面に無いときは、矢印が出ないだけで説明は出る
  *
  * ★ 説明を増やすときは steps に1つ足す。既にある trigger を使うならコードは触らない。
@@ -181,10 +181,27 @@
         ]
       },
 
+      // 作戦（v1.0.1 で足した。v1.0.0 で作戦を入れたときに説明が抜けていた）。
+      // id が新しいので、ほかの説明を見終わったセーブでも、次にターンの頭が出たときに1回だけ出る
+      turnTactic: {
+        id: "turnTactic",
+        trigger: "turnMenu",
+        order: 2,
+        pointAt: "tactic",
+        title: "作戦",
+        lines: [
+          "仲間ごとに「作戦」を決めておくと、",
+          "その仲間はコマンドを選ばなくても",
+          "自分で考えて動きます。",
+          "はじめは全員「命令する」になっています。",
+          "拠点の「仲間」の画面でも変えられます。"
+        ]
+      },
+
       cmdFlee: {
         id: "cmdFlee",
         trigger: "turnMenu",
-        order: 2,
+        order: 3,
         pointAt: "flee",
         title: "逃げる",
         lines: [

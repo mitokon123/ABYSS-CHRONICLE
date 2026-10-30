@@ -58,6 +58,10 @@
  *
  * ★ 動きを増やすときは、このファイルに1エントリ足すだけでよい。
  *
+ * ★ いちばん下に「動きの調整ページが書くところ」がある（v1.0.2）。
+ *   motion-viewer.html の調整の欄で「保存」すると、開発用サーバー（tools/devserver.py）がそこだけを書き直す。
+ *   そこにある id は、上の本体の行より優先される。手では直さない。
+ *
  * ─────────────────────────────────────────────
  * ▼ 場面ごとの動き（攻撃・被弾・技を放つ…）は、書かなくても全種族に付く
  *
@@ -2330,6 +2334,87 @@
     },
 
     // ─────────────────────────────────────────
+    // ツリガネ専用（2026-10-22）。蔦から逆さにぶら下がる小悪魔。
+    // 上の5行（蔦と足の爪）は動かさない（pinTop: 5）。回転は蔦をつかむ足を軸にした振り子になる。
+    // 姿は open（翼を広げる）・sleep（目と口を閉じ、風が止む）。ふだんは2コマ（風の筋の向きが変わる）
+    // ─────────────────────────────────────────
+
+    // ふだん。釣鐘のようにゆっくり揺れ、翼の隙間の風の筋が 2コマで入れ替わる
+    bellHang: {
+      frames:  { interval: 420 },
+      anchor:  "top",
+      pinTop:  5,
+      rotate:  { amplitude: 0.035, period: 3400 },
+      scaleY:  { amplitude: 0.015, period: 1700, phase: 0.25 }
+    },
+
+    // 通常攻撃・体技など。翼を広げながら大きく振りかぶり、振り子の勢いで前へ伸びる
+    bellSwoop: {
+      duration: 760,
+      anchor:  "top",
+      pinTop:  5,
+      rotate:  { amount: 0.09, shape: "wobble", cycles: 1.5 },
+      scaleY:  { amount: 0.22, shape: "windup", backRatio: 0.5 },
+      poses: [
+        { at: 0.15, pose: "open" },
+        { at: 0.85, pose: null }
+      ]
+    },
+
+    // 共鳴（デス・ゲイルなど）。翼を広げ、小刻みに揺れて風を鳴らす（その場から動かない）
+    bellResonate: {
+      duration: 800,
+      anchor:  "top",
+      pinTop:  5,
+      rotate:  { amount: 0.03, shape: "wobble", cycles: 4 },
+      scaleY:  { amount: 0.08, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "open" },
+        { at: 0.88, pose: null }
+      ]
+    },
+
+    // 被弾。翼で包んだまま大きく揺さぶられ、揺れながら戻る
+    bellHit: {
+      duration: 420,
+      anchor:  "top",
+      pinTop:  5,
+      rotate:  { amount: 0.08, shape: "decay", cycles: 2 },
+      scaleY:  { amount: -0.12, shape: "decay", cycles: 2 },
+      alpha:   { amount: -0.4,  shape: "fade" }
+    },
+
+    // 回避。振り子のように大きく横へ逃げて戻る
+    bellDodge: {
+      duration: 360,
+      anchor:  "top",
+      pinTop:  5,
+      rotate:  { amount: 0.22, shape: "pulse" }
+    },
+
+    // レベルアップ・スカウトに応じたとき。翼を広げて、くるくると揺れる
+    bellCheer: {
+      duration: 900,
+      anchor:  "top",
+      pinTop:  5,
+      rotate:  { amount: 0.07, shape: "wobble", cycles: 3 },
+      scaleY:  { amount: 0.08, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "open" },
+        { at: 0.9,  pose: null }
+      ]
+    },
+
+    // 眠っている間。風が止み、ゆっくり揺れるだけ
+    bellSleeping: {
+      pose: "sleep",
+      anchor:  "top",
+      pinTop:  5,
+      rotate:  { amplitude: 0.02, period: 5200 },
+      alpha:   { amplitude: -0.06, period: 5200 }
+    },
+
+    // ─────────────────────────────────────────
     // ビリムシ専用（RC-1、作り直し）。翅・触角・腹の針・火花を動かす。
     // 姿は up／down（翅の上げ下げ）・upB／downB（火花を裏返し触角が動く）・charge（帯電して体が明るくなり、火花が増える）・
     // sting／stingDown（腹を伸ばして針を出す。翅の上げ・下げ）・sleep（翅を下げ、火花が消え、暗くなり、目を閉じる）。
@@ -3144,6 +3229,944 @@
       rotate: { offset: 0.014 },
       scaleX: { offset: 0.012,  amplitude: 0.028, period: 5600 },
       scaleY: { offset: -0.05,  amplitude: 0.028, period: 5600, phase: 0.18 }
+    },
+
+    // ═════════════════════════════════════════
+    // 萌芽の穴・若葉の洞（v1.0.0）。5体とも、スライムと同じく「姿」（poses）を切り替えて動く。
+    // 姿の絵は data/sprites_marsh.js の最後。ふだんの動き（〜Idle など）はコマ絵の並びと周期を合わせてある
+    // ═════════════════════════════════════════
+
+    // ─────────────────────────────────────────
+    // フタバムシ。姿は leafUp（双葉が上がる）／leafDown（双葉がしおれる）／stretch（伸びる）／squash（縮む）／sleep。
+    // 芋虫なので跳ねない。体を伸び縮みさせて動き、双葉がそれについてくる
+    // ─────────────────────────────────────────
+
+    // ふだん：縮んで伸びる（尺取り）。双葉が体より少し遅れて上下する。
+    //   sprite: [元, LeafUp, Stretch, LeafUp, 元, LeafDown, Squash, LeafDown] × 240ms ＝ 1920ms
+    wormIdle: {
+      frames: { interval: 240 },
+      scaleX: { amplitude: -0.012, period: 1920 }
+    },
+
+    // 通常攻撃（体当たり）。縮んで溜め → 伸びて飛びかかる → 当たって縮む
+    wormTackle: {
+      duration: 480,
+      offsetY: { amount: 26, shape: "windup", backRatio: 0.3 },
+      poses: [
+        { at: 0,    pose: "squash" },
+        { at: 0.3,  pose: "stretch" },
+        { at: 0.6,  pose: "squash" },
+        { at: 0.75, pose: null }
+      ]
+    },
+
+    // 体技・斬撃・踊り（ロックスパイクなど）。2回続けて伸び上がって打ちつける
+    wormTechnique: {
+      duration: 800,
+      offsetY: { amount: 26, shape: "hops", count: 2 },
+      poses: [
+        { at: 0,    pose: "squash" },
+        { at: 0.08, pose: "stretch" },
+        { at: 0.42, pose: "squash" },
+        { at: 0.58, pose: "stretch" },
+        { at: 0.9,  pose: "squash" },
+        { at: 0.97, pose: null }
+      ]
+    },
+
+    // 共鳴。縮んで力をためてから、伸び上がって双葉を広げる（その場から動かない）
+    wormResonate: {
+      duration: 720,
+      offsetY: { amount: -6,   shape: "pulse" },
+      scaleY:  { amount: 0.05, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "squash" },
+        { at: 0.18, pose: "stretch" },
+        { at: 0.5,  pose: "leafUp" },
+        { at: 0.85, pose: null }
+      ]
+    },
+
+    // ブレス。縮んで吸い込み、伸びながら前へ吐き出す
+    wormBreath: {
+      duration: 680,
+      offsetY: { amount: 14,   shape: "windup", backRatio: 0.5 },
+      scale:   { amount: 0.08, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "squash" },
+        { at: 0.5,  pose: "stretch" },
+        { at: 0.85, pose: null }
+      ]
+    },
+
+    // 自分・味方にかける技。双葉を上げて、伸び上がる
+    wormBuff: {
+      duration: 520,
+      offsetY: { amount: -8, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "leafUp" },
+        { at: 0.25, pose: "stretch" },
+        { at: 0.75, pose: null }
+      ]
+    },
+
+    // 被弾。縮こまって双葉がしおれ、揺れながら戻る
+    wormHit: {
+      duration: 340,
+      offsetY: { amount: 10,   shape: "decay", cycles: 2 },
+      alpha:   { amount: -0.4, shape: "fade" },
+      poses: [
+        { at: 0,    pose: "squash" },
+        { at: 0.45, pose: "leafDown" },
+        { at: 0.75, pose: null }
+      ]
+    },
+
+    // 回避。縮んでから、横へ這うように身をよじる
+    wormDodge: {
+      duration: 440,
+      offsetX: { amount: 20, outRatio: 0.3 },
+      poses: [
+        { at: 0,    pose: "squash" },
+        { at: 0.3,  pose: "stretch" },
+        { at: 0.6,  pose: null }
+      ]
+    },
+
+    // 防御中。縮こまって双葉をたたむ（ずっと続く）
+    wormGuard: {
+      pose: "squash",
+      scale: { offset: -0.04 }
+    },
+
+    // レベルアップ・スカウトに応じたとき。縮んで溜め、伸び上がって双葉を広げ、2回小さく跳ねる
+    wormCheer: {
+      duration: 680,
+      offsetY: { amount: -10, shape: "hops", count: 2 },
+      poses: [
+        { at: 0,    pose: "squash" },
+        { at: 0.12, pose: "leafUp" },
+        { at: 0.5,  pose: "squash" },
+        { at: 0.62, pose: "leafUp" },
+        { at: 0.95, pose: null }
+      ]
+    },
+
+    // 眠っている間。縮んで双葉がしおれ、目を閉じる（Sleep の絵）。ゆっくり深く息をする
+    wormSleeping: {
+      pose: "sleep",
+      scaleY: { offset: -0.03, amplitude: 0.025, period: 3000 },
+      scaleX: { offset: 0.02,  amplitude: -0.012, period: 3000 }
+    },
+
+    // ─────────────────────────────────────────
+    // ユラツボミ。姿は swayL・swayR（つぼみを傾け、葉の腕を上げ下げする）／open（つぼみの先が開く）／sleep。
+    // 名前のとおり、ゆらゆら揺れる。根が生えているので、その場から大きくは動かない
+    // ─────────────────────────────────────────
+
+    // ふだん：左右にゆっくり揺れる。
+    //   sprite: [元, SwayL, 元, SwayR] × 520ms ＝ 2080ms ＝ 横の揺れの周期（傾いた側へ体も寄る）
+    budSway: {
+      frames:  { interval: 520 },
+      offsetX: { amplitude: -1.2, period: 2080 },
+      scaleY:  { amplitude: 0.012, period: 1040 }
+    },
+
+    // 通常攻撃。後ろへ傾いて溜め、反対へ振り下ろすように打つ
+    budSwat: {
+      duration: 500,
+      offsetY: { amount: 22, shape: "windup", backRatio: 0.35 },
+      poses: [
+        { at: 0,    pose: "swayR" },
+        { at: 0.35, pose: "swayL" },
+        { at: 0.75, pose: null }
+      ]
+    },
+
+    // 体技・斬撃・踊り（ララバイなど）。左右に大きく揺れて踊り、最後につぼみを開いて眠りを誘う
+    budDance: {
+      duration: 1000,
+      offsetX: { amount: 3,    shape: "wobble", cycles: 3 },
+      offsetY: { amount: -5,   shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "swayL" }, { at: 0.14, pose: "swayR" },
+        { at: 0.28, pose: "swayL" }, { at: 0.42, pose: "swayR" },
+        { at: 0.56, pose: "swayL" }, { at: 0.7,  pose: "open" },
+        { at: 0.92, pose: null }
+      ]
+    },
+
+    // 共鳴（フラッシュ・キュアなど）。すっと伸び上がり、つぼみの先を開いて光を放つ（その場から動かない）
+    budResonate: {
+      duration: 720,
+      offsetY: { amount: -8,   shape: "pulse" },
+      scaleY:  { amount: 0.06, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: null },
+        { at: 0.2,  pose: "open" },
+        { at: 0.82, pose: null }
+      ]
+    },
+
+    // ブレス。後ろへ傾いて吸い込み、つぼみを開いて前へ吐き出す
+    budBreath: {
+      duration: 680,
+      offsetY: { amount: 12,   shape: "windup", backRatio: 0.5 },
+      scale:   { amount: 0.06, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "swayR" },
+        { at: 0.5,  pose: "open" },
+        { at: 0.85, pose: null }
+      ]
+    },
+
+    // 自分・味方にかける技。左右に一度揺れてから、つぼみを開く
+    budBuff: {
+      duration: 560,
+      offsetY: { amount: -6, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "swayL" },
+        { at: 0.2,  pose: "swayR" },
+        { at: 0.4,  pose: "open" },
+        { at: 0.8,  pose: null }
+      ]
+    },
+
+    // 被弾。押されて大きくのけぞり、揺れながら戻る
+    budHit: {
+      duration: 380,
+      offsetY: { amount: 10,   shape: "decay", cycles: 2 },
+      alpha:   { amount: -0.4, shape: "fade" },
+      poses: [
+        { at: 0,    pose: "swayR" },
+        { at: 0.3,  pose: "swayL" },
+        { at: 0.6,  pose: null }
+      ]
+    },
+
+    // 回避。根が生えているので跳ばず、横へぐにゃりと身をかわす
+    budDodge: {
+      duration: 420,
+      offsetX: { amount: 14, outRatio: 0.3 },
+      poses: [
+        { at: 0,    pose: "swayR" },
+        { at: 0.55, pose: null }
+      ]
+    },
+
+    // レベルアップ・スカウトに応じたとき。左右に揺れてから、つぼみを開いて喜ぶ
+    budCheer: {
+      duration: 760,
+      offsetY: { amount: -8, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "swayL" },
+        { at: 0.18, pose: "swayR" },
+        { at: 0.36, pose: "open" },
+        { at: 0.9,  pose: null }
+      ]
+    },
+
+    // 眠っている間。目を閉じ（Sleep の絵）、ゆっくり左右に揺れながら息をする
+    budSleeping: {
+      pose: "sleep",
+      offsetX: { amplitude: 0.8, period: 4000 },
+      scaleY:  { offset: -0.03, amplitude: 0.02, period: 4000, phase: 0.25 }
+    },
+
+    // ─────────────────────────────────────────
+    // ワカバドリ。姿は up（翼を振り上げ）／down（振り下ろし）／sleep（翼をたたみ、目を閉じる）。
+    // コウモリと同じく、翼の上げ下げで勢いを見せる。追い風に乗る速い鳥なので、羽ばたきは速め
+    // ─────────────────────────────────────────
+
+    // ふだん：その場で羽ばたいて浮く。
+    //   sprite: [Up, 元, Down, 元] × 100ms ＝ 400ms ＝ 上下の揺れの周期。振り下ろした直後に体がいちばん高く浮く
+    birdHover: {
+      frames:  { interval: 100 },
+      offsetY: { amplitude: -2.2, period: 400, phase: 0.375 }
+    },
+
+    // 通常攻撃（ついばむ）。翼を振り上げて溜め → 振り下ろして一気に突っ込む
+    birdPeck: {
+      duration: 420,
+      offsetY: { amount: 30, shape: "windup", backRatio: 0.3 },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.3,  pose: "down" },
+        { at: 0.65, pose: null }
+      ]
+    },
+
+    // 体技・斬撃・踊り。2回続けて突っ込む（1回ごとに翼を打ち下ろす）
+    birdTechnique: {
+      duration: 720,
+      offsetY: { amount: 30, shape: "hops", count: 2 },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.1,  pose: "down" },
+        { at: 0.38, pose: "up" },
+        { at: 0.6,  pose: "down" },
+        { at: 0.88, pose: null }
+      ]
+    },
+
+    // 共鳴（ウィンド・ゲイルなど）。その場で舞い上がり、小刻みに羽ばたいて風を起こす
+    birdResonate: {
+      duration: 700,
+      offsetY: { amount: -14, shape: "pulse" },
+      poses: [
+        { at: 0,   pose: "up" },   { at: 0.1, pose: "down" },
+        { at: 0.2, pose: "up" },   { at: 0.3, pose: "down" },
+        { at: 0.4, pose: "up" },   { at: 0.5, pose: "down" },
+        { at: 0.6, pose: "up" },   { at: 0.7, pose: "down" },
+        { at: 0.8, pose: null }
+      ]
+    },
+
+    // ブレス。翼を振り上げて身を引き（吸い込む）、振り下ろしながら前へ吐き出す
+    birdBreath: {
+      duration: 640,
+      offsetY: { amount: 14,   shape: "windup", backRatio: 0.5 },
+      scale:   { amount: 0.06, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.5,  pose: "down" },
+        { at: 0.85, pose: null }
+      ]
+    },
+
+    // 自分・味方にかける技。羽ばたいて浮き上がる
+    birdBuff: {
+      duration: 520,
+      offsetY: { amount: -12, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "down" }, { at: 0.15, pose: "up" },
+        { at: 0.3,  pose: "down" }, { at: 0.45, pose: "up" },
+        { at: 0.6,  pose: "down" }, { at: 0.78, pose: null }
+      ]
+    },
+
+    // 被弾。翼を跳ね上げてのけぞり、揺れながら戻る
+    birdHit: {
+      duration: 300,
+      offsetY: { amount: 13,   shape: "decay", cycles: 2 },
+      alpha:   { amount: -0.45, shape: "fade" },
+      poses: [
+        { at: 0,   pose: "up" },
+        { at: 0.5, pose: null }
+      ]
+    },
+
+    // 回避。翼をひと打ちして、横へすばやく逃げる（コウモリより少し遠くへ）
+    birdDodge: {
+      duration: 360,
+      offsetX: { amount: 30, outRatio: 0.2 },
+      offsetY: { amount: -8, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.12, pose: "down" },
+        { at: 0.4,  pose: "up" },
+        { at: 0.55, pose: null }
+      ]
+    },
+
+    // レベルアップ・スカウトに応じたとき。羽ばたきながら、その場で一回転
+    birdCheer: {
+      duration: 560,
+      rotate:  { amount: 1,   shape: "rise" },
+      offsetY: { amount: -12, shape: "pulse" },
+      poses: [
+        { at: 0,   pose: "up" },   { at: 0.2, pose: "down" },
+        { at: 0.4, pose: "up" },   { at: 0.6, pose: "down" },
+        { at: 0.8, pose: "up" },   { at: 0.95, pose: null }
+      ]
+    },
+
+    // 眠っている間。翼をたたんで目を閉じ（Sleep の絵）、地面に降りて小さく息をする
+    birdSleeping: {
+      pose: "sleep",
+      scaleY: { offset: -0.04, amplitude: 0.02, period: 2600 },
+      scaleX: { offset: 0.02,  amplitude: -0.01, period: 2600 }
+    },
+
+    // ─────────────────────────────────────────
+    // コケガメ。姿は blink（まばたき）／lookUp（頭を上げる）／peek（頭と脚を半分引っ込める）／hide（甲羅にこもる）／
+    // stompL・stompR（脚の足踏み）／sleep（半分引っ込めて居眠り）。
+    // 重い壁役。ドロガメと同じく、こもる・顔を出すで見せる。甲羅の苔と双葉は動かさない
+    // ─────────────────────────────────────────
+
+    // ふだん：ゆっくり息をしながら、見上げる・まばたき・足踏みをくり返す。
+    //   sprite: [元, LookUp, 元, Blink, 元, StompL, 元, StompR] × 700ms
+    kokeBreathe: {
+      frames: { interval: 700 },
+      scaleY: { amplitude: 0.012, period: 2800 }
+    },
+
+    // 通常攻撃（噛みつく・体当たり）。足踏みしてから、頭を突き出してぶつかる
+    kokeBite: {
+      duration: 600,
+      offsetY: { amount: 20, shape: "windup", backRatio: 0.4 },
+      poses: [
+        { at: 0,    pose: "stompL" },
+        { at: 0.15, pose: "stompR" },
+        { at: 0.4,  pose: "lookUp" },
+        { at: 0.8,  pose: null }
+      ]
+    },
+
+    // 体技・斬撃・踊り。甲羅にこもって滑り込み、ぶつかってから顔を出す
+    kokeSlide: {
+      duration: 760,
+      offsetY: { amount: 26, shape: "windup", backRatio: 0.3 },
+      poses: [
+        { at: 0,    pose: "peek" },
+        { at: 0.12, pose: "hide" },
+        { at: 0.8,  pose: "peek" },
+        { at: 0.92, pose: null }
+      ]
+    },
+
+    // 共鳴（ウェーブ・クレンズなど）。頭を上げ、脚で交互に地面を踏み鳴らして力を響かせる（その場から動かない）
+    kokeResonate: {
+      duration: 800,
+      offsetX: { amount: 1.2,  shape: "wobble", cycles: 4 },
+      scale:   { amount: 0.04, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "lookUp" },
+        { at: 0.15, pose: "stompL" }, { at: 0.3,  pose: "stompR" },
+        { at: 0.45, pose: "stompL" }, { at: 0.6,  pose: "stompR" },
+        { at: 0.75, pose: "lookUp" },
+        { at: 0.9,  pose: null }
+      ]
+    },
+
+    // ブレス（あわ）。頭を半分引っ込めて吸い込み、頭を上げて吐き出す
+    kokeBreath: {
+      duration: 740,
+      offsetY: { amount: 10,   shape: "windup", backRatio: 0.45 },
+      scale:   { amount: 0.05, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "peek" },
+        { at: 0.45, pose: "lookUp" },
+        { at: 0.86, pose: null }
+      ]
+    },
+
+    // 自分・味方にかける技。甲羅にこもって身を固め、ゆっくり顔を出す
+    kokeBuff: {
+      duration: 680,
+      scaleY: { amount: -0.04, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "hide" },
+        { at: 0.6,  pose: "peek" },
+        { at: 0.82, pose: null }
+      ]
+    },
+
+    // 被弾。とっさに甲羅にこもる。重いのでほとんど押されない
+    kokeHit: {
+      duration: 420,
+      offsetY: { amount: 5,    shape: "decay", cycles: 2 },
+      alpha:   { amount: -0.3, shape: "fade" },
+      poses: [
+        { at: 0,    pose: "hide" },
+        { at: 0.6,  pose: "peek" },
+        { at: 0.82, pose: null }
+      ]
+    },
+
+    // 回避。跳べないので、甲羅にこもって横へずりっと滑る
+    kokeDodge: {
+      duration: 460,
+      offsetX: { amount: 16, outRatio: 0.3 },
+      poses: [
+        { at: 0,    pose: "hide" },
+        { at: 0.6,  pose: "peek" },
+        { at: 0.8,  pose: null }
+      ]
+    },
+
+    // 防御中。甲羅にこもったまま（ずっと続く。特性「硬い殻」らしく）
+    kokeGuard: {
+      pose: "hide",
+      scale: { offset: -0.03 }
+    },
+
+    // レベルアップ・スカウトに応じたとき。頭を上げて、脚で交互に足踏みしながら小さく2回跳ねる
+    kokeCheer: {
+      duration: 760,
+      offsetY: { amount: -6, shape: "hops", count: 2 },
+      poses: [
+        { at: 0,    pose: "lookUp" },
+        { at: 0.15, pose: "stompL" }, { at: 0.3,  pose: "stompR" },
+        { at: 0.45, pose: "stompL" }, { at: 0.6,  pose: "stompR" },
+        { at: 0.75, pose: "lookUp" },
+        { at: 0.95, pose: null }
+      ]
+    },
+
+    // 眠っている間。頭と脚を半分引っ込めて目を閉じ、ゆっくり深く息をする
+    kokeSleeping: {
+      pose: "sleep",
+      scaleY: { offset: -0.02, amplitude: 0.014, period: 4200 }
+    },
+
+    // ─────────────────────────────────────────
+    // コダマ。姿は up（双葉と腕を上げる）／down（下げる）／bright（体が光る）／sleep。
+    // 浮いている精なので、ずっと漂う。光の粒はコマごとに場所が変わり、またたいて見える
+    // ─────────────────────────────────────────
+
+    // ふだん：ふわふわ漂いながら、双葉と腕をゆっくり上げ下げする。
+    //   sprite: [元, Up, 元, Down] × 300ms ＝ 1200ms ＝ 上下の揺れの周期（双葉を上げたときに体が浮く）
+    kodamaFloat: {
+      frames:  { interval: 300 },
+      offsetY: { amplitude: -2.6, period: 1200, phase: 0.25 },
+      alpha:   { amplitude: -0.06, period: 2400 }
+    },
+
+    // 通常攻撃。双葉と腕を上げて溜め、振り下ろしながら体ごとぶつかる
+    kodamaBump: {
+      duration: 460,
+      offsetY: { amount: 26, shape: "windup", backRatio: 0.3 },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.3,  pose: "down" },
+        { at: 0.7,  pose: null }
+      ]
+    },
+
+    // 体技・斬撃・踊り。2回続けてぶつかる
+    kodamaTechnique: {
+      duration: 760,
+      offsetY: { amount: 26, shape: "hops", count: 2 },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.1,  pose: "down" },
+        { at: 0.4,  pose: "up" },
+        { at: 0.6,  pose: "down" },
+        { at: 0.9,  pose: null }
+      ]
+    },
+
+    // 共鳴（シャイン・グレアなど）。舞い上がって双葉を広げ、体を光らせる（その場から動かない）
+    kodamaResonate: {
+      duration: 760,
+      offsetY: { amount: -12,  shape: "pulse" },
+      scaleY:  { amount: 0.05, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.2,  pose: "bright" },
+        { at: 0.85, pose: null }
+      ]
+    },
+
+    // ブレス。双葉を下げて身を縮め、上げながら前へ吐き出す
+    kodamaBreath: {
+      duration: 660,
+      offsetY: { amount: 14,   shape: "windup", backRatio: 0.5 },
+      scale:   { amount: 0.06, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "down" },
+        { at: 0.5,  pose: "up" },
+        { at: 0.85, pose: null }
+      ]
+    },
+
+    // 自分・味方にかける技。光りながら、ふわりと浮き上がる
+    kodamaBuff: {
+      duration: 560,
+      offsetY: { amount: -10, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.25, pose: "bright" },
+        { at: 0.78, pose: null }
+      ]
+    },
+
+    // 被弾。双葉と腕がしおれ、揺れながら戻る
+    kodamaHit: {
+      duration: 320,
+      offsetY: { amount: 12,   shape: "decay", cycles: 2 },
+      alpha:   { amount: -0.45, shape: "fade" },
+      poses: [
+        { at: 0,    pose: "down" },
+        { at: 0.5,  pose: null }
+      ]
+    },
+
+    // 回避。双葉を上げて、横へふわりと流れる
+    kodamaDodge: {
+      duration: 420,
+      offsetX: { amount: 26, outRatio: 0.25 },
+      offsetY: { amount: -6, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.5,  pose: null }
+      ]
+    },
+
+    // レベルアップ・スカウトに応じたとき。光りながら、その場で一回転する
+    kodamaCheer: {
+      duration: 620,
+      rotate:  { amount: 1,   shape: "rise" },
+      offsetY: { amount: -12, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.2,  pose: "bright" },
+        { at: 0.8,  pose: "up" },
+        { at: 0.95, pose: null }
+      ]
+    },
+
+    // 眠っている間。双葉と腕を下げ、目を閉じて（Sleep の絵）、低く漂う
+    kodamaSleeping: {
+      pose: "sleep",
+      offsetY: { offset: 3, amplitude: -1, period: 3400 },
+      scaleY:  { offset: -0.02, amplitude: 0.02, period: 3400 }
+    },
+
+    // ─────────────────────────────────────────
+    // 若葉の洞の主（名前は仮）。姿は armsOut（根の腕を広げる）／armsUp（掲げる）／leafL・leafR（頭の葉が揺れる）／
+    // glare（目を見開く）／sleep（葉がしおれ、目を閉じる）。
+    // 根を張った重い主なので跳ねない。ゆっくり息をし、頭の葉が風に揺れる
+    // ─────────────────────────────────────────
+
+    // ふだん：深く息をしながら、頭の葉が左右に揺れる。
+    //   sprite: [元, LeafL, 元, LeafR] × 560ms ＝ 2240ms。息はその2倍の周期でゆっくり
+    woodLordBreathe: {
+      frames: { interval: 560 },
+      scaleX: { amplitude: 0.014, period: 4480 },
+      scaleY: { amplitude: 0.020, period: 4480, phase: 0.2 }
+    },
+
+    // 通常攻撃。根の腕を高く掲げて溜め、振り下ろして叩きつける
+    woodLordSlam: {
+      duration: 640,
+      offsetY: { amount: 22, shape: "windup", backRatio: 0.45 },
+      poses: [
+        { at: 0,    pose: "armsUp" },
+        { at: 0.45, pose: "armsOut" },
+        { at: 0.8,  pose: null }
+      ]
+    },
+
+    // 体技・斬撃・踊り。根の腕を広げて、左右に振り回しながら2回踏み込む
+    woodLordSweep: {
+      duration: 860,
+      offsetY: { amount: 20, shape: "hops", count: 2 },
+      offsetX: { amount: 2,  shape: "wobble", cycles: 2 },
+      poses: [
+        { at: 0,    pose: "armsUp" },
+        { at: 0.2,  pose: "armsOut" },
+        { at: 0.5,  pose: "armsUp" },
+        { at: 0.7,  pose: "armsOut" },
+        { at: 0.92, pose: null }
+      ]
+    },
+
+    // 共鳴（地の技など）。根の腕を掲げ、目を見開いて地の力を響かせる（その場から動かない）
+    woodLordResonate: {
+      duration: 820,
+      offsetY: { amount: -6,   shape: "pulse" },
+      scaleY:  { amount: 0.05, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "armsUp" },
+        { at: 0.35, pose: "glare" },
+        { at: 0.85, pose: null }
+      ]
+    },
+
+    // ブレス。腕を広げて身を引き（吸い込む）、目を見開いて吐き出す
+    woodLordBreath: {
+      duration: 760,
+      offsetY: { amount: 12,   shape: "windup", backRatio: 0.5 },
+      scale:   { amount: 0.05, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "armsOut" },
+        { at: 0.5,  pose: "glare" },
+        { at: 0.88, pose: null }
+      ]
+    },
+
+    // 自分・味方にかける技。根の腕を掲げ、頭の葉を揺らす
+    woodLordBuff: {
+      duration: 720,
+      offsetY: { amount: -6, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "armsUp" },
+        { at: 0.3,  pose: "leafL" },
+        { at: 0.5,  pose: "leafR" },
+        { at: 0.7,  pose: "armsUp" },
+        { at: 0.88, pose: null }
+      ]
+    },
+
+    // 被弾。腕が跳ね、頭の葉が揺れる。重いのでほとんど押されない
+    woodLordHit: {
+      duration: 420,
+      offsetY: { amount: 5,    shape: "decay", cycles: 2 },
+      alpha:   { amount: -0.3, shape: "fade" },
+      poses: [
+        { at: 0,    pose: "armsOut" },
+        { at: 0.3,  pose: "leafR" },
+        { at: 0.6,  pose: "leafL" },
+        { at: 0.85, pose: null }
+      ]
+    },
+
+    // 回避。根を引きずって、横へわずかにずれる
+    woodLordDodge: {
+      duration: 460,
+      offsetX: { amount: 12, outRatio: 0.35 },
+      poses: [
+        { at: 0,    pose: "leafL" },
+        { at: 0.6,  pose: null }
+      ]
+    },
+
+    // レベルアップ・スカウトに応じたとき。根の腕を掲げ、頭の葉を揺らして小さく2回跳ねる
+    woodLordCheer: {
+      duration: 800,
+      offsetY: { amount: -6, shape: "hops", count: 2 },
+      poses: [
+        { at: 0,    pose: "armsUp" },
+        { at: 0.25, pose: "leafL" },
+        { at: 0.5,  pose: "armsUp" },
+        { at: 0.75, pose: "leafR" },
+        { at: 0.95, pose: null }
+      ]
+    },
+
+    // 眠っている間。頭の葉がしおれ、目を閉じて（Sleep の絵）、ゆっくり深く息をする
+    woodLordSleeping: {
+      pose: "sleep",
+      scaleX: { offset: 0.01,  amplitude: 0.016, period: 5000 },
+      scaleY: { offset: -0.03, amplitude: 0.018, period: 5000, phase: 0.25 }
+    },
+
+    /**
+     * --- シニガミ（蔦這う回廊の初見殺し。2026-10-21） ---
+     * 姿は sprites_marsh.js の shinigami（ふつう）・shinigamiRaise（振りかぶる）・shinigamiSwing（振り下ろす）。
+     * 影なので跳ねたり歩いたりしない。漂い、揺らぎ、すっと間合いを詰める
+     */
+
+    // ふだん：ゆっくり上下に漂い、影の濃さが揺らぐ（実体の無い感じ）
+    reaperFloat: {
+      offsetY: { amplitude: -3.0,  period: 2600 },
+      offsetX: { amplitude: 1.0,   period: 3900, phase: 0.3 },
+      alpha:   { amplitude: -0.14, period: 1900 }
+    },
+
+    /**
+     * 死神の鎌（専用の動き。作者の指定。2026-10-21 に作り直した）。技の側に motion: "reap" と書いてある。
+     *   0.00〜0.20  鎌を振りかぶる（raise）
+     *   0.20〜0.50  さらに大きく、肩に担ぐように振りかぶる（windup）。小刻みに震える（来る、と分からせる）
+     *   0.50        振りの途中のコマ（mid：刃が伸び、軌跡が残る）
+     *   0.56        振り下ろしのコマ（swing）。ここで当たる（技の windupMs 840 ＝ 0.56 × 1500）
+     *   0.56〜0.88  振り抜いたまま止まる（残心）
+     * ★ 作者の指定「撃ったときにシニガミ自体が動きすぎないように」で、体の踏み込み・ふくらみ・傾きは小さくしてある。
+     *   見せ場は鎌の絵の切り替わりと、当たった演出（data/effects.js の reap）に任せる
+     */
+    reaperScythe: {
+      duration: 1500,
+      offsetY: { amount: 10,   shape: "windup", backRatio: 0.5 },
+      offsetX: { amount: 0.8,  shape: "wobble", cycles: 9 },
+      scale:   { amount: 0.04, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "raise" },
+        { at: 0.20, pose: "windup" },
+        { at: 0.50, pose: "mid" },
+        { at: 0.56, pose: "swing" },
+        { at: 0.88, pose: null }
+      ]
+    },
+
+    // 通常攻撃：鎌を軽く振る（死神の鎌より溜めが短く、踏み込みも浅い）。
+    // 振りかぶり → 振りの途中（mid：刃が伸びて軌跡が見える。作者の依頼）→ 振り下ろし
+    reaperSlash: {
+      duration: 620,
+      offsetY: { amount: 24, shape: "windup", backRatio: 0.3 },
+      poses: [
+        { at: 0,    pose: "raise" },
+        { at: 0.26, pose: "mid" },
+        { at: 0.36, pose: "swing" },
+        { at: 0.78, pose: null }
+      ]
+    },
+
+    // 踊り（死の踊り）など：鎌を振りかぶっては振り下ろし、影ごとゆらゆら揺れる
+    reaperDance: {
+      duration: 900,
+      offsetX: { amount: 6,    shape: "wobble", cycles: 2 },
+      rotate:  { amount: 0.05, shape: "wobble", cycles: 2 },
+      poses: [
+        { at: 0,    pose: "raise" },
+        { at: 0.24, pose: "mid" },
+        { at: 0.3,  pose: "swing" },
+        { at: 0.55, pose: "raise" },
+        { at: 0.74, pose: "mid" },
+        { at: 0.8,  pose: "swing" },
+        { at: 0.95, pose: null }
+      ]
+    },
+
+    // 共鳴（デス・デスラ）：その場で鎌を掲げ、目を光らせて影がふくらむ（動かない）
+    reaperResonate: {
+      duration: 820,
+      offsetY: { amount: -8,   shape: "pulse" },
+      scale:   { amount: 0.08, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "raise" },
+        { at: 0.85, pose: null }
+      ]
+    },
+
+    // 被弾：影が散るように薄れて、揺れる
+    reaperHit: {
+      duration: 340,
+      offsetX: { amount: 6,    shape: "decay", cycles: 2 },
+      alpha:   { amount: -0.6, shape: "fade" }
+    },
+
+    // 回避：影がすっと横へ流れて消え、また現れる
+    reaperDodge: {
+      duration: 460,
+      offsetX: { amount: 18,  outRatio: 0.3 },
+      alpha:   { amount: -0.7, shape: "fade" }
+    },
+
+    // 倒れる：影がほどけて消える（縮みながら上へ薄れる）
+    reaperFade: {
+      duration: 700,
+      offsetY: { amount: -14, shape: "rise" },
+      scale:   { amount: -0.3, shape: "rise" },
+      alpha:   { amount: -1,  shape: "rise" }
+    },
+
+    /**
+     * --- ザンガルド（蔦這う回廊の雷の竜の子。2026-10-26） ---
+     * 作者の指定「体全体を動かす・脈動感があったほうがいい（腕と剣だけはよくない）」。
+     * 姿の絵は作者が描いた（data/sprites_marsh.js の thunderDragon〜。参考絵/zangard_sprites/ の zangard_atlas.json）。
+     * コマの長さは作者の atlas の比のまま。当たる瞬間（技を出して約400ms。BattleScene の eventDelay）に
+     * 振り下ろし・突きのコマが来るようにしてある。体の伸び縮み・踏み込みは、その上に軽く重ねているだけ。
+     * 技ごとには分けない（作者：DQM のように、技の種類ごとに同じ動き）。
+     * ★ 2026-10-27 作者が動きの見本で見て確定（攻撃 460ms・技 480ms・被弾の絵 200ms を含めて）。
+     * 絵は右向き（rotate は回転数。正で前へ倒れる・負で反る。0.03 で約11°）
+     */
+
+    // ふだん：作者の idle 4枚（220ms ずつ＝880ms）。胸のふくらみはコマ2周（1760ms）で1回
+    zanBreathe: {
+      frames:  { interval: 220 },
+      scaleY:  { amplitude: 0.02,  period: 1760 },
+      scaleX:  { amplitude: 0.012, period: 1760, phase: 0.5 },
+      offsetY: { amplitude: -1,    period: 1760, phase: 0.1 }
+    },
+
+    // 通常攻撃（剣で斬る）：atlas の attack 6枚（120/120/70/70/110/160ms ＝ 650ms）。
+    // 振りかぶる → 振り上げる → 振り下ろす（attack4）→ 戻す
+    // 2026-10-27 作者「もうちょい速く、特に通常攻撃」→ 650ms を 460ms に縮めた（比はそのまま。85/85/50/50/78/112ms）。
+    //   振り下ろし（attack4）は 269〜347ms。当たる瞬間（約400ms）は振り抜いたあと（attack5）になる
+    zanSlash: {
+      duration: 460,
+      offsetY: { amount: 22,    shape: "windup", backRatio: 0.23 },
+      rotate:  { amount: 0.012, shape: "windup", backRatio: 0.23 },
+      scale:   { amount: 0.03,  shape: "windup", backRatio: 0.23 },
+      poses: [
+        { at: 0,     pose: "attack0" },
+        { at: 0.185, pose: "attack1" },
+        { at: 0.369, pose: "attack2" },
+        { at: 0.477, pose: "attack3" },
+        { at: 0.585, pose: "attack4" },
+        { at: 0.754, pose: "attack5" }
+      ]
+    },
+
+    // 体技・斬撃（稲妻斬り・二連斬り・いなずま）：atlas の skill 8枚で2回斬る。
+    // 作者「長すぎるかも、短くしてもいい」→ atlas の 730ms を 600ms に縮めた（比はそのまま。90/58/66/58/74/58/74/122ms）。
+    // 2026-10-27 作者「もうちょい速く」→ さらに 480ms に縮めた（72/46/53/46/59/46/59/98ms）。
+    // 1回目の振り下ろしが 118〜218ms、2回目の突き（skill6）が 323〜383ms で、当たる瞬間（約400ms）の直前
+    zanCleave: {
+      duration: 480,
+      offsetY: { amount: 26,    shape: "windup", backRatio: 0.35 },
+      rotate:  { amount: 0.015, shape: "windup", backRatio: 0.35 },
+      scale:   { amount: 0.04,  shape: "windup", backRatio: 0.35 },
+      poses: [
+        { at: 0,     pose: "skill0" },
+        { at: 0.15,  pose: "skill1" },
+        { at: 0.247, pose: "skill2" },
+        { at: 0.357, pose: "skill3" },
+        { at: 0.453, pose: "skill4" },
+        { at: 0.577, pose: "skill5" },
+        { at: 0.673, pose: "skill6" },
+        { at: 0.797, pose: "skill7" }
+      ]
+    },
+
+    // 共鳴（サンダー）：atlas の magic 5枚（140/120/120/120/220ms ＝ 720ms）。
+    // 剣を下げ、腕を胸へ寄せてから掲げる。その場で胸をふくらませ、帯電したように震える（踏み込まない）
+    zanResonate: {
+      duration: 720,
+      scaleY:  { amount: 0.05,   shape: "pulse" },
+      scaleX:  { amount: 0.03,   shape: "pulse" },
+      rotate:  { amount: -0.008, shape: "pulse" },
+      offsetX: { amount: 1,      shape: "wobble", cycles: 6 },
+      poses: [
+        { at: 0,     pose: "magic0" },
+        { at: 0.194, pose: "magic1" },
+        { at: 0.361, pose: "magic2" },
+        { at: 0.528, pose: "magic3" },
+        { at: 0.694, pose: "magic4" }
+      ]
+    },
+
+    // ちからため：共鳴と同じ magic 5枚。身を沈めてから、反り返って体をふくらませる
+    zanGather: {
+      duration: 720,
+      scaleY:  { amount: 0.07,   shape: "windup", backRatio: 0.35 },
+      rotate:  { amount: -0.012, shape: "pulse" },
+      offsetY: { amount: -5,     shape: "windup", backRatio: 0.35 },
+      poses: [
+        { at: 0,     pose: "magic0" },
+        { at: 0.194, pose: "magic1" },
+        { at: 0.361, pose: "magic2" },
+        { at: 0.528, pose: "magic3" },
+        { at: 0.694, pose: "magic4" }
+      ]
+    },
+
+    // 被弾：atlas の hit 1枚でのけぞって揺れ戻る。
+    // 2026-10-27 作者「被弾だけ切り替わる時間を速く」→ hit の絵は最初の 200ms だけ（前は 420ms ずっと）。
+    //   そのあとはふだんの絵に戻り、体の揺れ戻りだけが 420ms まで続く
+    zanHit: {
+      duration: 420,
+      offsetY: { amount: 7,     shape: "decay", cycles: 2 },
+      rotate:  { amount: -0.018, shape: "decay", cycles: 2 },
+      alpha:   { amount: -0.3,  shape: "fade" },
+      poses: [
+        { at: 0,    pose: "hit" },
+        { at: 0.48, pose: null }
+      ]
+    },
+
+    // 回避：横へすべる（作者）
+    zanDodge: {
+      duration: 520,
+      offsetX: { amount: 24, outRatio: 0.3 }
+    },
+
+    // レベルアップ・スカウトに応じたとき：共鳴の動きを速めに流す（作者。720ms → 480ms）
+    zanCheer: {
+      duration: 480,
+      scaleY:  { amount: 0.05,   shape: "pulse" },
+      scaleX:  { amount: 0.03,   shape: "pulse" },
+      rotate:  { amount: -0.008, shape: "pulse" },
+      offsetX: { amount: 1,      shape: "wobble", cycles: 4 },
+      poses: [
+        { at: 0,     pose: "magic0" },
+        { at: 0.194, pose: "magic1" },
+        { at: 0.361, pose: "magic2" },
+        { at: 0.528, pose: "magic3" },
+        { at: 0.694, pose: "magic4" }
+      ]
     }
   };
 
@@ -3188,4 +4211,11 @@
       levelUp:   "cheerHop"
     }
   };
+
+  // ▼▼▼ 動きの調整ページが書くところ。手で直さない（tools/devserver.py が丸ごと書き直す）▼▼▼
+  // 気に入った調整は、上の本体の行へ移してからここを消す。ここにある id は本体より優先される。
+  var tuned = {};
+  for (var tunedId in tuned) NS.rawData.motions[tunedId] = tuned[tunedId];
+  NS.rawData.motionsTuned = Object.keys(tuned);   // 見本ページで ★ を付ける
+  // ▲▲▲ 動きの調整ページが書くところ（ここまで）
 })(window.MyGame);

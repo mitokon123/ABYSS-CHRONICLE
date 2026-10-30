@@ -151,6 +151,20 @@
           { item: "spiritRing",       unlockedBy: "venomMarsh" },
           { item: "travelerCharm",    unlockedBy: "venomMarsh" },
 
+          // 若葉の洞の素材（v1.0.0）。クリアしてから取り扱いが始まる。
+          // 若芽の種（コダマ）と若木の芯（主）は並べない
+          { item: "shedHusk",    unlockedBy: "sproutHollow" },
+          { item: "sleepPollen", unlockedBy: "sproutHollow" },
+          { item: "leafFeather", unlockedBy: "sproutHollow" },
+          { item: "mossyShell",  unlockedBy: "sproutHollow" },
+
+          // 蔦這う回廊の素材。クリアしてから取り扱いが始まる（ねじれ蔦・錆びた骨はもう並んでいる）。
+          // 金角のかけら（ザンガルドの珍しいドロップ）と絡み主根（B4F の宝箱だけ。作者の指定）は並べない
+          { item: "mossSpore",        unlockedBy: "ivyCorridor" },
+          { item: "windChimeFeather", unlockedBy: "ivyCorridor" },
+          { item: "blueThunderScale", unlockedBy: "ivyCorridor" },
+          { item: "glowMoss",         unlockedBy: "ivyCorridor" },
+
           // 大きく回復する薬。毒沼をクリアしてから並ぶ。
           //   毒沼までは回復薬（50G / 50回復）で足りる。
           //   ここで初めて「1ターンで100戻す」選択肢を出す

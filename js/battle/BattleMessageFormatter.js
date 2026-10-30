@@ -84,10 +84,22 @@
         return event.text || null;
       case "defend":
         return fill(t.defend, { actor: this._actorName(event) });
+      case "defendFailed":
+        return fill(t.defendFailed, this._statusValues(event));
+      case "defendBroken":
+        return fill(t.defendBroken, this._statusValues(event));
       case "wait":
         return fill(t.wait, { actor: this._actorName(event) });
       case "useSkill":
+        // 技に useMessage があれば、その文で宣言する（主のやくそう。v1.0.0）
+        if (event.skill && event.skill.useMessage) {
+          return fill(event.skill.useMessage, { actor: this._actorName(event), skill: event.skillName });
+        }
         return fill(t.useSkill, { actor: this._actorName(event), skill: event.skillName });
+      // 相手のPPを減らした（ミステリーダンス）
+      case "ppDamage":
+        return fill(event.amount > 0 ? t.ppDamage : t.ppDamageNone,
+                    { target: this._targetName(event), amount: event.amount });
       case "miss":
         return fill(t.miss, { target: this._targetName(event) });
       case "critical":
@@ -134,6 +146,18 @@
         return fill(t.undyingEnd, { target: this._targetName(event) });
       case "partyFirstStrike":
         return fill(t.partyFirstStrike, { ability: event.abilityName });
+      // v1.0.0 追い風・芽吹き
+      case "tailwind":
+        return fill(t.tailwind, { target: this._targetName(event), ability: event.abilityName });
+      case "tailwindEnd":
+        return fill(t.tailwindEnd, { target: this._targetName(event), ability: event.abilityName });
+      case "wardGiven":
+        return fill(t.wardGiven, { target: this._targetName(event), ability: event.abilityName,
+          ally: this._targetName({ targetName: event.allyName, targetSide: event.targetSide }) });
+      case "wardBlocked":
+        return fill(t.wardBlocked, this._statusValues(event));
+      case "wardSkill":
+        return fill(t.wardSkill, { target: this._targetName(event) });
       case "heal":
         return fill(t.healed, { target: this._targetName(event), amount: event.healAmount });
       case "healFull":
@@ -166,6 +190,12 @@
                     this._statusValues(event));
       case "statusMiss":
         return fill(t.statusMiss, this._statusValues(event));
+      case "modifierMiss":
+        return fill(t.modifierMiss || t.statusMiss, { target: this._targetName(event) });
+      case "recoil":
+        return fill(t.recoil, { target: this._targetName(event), amount: event.amount });
+      case "charge":
+        return fill(t.charge, { target: this._targetName(event) });
       case "statusImmune":
         return fill(t.statusImmune, this._statusValues(event));
       case "expGained":

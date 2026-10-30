@@ -14,6 +14,12 @@
     技はすべての技から選べ、選んだ技で上段の相手へ与えるダメージ（BattleSystem.calcDamage）も出る。
     セーブや設定には一切書き込まない。
 
+    ▼ 動きの調整（v1.0.2。右の欄）
+    動きの数字をつまみで変えると、その場で見た目が変わる（ページの中の値を書き換えるだけ）。
+    開発用サーバー（tools/devserver.py。8124 番）で開いているときだけ、「保存」で data/motions.js の
+    いちばん下の「調整ページが書くところ」へ書き込める（ほかの行には触らない。書く前の写しは backup/ に残る）。
+    ふつうのサーバー（8123）では試すだけで、保存はできない。
+
     読み込むファイルは app.html の一覧をそのまま使う（js/main.js だけ除く）ので、
     ゲームにファイルを足しても、ここを直す必要はない。
     ★ 一覧を読むのに fetch を使うので、app.html と同じくサーバー経由（http://〜）で開くこと。
@@ -63,6 +69,26 @@
     #damageBox label { font-size: 12px; color: #9aa4c0; }
     #skillPick { margin-bottom: 4px; }
     #now { font-size: 13px; color: #ffd75e; min-height: 1.4em; margin-top: 6px; }
+    /* 動きの調整の欄 */
+    #tune { width: 330px; }
+    #tune .tnote { font-size: 12px; color: #6b7590; line-height: 1.6; }
+    #tune .tnote.ok { color: #9adfaa; }
+    #tune .tnote.warn { color: #ff9a7a; }
+    #tune .grp { border: 1px solid #2a3350; background: #0a0f1c; padding: 6px 8px; margin: 8px 0; }
+    #tune .grp > .head { display: flex; justify-content: space-between; align-items: center;
+                         color: #ffd75e; font-size: 13px; margin-bottom: 4px; }
+    #tune .prm { display: flex; gap: 6px; align-items: center; font-size: 12px; margin: 3px 0; }
+    #tune .prm > .k { width: 74px; color: #9aa4c0; flex: none; }
+    #tune .prm input[type=range] { flex: 1; min-width: 0; }
+    #tune .prm input[type=number] { width: 70px; padding: 2px 4px; background: #141b2e; color: #e8ecf8;
+                                    border: 1px solid #2a3350; }
+    #tune .prm select, #tune .prm input[type=text] { flex: 1; width: auto; padding: 2px 4px; }
+    #tune input[type=text], #tune textarea { background: #141b2e; color: #e8ecf8; border: 1px solid #2a3350; }
+    #tune textarea { width: 100%; box-sizing: border-box; font-family: monospace; font-size: 12px; }
+    #tune .x { width: auto; display: inline-block; margin: 0; padding: 0 7px; text-align: center; font-size: 12px; }
+    #tune .row select { flex: 1; }
+    #tune .row button { width: auto; }
+    #tune details { margin-top: 10px; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -132,6 +158,34 @@
         開発用のページ。セーブには触れない。<br>
         動きの数字は data/motions.js、共鳴の演出は data/effects.js の resonance。
       </div>
+    </div>
+
+    <!-- 動きの調整。つまみで数字を変えるとその場で動きが変わる。開発用サーバーなら保存できる -->
+    <div id="tune">
+      <h1>動きの調整</h1>
+      <div id="tuneStatus" class="tnote">サーバーを確かめています…</div>
+      <h2>調整する動き（★＝調整を保存したもの・＊＝保存していない変更あり）</h2>
+      <select id="tuneMotion"></select>
+      <div id="tuneInfo" class="tnote"></div>
+      <div class="row">
+        <button id="tunePlay">再生</button>
+        <label class="tnote"><input type="checkbox" id="tuneLoop"> くり返す</label>
+      </div>
+      <div id="tuneFields"></div>
+      <div class="row">
+        <select id="tuneAdd"></select>
+        <button id="tuneAddBtn">足す</button>
+      </div>
+      <h2>保存</h2>
+      <div id="tuneDirty" class="tnote"></div>
+      <button id="tuneSave">data/motions.js へ保存</button>
+      <button id="tuneRevert">ファイルに入っている値に戻す</button>
+      <button id="tuneCopy">新しい名前で写す</button>
+      <button id="tuneUntune">保存した調整を消す（本体の値に戻す）</button>
+      <details>
+        <summary>文字で見る（そのまま書き写せる形）</summary>
+        <textarea id="tuneText" rows="12" readonly></textarea>
+      </details>
     </div>
   </div>
 
@@ -330,7 +384,8 @@
         if (s) playSkill(s.id, targetKindOf(s), s.name);
       };
       function targetKindOf(skill) {
-        return (skill.target === "self" || skill.target === "ally") ? "self" : "foe";
+        // 味方全体の技（ベール・鼓舞の舞など）も、こちら側に出す
+        return (skill.target === "self" || skill.target === "ally" || skill.target === "allAllies") ? "self" : "foe";
       }
 
       /**
@@ -384,6 +439,8 @@
 
         var critRate = ((gd.battle || {}).critical || {}).baseRate || 0;
         critRate += skill.criticalBonus || 0;
+        // 種族の上乗せ（ザンガルド +4%。BattleSystem._rollCritical）
+        critRate += (hero._species && hero._species.criticalBonus) || 0;
         if (gd.getSkillRule(skill, "canCritical") !== false && critRate > 0) {
           var clo = damageOf(skill, 0, true), chi = damageOf(skill, 0.999999, true);
           html += "<br><span class='crit'>クリティカル " + span(num(clo.damage), num(chi.damage)) +
@@ -397,6 +454,7 @@
         box.innerHTML = html;
       }
 
+      var afterBuild = [];   // モンスターを作り直したあとにすること（動きの調整の一覧を作り直す）
       function build(speciesId) {
         hero = new NS.MonsterInstance(speciesId, level, gd, { nature: natureId });
         foe = new NS.MonsterInstance(foeSelect.value, foeLevel(), gd);
@@ -409,6 +467,7 @@
         scene._captureStatusMarks();
         renderStats();
         renderDamage();
+        afterBuild.forEach(function (fn) { fn(speciesId); });
       }
       build("slime");
 
@@ -437,8 +496,12 @@
         // 当たる瞬間（動きの半分くらい）に、相手側の演出とのけぞりを出す
         var motionId = hero.getActionMotionId(kind);
         var def = motionId ? gd.motions[motionId] : null;
-        var hitAt = game.clock + (def && def.duration ? def.duration * 0.45 : 250);
-        queue.push({ at: hitAt, fn: function () {
+        // 溜めの長い技（死神の鎌）は、ゲームと同じく windupMs で当たる（data/skills.js）
+        var hitAt = game.clock + (skill.windupMs || (def && def.duration ? def.duration * 0.45 : 250));
+        // 何回か当てる技（二連斬り）は、ゲームと同じく回数ぶん当たる（少しずつ遅らせる）
+        var hitCount = Math.max(1, skill.hits || 1);
+        for (var h = 0; h < hitCount; h++) queue.push({ at: hitAt + h * 300, fn: hitOnce });
+        function hitOnce() {
           var ev = (skill.modifier && !skill.power)
             // 強化か弱体かはゲームと同じ判定で決める（弱体＝ちからぬきなどは上から下へ流れる）
             ? { type: "modifier", target: target, raised: NS.BattleSystem.isRaising(skill), side: "ally" }
@@ -453,7 +516,7 @@
               foe, String(hit.damage));
           }
           if (skill.heal) scene._startMotion(hero, "heal", 1);
-        } });
+        }
       }
 
       // --- ほかの場面 ---
@@ -525,6 +588,430 @@
           b.className = "on";
         };
       });
+
+      // =====================================================================
+      // 動きの調整（v1.0.2）
+      //   gd.motions の中身をその場で書き換える。ゲームは毎回ここから読むので、すぐ見た目に出る。
+      //   ふだんの動き（duration が無いもの）は、いまのモンスターのふだんの動きに差し替えて見せる。
+      //   1回だけの動き（duration があるもの）は「再生」で出す（相手の方へ向けて）。
+      // =====================================================================
+      var CHANNELS = ["offsetX", "offsetY", "scale", "scaleX", "scaleY", "alpha", "rotate", "lift"];
+      var CHANNEL_NAMES = { offsetX: "左右", offsetY: "上下", scale: "大きさ", scaleX: "横の大きさ",
+                            scaleY: "縦の大きさ", alpha: "濃さ", rotate: "傾き", lift: "浮く" };
+      var PARAM_NAMES = { amplitude: "動く量", amount: "動く量", speed: "速さ", period: "1往復(ms)", wave: "波の形",
+                          phase: "ずらし", shape: "形", outRatio: "出きる割合", backRatio: "引く割合",
+                          cycles: "揺れる回数", count: "回数", duration: "長さ(ms)", interval: "1コマ(ms)",
+                          pinTop: "動かさない行", anchor: "伸縮の基準" };
+      var PARAM_DEFAULTS = { amplitude: 1, speed: 0.002, period: 2000, wave: "sin", phase: 0, amount: 1, shape: "pulse",
+                             outRatio: 0.3, backRatio: 0.45, cycles: 2, count: 2 };
+      var WAVES = ["sin", "bounce", "blink"];
+      var SCENE_NAMES = { attack: "攻撃", resonance: "共鳴", breath: "ブレス", technique: "体技・斬撃", buff: "自分にかける",
+                          hit: "被弾", guard: "防御", dodge: "回避", heal: "回復", faint: "倒れる", levelUp: "レベルアップ" };
+      // 形（shape）の候補は、いま使われているものを集める
+      var SHAPES = [];
+      Object.keys(gd.motions).forEach(function (id) {
+        var def = gd.motions[id];
+        Object.keys(def).forEach(function (k) {
+          if (def[k] && typeof def[k] === "object" && typeof def[k].shape === "string" && SHAPES.indexOf(def[k].shape) < 0) {
+            SHAPES.push(def[k].shape);
+          }
+        });
+      });
+
+      var tuneSelect = document.getElementById("tuneMotion");
+      var tuneFields = document.getElementById("tuneFields");
+      var tuneInfo = document.getElementById("tuneInfo");
+      var tuneStatus = document.getElementById("tuneStatus");
+      var tuneDirty = document.getElementById("tuneDirty");
+      var tuneText = document.getElementById("tuneText");
+      var tuneLoop = document.getElementById("tuneLoop");
+      var canSave = false;
+      var cur = null;            // { id, def（gd.motions の中身そのもの） }
+      // ファイルに入っている値（開いたときの値。保存したらその値）。これと違えば「保存していない変更」
+      var baseline = JSON.parse(JSON.stringify(gd.motions));
+      var idleBackup = {};       // 差し替える前の、種族のふだんの動き
+      var tunedIds = (NS.rawData.motionsTuned || []).slice();
+
+      function copyOf(v) { return JSON.parse(JSON.stringify(v)); }
+      function isOneShot(def) { return !!(def && def.duration); }
+
+      fetch("/api/ping").then(function (r) { return r.json(); }).then(function (d) {
+        canSave = !!(d && d.canSave);
+      }).catch(function () { canSave = false; }).then(function () {
+        tuneStatus.className = "tnote " + (canSave ? "ok" : "warn");
+        tuneStatus.textContent = canSave
+          ? "開発用サーバーで開いています。保存できます。"
+          : "ふつうのサーバーで開いています。試せますが保存はできません（開発用サーバー abyss-tools から開くと保存できる）。";
+        updateDirty();
+      });
+
+      /** いまのモンスターの動き（ふだん・場面ごと）を上に、すべての動きを下に並べる */
+      function refreshTuneList(keepId) {
+        var species = hero.getSpecies();
+        tuneSelect.innerHTML = "";
+        function add(group, id, label) {
+          if (!gd.motions[id]) return;
+          var o = document.createElement("option");
+          o.value = id;
+          o.textContent = (tunedIds.indexOf(id) >= 0 ? "★ " : "") + (isDirty(id) ? "＊ " : "") + label;
+          group.appendChild(o);
+        }
+        var mine = document.createElement("optgroup");
+        mine.label = species.name + " の動き";
+        var idleId = idleBackup[hero.speciesId] !== undefined ? idleBackup[hero.speciesId] : species.motion;
+        if (idleId) add(mine, idleId, "ふだん：" + idleId);
+        Object.keys(SCENE_NAMES).forEach(function (kind) {
+          var id = hero.getActionMotionId(kind);
+          if (id) add(mine, id, SCENE_NAMES[kind] + "：" + id);
+        });
+        tuneSelect.appendChild(mine);
+        var all = document.createElement("optgroup");
+        all.label = "すべての動き";
+        Object.keys(gd.motions).forEach(function (id) { add(all, id, id); });
+        tuneSelect.appendChild(all);
+        tuneSelect.value = keepId && gd.motions[keepId] ? keepId : (idleId || Object.keys(gd.motions)[0]);
+        selectMotion(tuneSelect.value);
+      }
+
+      /** 差し替えていたふだんの動きを元に戻す */
+      function restoreIdle() {
+        Object.keys(idleBackup).forEach(function (sid) { gd.monsters[sid].motion = idleBackup[sid]; });
+        idleBackup = {};
+      }
+
+      function selectMotion(id) {
+        restoreIdle();
+        var def = gd.motions[id];
+        cur = { id: id, def: def };
+        // ふだんの動きは、いまのモンスターのふだんの動きにして見せる
+        if (!isOneShot(def)) {
+          idleBackup[hero.speciesId] = gd.monsters[hero.speciesId].motion;
+          gd.monsters[hero.speciesId].motion = id;
+        }
+        // どの種族が使っているか
+        var users = [];
+        Object.keys(gd.monsters).forEach(function (sid) {
+          var m = gd.monsters[sid];
+          var idle = idleBackup[sid] !== undefined ? idleBackup[sid] : m.motion;
+          if (idle === id) users.push(m.name + "（ふだん）");
+          Object.keys(m.motions || {}).forEach(function (k) {
+            if (m.motions[k] === id) users.push(m.name + "（" + (SCENE_NAMES[k] || k) + "）");
+          });
+        });
+        Object.keys((gd.motionDefaults || {}).action || {}).forEach(function (k) {
+          if (gd.motionDefaults.action[k] === id) users.push("既定の" + (SCENE_NAMES[k] || k));
+        });
+        tuneInfo.textContent = (isOneShot(def) ? "1回だけの動き（再生で出す）" : "ふだんの動き（いまのモンスターに付けて見せている）") +
+          "。使っているもの：" + (users.join("、") || "なし");
+        document.getElementById("tunePlay").disabled = !isOneShot(def);
+        renderFields();
+        if (isOneShot(def)) playTuned();
+      }
+
+      tuneSelect.onchange = function () {
+        // 保存していない変更は、ほかの動きを選んでもページの中には残る（★の無い「＊」の印が付く）
+        selectMotion(tuneSelect.value);
+      };
+      // モンスターを変えたら、そのモンスターのふだんの動きを選ぶ。レベルや性格を変えただけなら選んだまま
+      var tuneSpecies = hero.speciesId;
+      afterBuild.push(function (speciesId) {
+        var same = speciesId === tuneSpecies;
+        tuneSpecies = speciesId;
+        if (!same && cur) restoreIdle();   // 前のモンスターのふだんの動きを戻してから、一覧を作り直す
+        refreshTuneList(same && cur ? cur.id : null);
+      });
+
+      /** 1回だけの動きを、相手（上）の方へ向けて出す */
+      function playTuned() {
+        if (!cur || !isOneShot(cur.def)) return;
+        scene.actionMotions.clear();
+        scene.actionMotions.play(hero, cur.id, game.clock, -1);
+        nowLabel.textContent = "調整中：" + cur.id;
+        if (tuneLoop.checked) {
+          var id = cur.id;
+          queue.push({ at: game.clock + cur.def.duration + 500, fn: function () {
+            if (tuneLoop.checked && cur && cur.id === id) playTuned();
+          } });
+        }
+      }
+      document.getElementById("tunePlay").onclick = playTuned;
+      tuneLoop.onchange = function () { if (tuneLoop.checked) playTuned(); };
+
+      // --- 数字の欄 ---
+
+      /** つまみの範囲 [最小, 最大, 刻み]。今の値が外にあれば広げる */
+      function rangeOf(key, channel, value) {
+        var r;
+        if (key === "amplitude" || key === "amount") {
+          r = /^(offset|lift)/.test(channel) ? [-40, 40, 0.1] : (channel === "rotate" ? [-1, 1, 0.002] : [-1, 1, 0.005]);
+        } else {
+          r = { period: [100, 8000, 10], speed: [0, 0.02, 0.0001], phase: [0, 1, 0.01], outRatio: [0, 1, 0.01],
+                backRatio: [0, 1, 0.01], cycles: [1, 8, 1], count: [1, 8, 1], duration: [50, 3000, 10],
+                interval: [40, 1000, 10], pinTop: [0, 32, 1] }[key] || [-100, 100, 0.1];
+        }
+        r = r.slice();
+        if (value < r[0]) r[0] = value;
+        if (value > r[1]) r[1] = value;
+        return r;
+      }
+
+      /** 1項目の欄。obj[key] を書き換える。channel はつまみの範囲を決めるため */
+      function paramRow(obj, key, channel, onRemove) {
+        var row = document.createElement("div");
+        row.className = "prm";
+        var k = document.createElement("span");
+        k.className = "k";
+        k.textContent = PARAM_NAMES[key] || key;
+        k.title = key;
+        row.appendChild(k);
+        var v = obj[key];
+
+        if (key === "wave" || key === "shape" || key === "anchor") {
+          var sel = document.createElement("select");
+          var opts = key === "wave" ? WAVES : key === "shape" ? SHAPES : ["top"];
+          if (opts.indexOf(v) < 0) opts = opts.concat([v]);
+          opts.forEach(function (o) {
+            var e = document.createElement("option");
+            e.value = o; e.textContent = o;
+            sel.appendChild(e);
+          });
+          sel.value = v;
+          sel.onchange = function () { obj[key] = sel.value; changed(); };
+          row.appendChild(sel);
+        } else if (typeof v === "number") {
+          var r = rangeOf(key, channel, v);
+          var range = document.createElement("input");
+          range.type = "range"; range.min = r[0]; range.max = r[1]; range.step = r[2]; range.value = v;
+          var num = document.createElement("input");
+          num.type = "number"; num.step = r[2]; num.value = v;
+          range.oninput = function () { obj[key] = Number(range.value); num.value = range.value; changed(); };
+          num.onchange = function () {
+            var n = Number(num.value);
+            if (!isFinite(n)) { num.value = obj[key]; return; }
+            obj[key] = n;
+            if (n < Number(range.min)) range.min = n;
+            if (n > Number(range.max)) range.max = n;
+            range.value = n;
+            changed();
+          };
+          row.appendChild(range);
+          row.appendChild(num);
+        } else if (typeof v === "boolean") {
+          var cb = document.createElement("input");
+          cb.type = "checkbox"; cb.checked = v;
+          cb.onchange = function () { obj[key] = cb.checked; changed(); };
+          row.appendChild(cb);
+        } else {
+          // 並び（poses など）や、ほかの形の値は文字で直す
+          var ta = document.createElement("textarea");
+          ta.rows = Array.isArray(v) ? Math.min(8, v.length + 2) : 2;
+          ta.value = JSON.stringify(v, null, Array.isArray(v) ? 0 : 2).replace(/\},\{/g, "},\n{");
+          ta.onchange = function () {
+            try { obj[key] = JSON.parse(ta.value); ta.style.borderColor = ""; changed(); }
+            catch (e) { ta.style.borderColor = "#ff9a7a"; }
+          };
+          row.appendChild(ta);
+        }
+
+        if (onRemove) {
+          var x = document.createElement("button");
+          x.className = "x"; x.textContent = "×"; x.title = "この項目を消す";
+          x.onclick = onRemove;
+          row.appendChild(x);
+        }
+        return row;
+      }
+
+      /** 項目のまとまり（チャンネル1つ、または「全体」） */
+      function group(title, onRemove) {
+        var g = document.createElement("div");
+        g.className = "grp";
+        var head = document.createElement("div");
+        head.className = "head";
+        head.textContent = title;
+        if (onRemove) {
+          var x = document.createElement("button");
+          x.className = "x"; x.textContent = "消す";
+          x.onclick = onRemove;
+          head.appendChild(x);
+        }
+        g.appendChild(head);
+        tuneFields.appendChild(g);
+        return g;
+      }
+
+      function renderFields() {
+        var def = cur.def;
+        tuneFields.innerHTML = "";
+
+        // 全体（長さ・伸縮の基準・動かさない行・コマ絵・ポーズなど、チャンネル以外）
+        var top = Object.keys(def).filter(function (k) { return CHANNELS.indexOf(k) < 0; });
+        if (top.length) {
+          var g = group("全体");
+          top.forEach(function (k) {
+            if (k === "frames" && def.frames && typeof def.frames === "object" && !Array.isArray(def.frames)) {
+              Object.keys(def.frames).forEach(function (fk) { g.appendChild(paramRow(def.frames, fk, "frames")); });
+              return;
+            }
+            g.appendChild(paramRow(def, k, "", k === "duration" ? null : function () { delete def[k]; changed(true); }));
+          });
+        }
+
+        CHANNELS.forEach(function (ch) {
+          if (!def[ch] || typeof def[ch] !== "object") return;
+          var spec = def[ch];
+          var g = group((CHANNEL_NAMES[ch] || ch) + "（" + ch + "）", function () { delete def[ch]; changed(true); });
+          Object.keys(spec).forEach(function (pk) {
+            g.appendChild(paramRow(spec, pk, ch, function () { delete spec[pk]; changed(true); }));
+          });
+          // 項目を足す
+          var missing = (isOneShot(def) ? ["amount", "shape", "outRatio", "backRatio", "cycles", "count"]
+                                        : ["amplitude", "speed", "period", "wave", "phase"])
+            .filter(function (pk) { return spec[pk] === undefined; });
+          if (missing.length) {
+            var row = document.createElement("div");
+            row.className = "prm";
+            var sel = document.createElement("select");
+            missing.forEach(function (pk) {
+              var o = document.createElement("option");
+              o.value = pk; o.textContent = "＋ " + (PARAM_NAMES[pk] || pk) + "（" + pk + "）";
+              sel.appendChild(o);
+            });
+            var b = document.createElement("button");
+            b.className = "x"; b.textContent = "足す";
+            b.onclick = function () { spec[sel.value] = PARAM_DEFAULTS[sel.value]; changed(true); };
+            row.appendChild(sel);
+            row.appendChild(b);
+            g.appendChild(row);
+          }
+        });
+
+        // 下の「足す」：まだ無いチャンネルと、全体の項目
+        var addSel = document.getElementById("tuneAdd");
+        addSel.innerHTML = "";
+        CHANNELS.forEach(function (ch) {
+          if (def[ch]) return;
+          var o = document.createElement("option");
+          o.value = ch; o.textContent = "＋ " + CHANNEL_NAMES[ch] + "（" + ch + "）を動かす";
+          addSel.appendChild(o);
+        });
+        [["anchor", "top"], ["pinTop", 0]].forEach(function (p) {
+          if (def[p[0]] !== undefined) return;
+          var o = document.createElement("option");
+          o.value = p[0]; o.textContent = "＋ " + PARAM_NAMES[p[0]] + "（" + p[0] + "）";
+          addSel.appendChild(o);
+        });
+        updateText();
+        updateDirty();
+      }
+
+      document.getElementById("tuneAddBtn").onclick = function () {
+        var key = document.getElementById("tuneAdd").value;
+        if (!key || !cur) return;
+        if (CHANNELS.indexOf(key) >= 0) {
+          cur.def[key] = isOneShot(cur.def) ? { amount: 1, shape: "pulse" } : { amplitude: 1, period: 2000 };
+        } else {
+          cur.def[key] = key === "anchor" ? "top" : 0;
+        }
+        changed(true);
+      };
+
+      /** 値が変わった。rebuild なら欄を作り直す（項目が増えた・減ったとき） */
+      function changed(rebuild) {
+        if (rebuild) renderFields();
+        else { updateText(); updateDirty(); }
+        if (isOneShot(cur.def) && tuneLoop.checked === false) playTuned();
+      }
+
+      function updateText() {
+        tuneText.value = cur.id + ": " + JSON.stringify(cur.def, null, 2)
+          .replace(/"([A-Za-z_][A-Za-z0-9_]*)":/g, "$1:") + ",";
+      }
+
+      /** その動き（省けばいま選んでいるもの）が、ファイルに入っている値と違うか */
+      function isDirty(id) {
+        id = id || (cur && cur.id);
+        if (!id || !gd.motions[id]) return false;
+        return JSON.stringify(gd.motions[id]) !== JSON.stringify(baseline[id]);
+      }
+      function dirtyIds() { return Object.keys(gd.motions).filter(function (id) { return isDirty(id); }); }
+      function updateDirty() {
+        var dirty = isDirty();
+        var others = dirtyIds().filter(function (id) { return id !== cur.id; });
+        tuneDirty.className = "tnote" + (dirty || others.length ? " warn" : "");
+        tuneDirty.textContent = (dirty ? "この動きに、まだ保存していない変更があります。" : "この動きに、保存していない変更はありません。") +
+          (others.length ? "　ほかにも保存していないもの：" + others.join("、") : "");
+        // 一覧の「＊」を付け直す（選んでいる動きの行だけ）
+        Array.prototype.forEach.call(tuneSelect.options, function (o) {
+          if (o.value !== cur.id) return;
+          o.textContent = o.textContent.replace(/^(★ )?(＊ )?/, function (all, star) {
+            return (star || "") + (dirty ? "＊ " : "");
+          });
+        });
+        document.getElementById("tuneSave").disabled = !canSave;
+        document.getElementById("tuneRevert").disabled = !baseline[cur.id];
+        document.getElementById("tuneUntune").disabled = !canSave || tunedIds.indexOf(cur.id) < 0;
+      }
+      window.addEventListener("beforeunload", function (e) {
+        if (dirtyIds().length) { e.preventDefault(); e.returnValue = ""; }
+      });
+
+      document.getElementById("tuneRevert").onclick = function () {
+        if (!cur || !baseline[cur.id]) return;
+        // 中身を入れ替える（gd.motions の同じ入れ物のまま。ゲームが持っている参照を切らない）
+        Object.keys(cur.def).forEach(function (k) { delete cur.def[k]; });
+        var back = copyOf(baseline[cur.id]);
+        Object.keys(back).forEach(function (k) { cur.def[k] = back[k]; });
+        changed(true);
+      };
+
+      function post(path, body) {
+        return fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Dev-Tool": "1" },
+          body: JSON.stringify(body)
+        }).then(function (r) { return r.json(); });
+      }
+
+      document.getElementById("tuneSave").onclick = function () {
+        if (!cur || !canSave) return;
+        post("/api/motions/save", { id: cur.id, definition: cur.def }).then(function (res) {
+          if (!res.ok) { alert("保存できませんでした：" + res.error); return; }
+          tunedIds = res.tuned;
+          baseline[cur.id] = copyOf(cur.def);
+          tuneStatus.className = "tnote ok";
+          tuneStatus.textContent = cur.id + " を保存しました（保存の前の写し：backup/" + res.backup + "）。";
+          refreshTuneList(cur.id);
+        }).catch(function () { alert("保存できませんでした（サーバーに届かない）"); });
+      };
+
+      document.getElementById("tuneUntune").onclick = function () {
+        if (!cur || tunedIds.indexOf(cur.id) < 0) return;
+        if (!confirm(cur.id + " の保存した調整を消して、data/motions.js の本体の値に戻します。よろしいですか？")) return;
+        post("/api/motions/save", { id: cur.id, definition: null }).then(function (res) {
+          if (!res.ok) { alert("消せませんでした：" + res.error); return; }
+          tunedIds = res.tuned;
+          baseline[cur.id] = copyOf(cur.def);   // ページを開き直すまでは、いまの値が見えたまま
+          tuneStatus.className = "tnote ok";
+          tuneStatus.textContent = "調整を消しました。本体の値はページを開き直すと出ます。";
+          updateDirty();
+        });
+      };
+
+      document.getElementById("tuneCopy").onclick = function () {
+        if (!cur) return;
+        var id = prompt("新しい動きの名前（半角の英字で始まり、英数字と _ だけ）", cur.id + "2");
+        if (!id) return;
+        if (!/^[A-Za-z][A-Za-z0-9_]{0,47}$/.test(id)) { alert("名前は半角の英字で始め、英数字と _ だけにしてください。"); return; }
+        if (gd.motions[id]) { alert(id + " はもうあります。"); return; }
+        // 写しはまだどこにも保存されていない（baseline に無いので「＊」が付く）
+        gd.motions[id] = copyOf(cur.def);
+        refreshTuneList(id);
+        tuneStatus.className = "tnote";
+        tuneStatus.textContent = id + " を作りました（まだ保存していない）。種族に使わせるときは、data/monsters.js に書く必要がある。";
+      };
+
+      refreshTuneList();
 
       // --- 描画のループ（ゲームの時計を、選んだ速さで進める） ---
       var ctx = canvas.getContext("2d");

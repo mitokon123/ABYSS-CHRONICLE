@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>データの点検 - ABYSS CHRONICLE</title>
+  <!--
+    ▼ このファイルについて（開発用。ゲーム本体ではない）
+
+    ゲームのデータを読み込んで、書き間違い・書き忘れ・使っていないものを一覧にする（v1.0.2）。
+    ・どの項目がどこを指すか（技の id・絵の id・効果音の id …）は tools/devpage.js の RULES に書いてある
+    ・「使っていない」は、データとコード（js/）のどこにも "id" の形で出てこないもの。
+      コードが名前を組み立てて使っている（"iconElem" + 属性 など）ときは、使っていても出ることがある
+    ・音のファイルがあるかは、ファイルを読みに行って確かめる。
+      フォルダにあって使っていないファイルは、開発用サーバー（8124）で開いたときだけ出る
+    何も書き換えない。見るだけ。
+  -->
+  <style>
+    body { margin: 0; background: #05070d; color: #c8d0e8; font-family: sans-serif; font-size: 13px; }
+    main { max-width: 980px; margin: 0 auto; padding: 18px 16px 40px; }
+    h1 { font-size: 20px; color: #ffd75e; margin: 0 0 4px; }
+    h1 a { font-size: 12px; color: #6b7590; margin-left: 12px; font-weight: normal; }
+    .sub { color: #6b7590; font-size: 12px; line-height: 1.6; margin-bottom: 12px; }
+    #summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
+    .pill { padding: 6px 12px; border-radius: 14px; border: 1px solid #2a3350; background: #0a0f1c; }
+    .pill b { font-size: 16px; margin-right: 4px; }
+    .pill.err b { color: #ff7a7a; } .pill.warn b { color: #ffd75e; } .pill.info b { color: #8fb4e8; } .pill.good b { color: #8fd18f; }
+    details { border: 1px solid #2a3350; border-radius: 6px; margin: 8px 0; background: #0a0f1c; }
+    details summary { padding: 8px 12px; cursor: pointer; list-style: none; display: flex; gap: 10px; align-items: center; }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::before { content: "▸"; color: #4e5876; }
+    details[open] summary::before { content: "▾"; }
+    .tag { font-size: 11px; padding: 1px 7px; border-radius: 3px; flex: none; }
+    .tag.err { background: #4a1818; color: #ff9a9a; } .tag.warn { background: #3a3010; color: #ffd75e; }
+    .tag.info { background: #142440; color: #8fb4e8; } .tag.good { background: #143018; color: #8fd18f; }
+    .n { color: #e8ecf8; font-weight: bold; margin-left: auto; }
+    .why { color: #6b7590; font-size: 12px; padding: 0 12px 6px 34px; line-height: 1.6; }
+    ul { margin: 0; padding: 4px 12px 10px 34px; }
+    li { padding: 2px 0; line-height: 1.6; }
+    code { font-family: monospace; color: #e8ecf8; background: #141b2e; padding: 0 4px; border-radius: 3px; }
+    .where { color: #6b7590; font-family: monospace; font-size: 12px; }
+    #loading { color: #6b7590; }
+    button { background: #141b2e; color: #e8ecf8; border: 1px solid #2a3350; border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+    button:hover { border-color: #ffd75e; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>データの点検 <a href="dev.html">← 開発用の目次</a></h1>
+    <div class="sub">
+      data/ の書き間違い（無い id を指している）・書き忘れ・使っていないものを並べる。何も書き換えない。
+      データを直したら <button onclick="location.reload()">もう一度調べる</button>
+    </div>
+    <div id="loading">ゲームのデータを読んでいます…</div>
+    <div id="summary"></div>
+    <div id="results"></div>
+  </main>
+
+  <script src="tools/devpage.js"></script>
+  <script>
+  (function () {
+    "use strict";
+    var D = window.DevPage, esc = D.esc;
+    var LEVEL = {
+      err:  { tag: "壊れている", order: 0 },
+      warn: { tag: "注意", order: 1 },
+      info: { tag: "参考", order: 2 },
+      good: { tag: "問題なし", order: 3 }
+    };
+
+    D.loadGame(function (files) {
+      var raw = window.MyGame && window.MyGame.rawData;
+      if (!raw) { document.getElementById("loading").textContent = "ゲームのデータを読めませんでした。"; return; }
+      Promise.all([D.sources(files), D.ping()]).then(function (r) {
+        var texts = r[0], dev = r[1];
+        var audio = dev ? fetch("/api/audio-files").then(function (x) { return x.json(); }).then(function (d) { return d.files; }) : Promise.resolve(null);
+        audio.then(function (audioFiles) {
+          return checkAudioFiles(raw).then(function (missing) {
+            render(runChecks(raw, texts, files), missing, audioFiles, raw);
+          });
+        });
+      });
+    });
+
+    // --- 点検 ---
+    function runChecks(raw, texts, files) {
+      var refs = D.references(raw);
+      var out = [];
+      var codeOnly = function (f) { return f.indexOf("js/") === 0; };
+      var used = {};   // space → { id: true }（データの中で指されているもの）
+      refs.forEach(function (r) { if (r.ok) (used[r.space] = used[r.space] || {})[r.value] = true; });
+
+      // 1. 無い id を指している
+      var bad = refs.filter(function (r) { return !r.ok; });
+      out.push({
+        level: bad.length ? "err" : "good", title: "無い id を指している",
+        why: "書いた id が、その置き場所に無い。ゲームでは絵が出ない・音が鳴らない・技が出ないなどになる（多くは黙って無視される）。",
+        items: bad.map(function (r) {
+          return (r.key ? "名前 " : "") + "<code>" + esc(r.value) + "</code> が " + esc(D.SPACES[r.space].label) + " に無い　<span class='where'>" + esc(r.path) + "</span>";
+        })
+      });
+
+      // 2. id とキーが違う
+      var idMismatch = [];
+      ["monsters", "items", "skills", "abilities", "statuses", "bosses", "dungeons", "recipes", "blessings", "natures", "regions", "elements"].forEach(function (top) {
+        var group = raw[top] || {};
+        Object.keys(group).forEach(function (k) {
+          var e = group[k];
+          if (e && typeof e === "object" && e.id !== undefined && e.id !== k) {
+            idMismatch.push("<code>" + esc(top) + "." + esc(k) + "</code> の id が <code>" + esc(e.id) + "</code>");
+          }
+        });
+      });
+      out.push({ level: idMismatch.length ? "err" : "good", title: "id と名前（キー）が違う", items: idMismatch,
+        why: "monsters の slime: { id: \"slime\" } のように、キーと id はそろえる決まり。違うと、セーブや図鑑で別物として扱われる。" });
+
+      // 3. 名前・説明が無い
+      var noText = [];
+      [["monsters", "モンスター"], ["items", "道具"], ["skills", "技"], ["abilities", "特性"], ["blessings", "加護"]].forEach(function (t) {
+        var group = raw[t[0]] || {};
+        Object.keys(group).forEach(function (k) {
+          var e = group[k];
+          if (!e.name) noText.push(t[1] + " <code>" + esc(k) + "</code> に name が無い");
+          if (!e.description && k !== "normalAttack") noText.push(t[1] + " <code>" + esc(k) + "</code>（" + esc(e.name || "") + "）に description が無い");
+        });
+      });
+      out.push({ level: noText.length ? "warn" : "good", title: "名前・説明が無い", items: noText,
+        why: "図鑑・持ち物・技の説明に何も出ない。" });
+
+      // 4. 状態異常の耐性の書き忘れ（全種7つそろえる決まり。monsters.js の冒頭）
+      var statusIds = Object.keys(raw.statuses || {});
+      var resistMissing = [];
+      Object.keys(raw.monsters || {}).forEach(function (k) {
+        var sr = raw.monsters[k].statusResist;
+        var lack = statusIds.filter(function (s) { return !sr || !(s in sr); });
+        if (lack.length) resistMissing.push("<code>" + esc(k) + "</code>（" + esc(raw.monsters[k].name) + "）に無い：" + lack.map(esc).join("・"));
+      });
+      out.push({ level: resistMissing.length ? "warn" : "good", title: "状態異常の耐性の書き忘れ", items: resistMissing,
+        why: "全種に7つの状態異常ぶんを書く決まり（data/monsters.js の冒頭）。0 も書く。" });
+
+      // 5. Lv上限が 70 より低い（作者の指定 2026-10-28。シニガミの Lv1 は別扱い）
+      var defMax = (raw.growth && raw.growth.defaultMaxLevel) || 99;
+      var lowCap = [];
+      Object.keys(raw.monsters || {}).forEach(function (k) {
+        var m = raw.monsters[k];
+        var cap = m.maxLevel || defMax;
+        if (cap < 70 && cap !== 1) lowCap.push("<code>" + esc(k) + "</code>（" + esc(m.name) + "）の上限 " + cap);
+      });
+      out.push({ level: lowCap.length ? "warn" : "good", title: "Lv上限が 70 より低い", items: lowCap,
+        why: "上限は一番低くても 70 の決まり（data/monsters.js の maxLevel の説明）。上限 Lv1 のシニガミは別扱いなので数えない。" });
+
+      // 6. 手に入れる方法が見つからない道具
+      var obtain = {};
+      refs.forEach(function (r) {
+        if (r.space === "items" && r.ok && !/^recipes\.[^.]+\.materials\[/.test(r.path)) obtain[r.value] = true;
+      });
+      var noWay = Object.keys(raw.items || {}).filter(function (k) { return !obtain[k] && !D.findInText(texts, k, codeOnly).length; })
+        .map(function (k) { return "<code>" + esc(k) + "</code>（" + esc(raw.items[k].name) + "）"; });
+      out.push({ level: noWay.length ? "warn" : "good", title: "手に入れる方法が見つからない道具", items: noWay,
+        why: "落とす・宝箱・店・作る・最初の持ち物のどこにも出てこない（作るの材料としてだけ出てくるものも含む）。" });
+
+      // 7. 店に並ぶのに値段が 0
+      var free = [];
+      ((raw.shop && raw.shop.shops) || []).forEach(function (s) {
+        (s.stock || []).forEach(function (st) {
+          var it = raw.items[st.item];
+          if (it && !st.price && !it.price) free.push(esc(s.name) + " の <code>" + esc(st.item) + "</code>（" + esc(it.name) + "）");
+        });
+      });
+      out.push({ level: free.length ? "warn" : "good", title: "店に並ぶのに値段が 0", items: free,
+        why: "値段 0 は「売り買いできない」の意味（data/items.js の price）。店に並べると 0G で買える。" });
+
+      // 8〜. 使っていないもの（参考）
+      function unused(space, label, why, textFilter) {
+        var ids = Object.keys(D.SPACES[space].get(raw) || {});
+        var list = ids.filter(function (id) {
+          return !(used[space] && used[space][id]) && !D.findInText(texts, id, textFilter).length;
+        });
+        out.push({ level: list.length ? "info" : "good", title: label, why: why,
+          items: list.map(function (id) {
+            var g = D.SPACES[space].get(raw)[id];
+            return "<code>" + esc(id) + "</code>" + (g && g.name ? "（" + esc(g.name) + "）" : "");
+          }) });
+      }
+      var notOwnFile = function (own) { return function (f) { return f !== own; }; };
+      unused("monsters", "出てくる所が見つからないモンスター",
+        "ダンジョンの出現表・主・物語・最初の仲間のどこにも出てこない。", codeOnly);
+      unused("skills", "誰も使わない技",
+        "覚える技・敵のときの技・主の手順・絆の報酬のどこにも出てこない。", codeOnly);
+      unused("motions", "使っていない動き",
+        "種族・技・店主・物語のどこからも指されていない動き。動きの見本で試しに作ったものなど。", function () { return true; });
+      unused("se", "鳴らす所が無い効果音",
+        "データにもコード（playSe）にも出てこない効果音の id。", notOwnFile("data/audio.js"));
+      unused("bgm", "流す所が無いBGM",
+        "データにもコード（playBgm）にも出てこないBGMの id。", notOwnFile("data/audio.js"));
+      unused("sprites", "使っていない絵",
+        "データにもコードにも出てこない絵の id。コードが名前を組み立てて使う絵（iconElem〇〇 など）は、使っていても出ることがある。", function () { return true; });
+      unused("shapes", "使っていない演出の型",
+        "技・種族のどこからも指されていない演出（data/effects.js の shapes）。", notOwnFile("data/effects.js"));
+      return out;
+    }
+
+    // 音のファイルが置いてあるか（読みに行って確かめる）
+    function checkAudioFiles(raw) {
+      var a = raw.audio || {};
+      var base = a.basePath || "";
+      var want = [];
+      ["bgm", "se"].forEach(function (kind) {
+        Object.keys(a[kind] || {}).forEach(function (id) {
+          var f = a[kind][id].file;
+          (Array.isArray(f) ? f : f ? [f] : []).forEach(function (name) { want.push({ kind: kind, id: id, file: name }); });
+        });
+      });
+      return Promise.all(want.map(function (w) {
+        return fetch(base + encodeURIComponent(w.file), { method: "HEAD" }).then(function (r) { w.ok = r.ok; }, function () { w.ok = false; });
+      })).then(function () { return want; });
+    }
+
+    // --- 画面 ---
+    function render(checks, audioWant, audioFiles, raw) {
+      var missing = audioWant.filter(function (w) { return !w.ok; });
+      checks.splice(1, 0, {
+        level: missing.length ? "err" : "good", title: "音のファイルが無い",
+        why: "data/audio.js に書いたファイルが assets/audio/ に無い。ゲームでは黙って無音になる。",
+        items: missing.map(function (w) { return "<code>" + esc(w.file) + "</code>　<span class='where'>audio." + w.kind + "." + esc(w.id) + "</span>"; })
+      });
+      if (audioFiles) {
+        var named = {};
+        audioWant.forEach(function (w) { named[w.file] = true; });
+        var extra = audioFiles.filter(function (f) { return !named[f] && /\.(mp3|ogg|wav|m4a)$/i.test(f); });
+        checks.push({ level: extra.length ? "info" : "good", title: "フォルダにあって使っていない音のファイル",
+          why: "assets/audio/ にあるが、data/audio.js のどこにも書いていないファイル。",
+          items: extra.map(function (f) { return "<code>" + esc(f) + "</code>"; }) });
+      }
+
+      document.getElementById("loading").style.display = "none";
+      var counts = { err: 0, warn: 0, info: 0 };
+      checks.forEach(function (c) { if (c.level !== "good") counts[c.level] += c.items.length; });
+      document.getElementById("summary").innerHTML =
+        "<span class='pill err'><b>" + counts.err + "</b>壊れている</span>" +
+        "<span class='pill warn'><b>" + counts.warn + "</b>注意</span>" +
+        "<span class='pill info'><b>" + counts.info + "</b>参考</span>" +
+        "<span class='pill good'><b>" + Object.keys(raw.monsters).length + "</b>種・" +
+        Object.keys(raw.skills).length + "技・" + Object.keys(raw.items).length + "道具を調べた</span>";
+
+      checks.sort(function (a, b) { return LEVEL[a.level].order - LEVEL[b.level].order; });
+      var box = document.getElementById("results");
+      checks.forEach(function (c) {
+        var d = document.createElement("details");
+        if (c.level === "err" || c.level === "warn") d.open = true;
+        d.innerHTML = "<summary><span class='tag " + c.level + "'>" + LEVEL[c.level].tag + "</span>" + esc(c.title) +
+          "<span class='n'>" + (c.items.length || "") + "</span></summary>" +
+          "<div class='why'>" + esc(c.why) + "</div>" +
+          (c.items.length ? "<ul>" + c.items.map(function (i) { return "<li>" + i + "</li>"; }).join("") + "</ul>" : "");
+        box.appendChild(d);
+      });
+    }
+  })();
+  </script>
+</body>
+</html>

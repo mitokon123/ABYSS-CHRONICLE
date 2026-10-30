@@ -1,0 +1,3 @@
+# 開発用サーバー（tools/devserver.py）が残す、保存の前の写し。git には入れない
+backup/
+data/*.tmp

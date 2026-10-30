@@ -80,6 +80,23 @@
       slash:     { id: "slash",     name: "斬撃", order: 4, color: "#e8542a" },
       // 特殊効果が多く、攻め方もいろいろ
       dance:     { id: "dance",     name: "踊り", order: 5, color: "#ffd75e" }
+    },
+
+    /**
+     * 技の働き（2026-10-15）。図鑑の技と戦闘の技選びで「働きごと」に並べるときの見出し。
+     * どれに入るかは技の中身から決まる（BattleSystem.skillRoleOf）：
+     *   attack … ダメージを与える技（追加効果があってもこちら）
+     *   status … ダメージの無い状態異常の技
+     *   debuff … 相手を弱くする技・PPを減らす技
+     *   buff   … 自分や味方を強くする技（立ち塞がる・ちからため・守りも）
+     *   heal   … HPの回復・状態異常を治す技
+     */
+    skillRole: {
+      attack: { id: "attack", name: "攻撃",     order: 1, color: "#e8896a" },
+      status: { id: "status", name: "状態異常", order: 2, color: "#b48ce0" },
+      debuff: { id: "debuff", name: "弱体",     order: 3, color: "#e8542a" },
+      buff:   { id: "buff",   name: "強化",     order: 4, color: "#5fd18c" },
+      heal:   { id: "heal",   name: "回復",     order: 5, color: "#7fd9e8" }
     }
   };
 })(window.MyGame);

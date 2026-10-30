@@ -39,6 +39,9 @@
     // 身につけている装備（data/items.js の id の配列）。枠は config.equipSlots
     this.equipment = options.equipment || [];
 
+    // 作戦（data/battle.js の tactics.list の id）。null なら既定（tactics.default＝命令する）。v1.0.0
+    this.tactic = options.tactic || null;
+
     // 愛情度。勝った戦闘で場に出ていた回数の合計（data/affection.js）。
     // 段階が上がると能力が少し上がり、絆で専用技を覚える。下がることはない
     this.affection = 0;
@@ -146,6 +149,25 @@
     // （作った直後に呼ぶ前提。補正前のHPのまま戦い始めないように）
     this.currentHp = this.getMaxHp();
     this.currentPp = this.getMaxPp();
+  };
+
+  /**
+   * 敵として出るときの技に入れ替える（data/monsters.js の enemySkills）。
+   * 野生の敵と主を作ったところで呼ぶ。enemySkills の無い種族は何も変わらない。
+   * 仲間になるときは useLearnedSkills で覚える技の一覧に戻す。
+   */
+  MonsterInstance.prototype.useEnemySkills = function () {
+    var skills = NS.MonsterData.enemySkillsUpToLevel(this._species, this.level);
+    if (skills) this.skills = skills;
+  };
+
+  /**
+   * 覚える技の一覧（learnset）のとおりに技を戻す。仲間になるときに呼ぶ。
+   * 戻さないと、敵のときの技のままセーブされてしまう（読み込みでも消えない）。
+   */
+  MonsterInstance.prototype.useLearnedSkills = function () {
+    if (!this._species || !this._species.enemySkills) return;
+    this.skills = NS.MonsterData.skillsUpToLevel(this._species, this.level);
   };
 
   /**
@@ -409,6 +431,24 @@
     this._bossImmuneToStatus = list || [];
   };
 
+  /**
+   * 弱体への耐性（-5〜10。2026-10-15）。相手から掛けられる弱体が入る確率を下げる（表は状態異常の耐性と同じ）。
+   * 種族の debuffResist（書かなければ baseValue ＝ data/battle.js の debuffResistBase）。
+   * 主として出ているあいだは setDebuffResist の値で上書きする
+   */
+  MonsterInstance.prototype.getDebuffResist = function (baseValue) {
+    var own = this._species && this._species.debuffResist;
+    var value = (typeof this._debuffResistOverride === "number")
+      ? this._debuffResistOverride
+      : ((typeof own === "number") ? own : (baseValue || 0));
+    return Math.max(-5, Math.min(10, value));
+  };
+
+  /** 主として立ちはだかるあいだの弱体への耐性（DungeonScene._startBossBattle）。数でなければ外す */
+  MonsterInstance.prototype.setDebuffResist = function (value) {
+    this._debuffResistOverride = (typeof value === "number") ? value : null;
+  };
+
   /** その状態異常を完全に無効化するか（主が毒を受け付けない、など） */
   MonsterInstance.prototype.isImmuneToStatus = function (statusId) {
     var list = (this._species && this._species.immuneToStatus) || [];
@@ -442,8 +482,10 @@
     // 前後の空白は名前として意味を持たないので落とす
     text = text.replace(/^[\s　]+|[\s　]+$/g, "");
 
+    // 漢字・絵文字も1文字と数えて切る（2026-10-27 キーボード入力にしたため。Array.from はサロゲートペアを1文字にする）
     var max = ((this._data && this._data.naming) || {}).maxLength;
-    if (typeof max === "number" && text.length > max) text = text.slice(0, max);
+    var chars = Array.from ? Array.from(text) : text.split("");
+    if (typeof max === "number" && chars.length > max) text = chars.slice(0, max).join("");
 
     this.nickname = text || null;
     return this.nickname;
@@ -877,9 +919,10 @@
   MonsterInstance.prototype.getExpReward = function () {
     if (!this._species) return 0;
 
-    var base = this._species.expReward || 0;
+    // rewardMultiplier … 出る場所の表で決めた倍率（EncounterSystem。蔦這う回廊のカゲヅタ）
+    var base = (this._species.expReward || 0) * (this.rewardMultiplier || 1);
     var perLevel = (this._data.growth || {}).expRewardPerLevel;
-    if (!perLevel) return base;
+    if (!perLevel) return Math.floor(base);
 
     return Math.floor(base * (1 + (this.level - 1) * perLevel));
   };
@@ -891,9 +934,9 @@
   MonsterInstance.prototype.getGoldReward = function () {
     if (!this._species) return 0;
 
-    var base = this._species.goldReward || 0;
+    var base = (this._species.goldReward || 0) * (this.rewardMultiplier || 1);
     var perLevel = (this._data.growth || {}).goldRewardPerLevel;
-    if (!perLevel) return base;
+    if (!perLevel) return Math.floor(base);
 
     return Math.floor(base * (1 + (this.level - 1) * perLevel));
   };
@@ -1084,6 +1127,28 @@
     return [skillId];
   };
 
+  // --- 作戦（v1.0.0） ---
+
+  /** いまの作戦の定義（data/battle.js の tactics.list）。決めていなければ既定のもの */
+  MonsterInstance.prototype.getTactic = function () {
+    var tactics = (this._data.battle || {}).tactics || {};
+    var list = tactics.list || {};
+    return list[this.tactic] || list[tactics.default] || null;
+  };
+
+  /** 作戦を変える。無い id は既定に戻す（null で保存） */
+  MonsterInstance.prototype.setTactic = function (id) {
+    var tactics = (this._data.battle || {}).tactics || {};
+    this.tactic = (id && (tactics.list || {})[id] && id !== tactics.default) ? id : null;
+    return this.tactic;
+  };
+
+  /** 作戦で動くか（コマンドを聞かない） */
+  MonsterInstance.prototype.isTacticAi = function () {
+    var tactic = this.getTactic();
+    return !!(tactic && tactic.ai);
+  };
+
   // --- セーブ・ロード ---
 
   /**
@@ -1105,6 +1170,8 @@
       skills: this.skills.slice(),
       equipment: (this.equipment || []).slice(),
       affection: this.affection || 0,
+      // 作戦。既定（命令する）のままなら書かない
+      tactic: this.tactic || undefined,
       // 最初の相棒（はじめから一緒にいるスライム）。逃がせない。物語の場面にも立つ
       partner: this.partner ? true : undefined,
       // 状態異常。ふつうは拠点へ帰った時点で空になるが、
@@ -1165,6 +1232,8 @@
     // 愛情度。古いセーブには無いので 0 から。
     // HP・PP を戻すより先に入れる（最大値が愛情度で上がっているため）
     instance.affection = saved.affection || 0;
+    // 作戦。古いセーブには無い・定義が消えた作戦は既定（命令する）に戻す
+    instance.setTactic(saved.tactic);
     // 絆の報酬の技があとから決まった場合も、もう絆に届いている仲間には覚えさせる
     instance._learnBondSkill();
     // 最大値を超えないように補正してから戻す

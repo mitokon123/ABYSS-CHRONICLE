@@ -27,6 +27,17 @@
     },
 
     /**
+     * 敵として出たときに使う技のidリストを返す（data/monsters.js の enemySkills）。
+     * 書き方は learnset と同じ [{ level, skill }]。そのレベルまでのものを使う。
+     * enemySkills を書いていない種族は null（呼び出し側は learnset のままにする）。
+     * @returns {string[]|null}
+     */
+    enemySkillsUpToLevel: function (species, level) {
+      if (!species || !species.enemySkills) return null;
+      return MonsterData.skillsUpToLevel({ learnset: species.enemySkills }, level);
+    },
+
+    /**
      * ちょうどそのレベルで覚える技のidリストを返す（レベルアップ時に使用）。
      */
     skillsLearnedAtLevel: function (species, level) {

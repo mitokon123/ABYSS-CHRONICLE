@@ -22,7 +22,7 @@
  *   { type:"resistBonus",    element:"fire", value:3 }  … 耐性の数値そのものを上げる
  *   { type:"accuracyMultiplier", value:0.8 }  … 命中率に倍率（盲目とは別）
  *   { type:"healDealt",      value:1.2 }  … 自分が使う回復の技の回復量に倍率（粘晶のネックレス）
- *   戦闘中に働くもの（regen / counterStatus / drain / firstStrike / undying）は
+ *   戦闘中に働くもの（regen / counterStatus / onHitStatus / damageByTargetHp / drain / firstStrike / undying / shedStatus / tailwind / wardAlly）は
  *   ここでは集めるだけで、働かせるのは BattleSystem（_findEffects で拾う）
  *
  * ▼ 倍率と加算の違い
@@ -203,6 +203,7 @@
    *     element を書いた効果は状態異常には効かず、status を書いた効果は属性に効かない。
    *     これを分けないと、炎よけの札が毒にも効いてしまう。
    *   ★ どちらも書かない resistBonus は、その種類すべてに効く（全属性・全状態異常）。
+   *   ★ status: "all" は全状態異常だけ、element: "all" は全属性だけに効く（v1.0.0）
    *
    * @param {object} monster
    * @param {string} id 属性id または 状態異常id
@@ -219,8 +220,9 @@
       if (wantStatus && effect.element) return null;
       if (!wantStatus && effect.status) return null;
 
+      // "all" は、その種類すべて（status: "all" … 全状態異常。属性には効かない。芽吹きの加護）
       var key = wantStatus ? effect.status : effect.element;
-      if (key && key !== id) return null;
+      if (key && key !== "all" && key !== id) return null;
 
       if (!self._matchCondition(monster, effect.condition)) return null;
       return effect.value;
@@ -262,6 +264,22 @@
       if (effect.element && effect.element !== elementId) return null;
       if (!self._matchCondition(monster, effect.condition)) return null;
       return effect.value;
+    });
+  };
+
+  /**
+   * 受けるダメージが毎回ばらつく効果（特性「ギャンブル」。{ type:"damageTakenRandom", min:0.75, max:1.25 }）。
+   * 当たるたびに min〜max から1つ引く。乱数は呼ぶ側（BattleSystem.calcDamage）が渡す。
+   * 見積もり（作戦のAI）では引かず、真ん中の値を使う（random を渡さない）。何も無ければ 1
+   */
+  EffectSystem.prototype.getDamageTakenRandomMultiplier = function (monster, random) {
+    var self = this;
+    return this._multiply(monster, function (effect) {
+      if (effect.type !== "damageTakenRandom") return null;
+      if (!self._matchCondition(monster, effect.condition)) return null;
+      var min = (typeof effect.min === "number") ? effect.min : 1;
+      var max = (typeof effect.max === "number") ? effect.max : min;
+      return random ? min + random.next() * (max - min) : (min + max) / 2;
     });
   };
 
@@ -337,7 +355,11 @@
       // 属性の耐性（炎よけの札）と、状態異常の耐性（毒よけの護符）の両方。
       // ここが無かったころは、工房や仲間画面の効果欄に**空の行**が出ていた
       var target;
-      if (effect.status) {
+      if (effect.status === "all") {
+        target = party.allStatuses || "全状態異常";
+      } else if (effect.element === "all") {
+        target = party.allElements || "全";
+      } else if (effect.status) {
         var status = (gameData.statuses || {})[effect.status];
         target = status ? status.name : effect.status;
       } else if (effect.element) {
@@ -348,7 +370,20 @@
       }
       text = target + "への耐性 " + (effect.value >= 0 ? "+" : "") + effect.value;
     } else if (effect.type === "regen") {
-      text = fillText(party.effectRegen || "HP{percent}%", { percent: percentOf(effect.value) });
+      text = (effect.max && party.effectRegenMax)
+        ? fillText(party.effectRegenMax, { percent: percentOf(effect.value), max: effect.max })
+        : fillText(party.effectRegen || "HP{percent}%", { percent: percentOf(effect.value) });
+    } else if (effect.type === "damageByTargetHp") {
+      // 「相手HP100%以上 ×1.2・75%以上 ×1.1・50%以下 ×0.9」のように並べる
+      text = (party.effectByTargetHp || "") + (effect.tiers || []).map(function (tier) {
+        var pct = Math.round(((tier.atLeast !== undefined) ? tier.atLeast : tier.atMost) * 100);
+        return pct + "%" + ((tier.atLeast !== undefined) ? "以上" : "以下") + " ×" + tier.value;
+      }).join("・");
+    } else if (effect.type === "onHitStatus") {
+      var hitDef = (gameData.statuses || {})[effect.status];
+      text = fillText(effect.normalAttackOnly ? party.effectOnHitNormal : party.effectOnHit,
+        { percent: percentOf(effect.chance === undefined ? 1 : effect.chance),
+          status: hitDef ? hitDef.name : effect.status });
     } else if (effect.type === "counterStatus") {
       var counterDef = (gameData.statuses || {})[effect.status];
       text = fillText((effect.trigger === "normalAttack")
@@ -366,6 +401,12 @@
       text = party.effectFirstStrike || "";
     } else if (effect.type === "undying") {
       text = party.effectUndying || "";
+    } else if (effect.type === "shedStatus") {
+      text = fillText(party.effectShedStatus, { percent: percentOf(effect.chance === undefined ? 1 : effect.chance) });
+    } else if (effect.type === "tailwind") {
+      text = fillText(party.effectTailwind, { turns: effect.turns || 1, value: effect.value });
+    } else if (effect.type === "wardAlly") {
+      text = party.effectWardAlly || "";
     }
 
     if (text && effect.condition) text += describeCondition(effect.condition);

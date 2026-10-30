@@ -406,6 +406,11 @@
     // 名前と色も前の周回のものを持ち越さない（この画面で決め直す）
     game.playerName = null;
     game.playerColor = null;
+    game.playerPants = null;
+    game.playerHair = null;
+    game.playerHairColor = null;
+    game.playerAcc = null;
+    game.playerAccColor = null;
     game.playerGender = null;
     game.playerFirstPerson = null;
     game.doneEvents = {};

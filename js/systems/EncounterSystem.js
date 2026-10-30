@@ -147,6 +147,15 @@
    *                    「単体でしか出ないぶん、1体としては手強い」を作るのに使う
    *   actionPattern  … 決まった順番で行動させる。主と同じ書き方（"wait" も使える）。
    *                    門番のような相手を「読めば対処できる」形にできる
+   *   skills         … その場所でだけ使う技（技idの配列）。種族の learnset・enemySkills より優先する。
+   *                    同じ種族でも、出る場所ごとに役を変えられる（v1.0.0 蔦這う回廊のカゲヅタ・ヌマボネ）
+   *   skillRate      … その場所でだけの、技を使う確率（種族の skillRate より優先）
+   *   skillWeights   … 技ごとの選ばれやすさ { 技id: 重み }（書かなければ均等。コケキノコ：しびれ粉0.6・堅守の陣0.4）。
+   *                    技idのかわりに criticalAttack と書くと「必ずクリティカルの通常攻撃」を選択肢に入れられる（ザンガルド）
+   *   infinitePp     … true なら、敵のあいだ PP が減らない（シニガミ）
+   *   rewardMultiplier … 倒したときの経験値・ゴールドの倍率（種族の値は変えずに、その場所だけ。回廊のカゲヅタ 1.5）
+   *   effects        … 敵のあいだだけ足す効果。特性・装備と同じ書き方（シニガミの耐性の上乗せ）
+   *   ※ どれも仲間にすると外れる（スカウトした個体は覚える技の一覧で作り直す）
    *
    * @param {object} entry data/dungeons.js の table の1件
    * @returns {MyGame.MonsterInstance|null}
@@ -159,11 +168,25 @@
     var enemy = NS.MonsterInstance.create(entry.species, level, this.data, this.random);
     if (!enemy) return null;
 
+    // 敵のときだけ使う技（data/monsters.js の enemySkills）があれば入れ替える
+    if (enemy.useEnemySkills) enemy.useEnemySkills();
     if (entry.statMultiplier && enemy.setEncounterMultipliers) {
       enemy.setEncounterMultipliers(entry.statMultiplier);
     }
     if (entry.actionPattern && enemy.setActionPattern) {
       enemy.setActionPattern(entry.actionPattern);
+    }
+    // その場所でだけの技と、技を使う確率
+    if (Array.isArray(entry.skills) && entry.skills.length > 0) enemy.skills = entry.skills.slice();
+    if (typeof entry.skillRate === "number") enemy.skillRateOverride = entry.skillRate;
+    if (entry.skillWeights) enemy.skillWeights = entry.skillWeights;
+    // 敵のときだけ PP が減らない（シニガミ。BattleSystem.ppCostOf）
+    if (entry.infinitePp) enemy.infinitePp = true;
+    // その場所でだけ、倒したときの経験値・ゴールドに倍率を掛ける（蔦這う回廊のカゲヅタ。MonsterInstance.getExpReward）
+    if (typeof entry.rewardMultiplier === "number") enemy.rewardMultiplier = entry.rewardMultiplier;
+    // 敵のときだけ足す効果（特性・装備と同じ書き方。シニガミの「敵のときは耐性が高い」）。statMultiplier のあとに足す
+    if (Array.isArray(entry.effects) && entry.effects.length > 0) {
+      enemy.encounterEffects = (enemy.encounterEffects || []).concat(entry.effects);
     }
     return enemy;
   };

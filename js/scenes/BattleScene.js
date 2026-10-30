@@ -253,6 +253,17 @@
       return;
     }
 
+    // 眠っている仲間（必ず手番を失う状態異常）にできるのは「交代」と「そのまま」だけ（v1.0.0・作者の指定）。
+    // 選んでも眠りで止められて無駄になるコマンドは並べない。交代は眠っていても止められない（BattleSystem._performAction）
+    if (actor && this._isAsleep(actor)) {
+      var sleepItems = [];
+      if (hasReserve) sleepItems.push({ label: labels.swap || "swap", value: "swap" });
+      sleepItems.push({ label: labels.skip || "skip", value: "skip" });
+      sleepItems.push({ label: labels.inspect || "inspect", value: "inspect" });
+      this.commandMenu.setItems(sleepItems);
+      return;
+    }
+
     var items = [
       { label: labels.attack || "attack", value: "attack" },  // 通常攻撃（技を選ばず即対象選択）
       { label: labels.fight  || "fight",  value: "fight" },   // 技を選ぶ
@@ -270,6 +281,15 @@
     this.commandMenu.setItems(items);
   };
 
+  /** 必ず手番を失う状態異常（眠り。data/statuses.js の blocksTurn: "always"）に掛かっているか */
+  BattleScene.prototype._isAsleep = function (monster) {
+    var defs = monster.getStatusDefs ? monster.getStatusDefs() : [];
+    for (var i = 0; i < defs.length; i++) {
+      if (defs[i].blocksTurn === "always") return true;
+    }
+    return false;
+  };
+
   /**
    * ターンの頭のメニュー「戦う／逃げる」。
    * 主戦は「逃げる」を薄く出して選べないようにする（無いのではなく、できないと分かるように）。
@@ -280,42 +300,166 @@
 
     this.commandMenu.setItems([
       { label: labels.go   || "go",   value: "go" },
+      // 仲間ごとの作戦を変える（v1.0.0）。行動にはならず、変えたらこのメニューへ戻る
+      { label: labels.tactic || "tactic", value: "tactic" },
       { label: labels.flee || "flee", value: "flee",
         disabled: !this.allowFlee, color: this.allowFlee ? null : t.hintColor }
     ]);
   };
+
+  // --- 作戦（v1.0.0）：ターンの頭の「作戦」から、仲間を選ぶ → 作戦を選ぶ ---
+
+  BattleScene.prototype._tacticsData = function () {
+    return (this.game.data.battle || {}).tactics || { order: [], list: {} };
+  };
+
+  /** 作戦を変える仲間の一覧（連れている全員。控えも変えられる） */
+  BattleScene.prototype._beginTacticMember = function (keepIndex) {
+    var members = this._partyMembers();
+    var rows = [];
+    for (var i = 0; i < members.length; i++) {
+      var tactic = members[i].getTactic ? members[i].getTactic() : null;
+      rows.push({
+        type: "entry",
+        label: members[i].getName(),
+        right: tactic ? tactic.name : "",
+        color: members[i].isFainted() ? this.theme.hintColor : null,
+        value: members[i]
+      });
+    }
+    this._useNormalSubMenu();
+    this.subMenu.syncRows(rows, keepIndex || 0);
+    this.phase = "tacticMember";
+  };
+
+  BattleScene.prototype._updateTacticMember = function (input) {
+    this.subMenu.handleInput(input);
+    if (input.isPressed("cancel")) { this._beginTurnMenu(); return; }
+    if (!input.isPressed("confirm") && !this.subMenu.clickedEntry(input)) return;
+
+    var selected = this.subMenu.getSelected();
+    if (!selected) return;
+    this._tacticMember = selected.value;
+    this._tacticMemberIndex = this.subMenu.index;
+
+    var data = this._tacticsData();
+    var current = this._tacticMember.getTactic ? this._tacticMember.getTactic() : null;
+    var rows = [], at = 0;
+    for (var i = 0; i < (data.order || []).length; i++) {
+      var tactic = data.list[data.order[i]];
+      if (!tactic) continue;
+      if (current && current.id === tactic.id) at = rows.length;
+      rows.push({ type: "entry", label: tactic.name,
+        right: (current && current.id === tactic.id) ? (this.texts.tacticCurrent || "") : "",
+        value: tactic.id });
+    }
+    this._useNormalSubMenu();
+    this.subMenu.syncRows(rows, at);
+    this.phase = "tacticPick";
+  };
+
+  BattleScene.prototype._updateTacticPick = function (input) {
+    this.subMenu.handleInput(input);
+    if (input.isPressed("cancel")) { this._beginTacticMember(this._tacticMemberIndex); return; }
+    if (!input.isPressed("confirm") && !this.subMenu.clickedEntry(input)) return;
+
+    var selected = this.subMenu.getSelected();
+    if (!selected || !this._tacticMember) return;
+    this._tacticMember.setTactic(selected.value);
+    this._beginTacticMember(this._tacticMemberIndex);
+  };
+
+  /** 作戦を選んでいるときの左側：選んでいる作戦（仲間の一覧ではその仲間のいまの作戦）の説明 */
+  BattleScene.prototype._renderTacticInfo = function (origin, rect) {
+    var selected = this.subMenu.getSelected();
+    if (!selected) return;
+    var tactic = null;
+    if (this.phase === "tacticPick") tactic = this._tacticsData().list[selected.value];
+    else if (selected.value && selected.value.getTactic) tactic = selected.value.getTactic();
+    if (!tactic) return;
+
+    var t = this.theme;
+    var lh = t.lineHeight || 18;
+    var y = origin.y + 20 + lh + 6;
+    this.panel.drawText(tactic.name, origin.x, y);
+    var lines = wrapText(tactic.description || "", (this.layout.tacticInfo || {}).wrap || 17);
+    for (var i = 0; i < lines.length; i++) {
+      this.panel.drawText(lines[i], origin.x, y + lh * (i + 1) + 4, { font: t.smallFont, color: t.hintColor });
+    }
+  };
+
 
   /** 「攻撃」コマンドで使う技id（data/battle.js） */
   BattleScene.prototype._normalAttackId = function () {
     return (this.game.data.battle || {}).normalAttackSkill || "normalAttack";
   };
 
-  BattleScene.prototype._buildSkillMenu = function () {
+  /**
+   * 技の並べ方（2026-10-15）。Q/E（または右の並びの札を押す）で切り替える。
+   * 選んだ並びは戦闘をまたいで覚えておく（セーブはしない）
+   *   learned … 覚えた順（今までの並び）／role … 働きごと／kind … 種類ごと／element … 属性ごと
+   */
+  var BATTLE_SKILL_SORTS = ["learned", "role", "kind", "element"];
+
+  BattleScene.prototype._battleSkillSort = function () {
+    var mode = this.game.battleSkillSort;
+    return BATTLE_SKILL_SORTS.indexOf(mode) >= 0 ? mode : BATTLE_SKILL_SORTS[0];
+  };
+
+  BattleScene.prototype._changeBattleSkillSort = function (direction) {
+    var i = BATTLE_SKILL_SORTS.indexOf(this._battleSkillSort());
+    this.game.battleSkillSort = BATTLE_SKILL_SORTS[(i + direction + BATTLE_SKILL_SORTS.length) % BATTLE_SKILL_SORTS.length];
+    var keep = this.subMenu.getSelected();
+    this._buildSkillMenu(keep ? keep.value : null);
+  };
+
+  /**
+   * 技の一覧を組む。技が多くなっても選びやすいよう、技を選ぶときだけ枠を大きくし（layout.skillMenu）、
+   * 並べ方に応じて見出し（働き・種類・属性）を挟む
+   * @param {string} [keepId] この技にカーソルを合わせる（並べ替えたとき）
+   */
+  BattleScene.prototype._buildSkillMenu = function (keepId) {
     var actor = this._currentActor();
     var rows = [];
-    var skills = (actor && actor.skills) || [];
+    var ids = ((actor && actor.skills) || []).filter(function (id) { return !!this.game.data.getSkill(id); }, this);
     var theme = this.theme;
+    var mode = this._battleSkillSort();
+    var groups = NS.BattleSystem.groupSkills(this.game.data, ids, mode === "learned" ? "order" : mode);
+    var at = -1;
 
-    for (var i = 0; i < skills.length; i++) {
-      var skill = this.game.data.getSkill(skills[i]);
-      if (!skill) continue;
-
-      // PPが足りない技は薄く表示して、使えないことを分かるようにする
-      var affordable = this._canAfford(actor, skill);
-      rows.push({
-        type: "entry",
-        label: skill.name,
-        right: "PP" + (skill.pp || 0),
-        color: affordable ? theme.textColor : theme.hintColor,
-        value: skills[i]
-      });
+    for (var g = 0; g < groups.length; g++) {
+      if (groups[g].group) {
+        rows.push({ type: "header", label: "- " + groups[g].group.name + " -", color: groups[g].group.color });
+      }
+      for (var i = 0; i < groups[g].ids.length; i++) {
+        var id = groups[g].ids[i];
+        var skill = this.game.data.getSkill(id);
+        // PPが足りない技は薄く表示して、使えないことを分かるようにする
+        var affordable = this._canAfford(actor, skill);
+        if (id === keepId) at = rows.length;
+        rows.push({
+          type: "entry",
+          label: skill.name,
+          // 払うPP（特性「死神」で即死の技は0になる。BattleSystem.ppCostOf）
+          right: "PP" + this.system.ppCostOf(actor, skill),
+          color: affordable ? theme.textColor : theme.hintColor,
+          value: id
+        });
+      }
     }
-    this.subMenu.setRows(rows);
+    this.subMenu.rect = this.layout.skillMenu || this.layout.subMenu;
+    if (at >= 0) this.subMenu.syncRows(rows, at);
+    else this.subMenu.setRows(rows);
+  };
+
+  /** 技以外（道具・交代・作戦）の一覧は、ふつうの大きさの枠に戻す */
+  BattleScene.prototype._useNormalSubMenu = function () {
+    this.subMenu.rect = this.layout.subMenu;
   };
 
   /** その技のPPを今払えるか */
   BattleScene.prototype._canAfford = function (actor, skill) {
-    var cost = skill.pp || 0;
+    var cost = this.system.ppCostOf(actor, skill);
     if (cost <= 0) return true;
     return !!(actor && actor.canPayPp && actor.canPayPp(cost));
   };
@@ -364,6 +508,7 @@
         value: reserves[i]
       });
     }
+    this._useNormalSubMenu();
     this.subMenu.setRows(rows);
   };
 
@@ -388,6 +533,7 @@
         });
       }
     }
+    this._useNormalSubMenu();
     this.subMenu.setRows(rows);
   };
 
@@ -433,6 +579,8 @@
       case "target":   this._updateTarget(input); break;
       case "scoutChoice": this._updateScoutChoice(input); break;
       case "scoutSwap":   this._updateScoutSwap(input); break;
+      case "tacticMember": this._updateTacticMember(input); break;
+      case "tacticPick":   this._updateTacticPick(input); break;
       case "done":     this._updateDone(); break;
     }
   };
@@ -521,6 +669,8 @@
     this.playbackTimer = 0;
     this.playbackWaiting = false;
     this.messageLog.clear();
+    // 防御の構えは、演出のあいだは出来事に合わせて出し入れする（前のターンの構えはここで解く）
+    this.shownGuard = [];
     this.phase = "playback";
   };
 
@@ -611,12 +761,19 @@
   BattleScene.prototype._playEvent = function (event, quick) {
     this.messageLog.stream(this.formatter.formatOne(event));
 
+    // 次の行動が始まったら、前の行動の札をまとめて消す（v1.0.0）
+    this._dismissPopupsOnActionStart(event);
     // 強化・弱体・特性・加護が発動したら、画面上部に札を出す
     this._pushEffectPopup(event);
 
     var wait = quick
       ? (this.animation.quickDelay || 90)
       : (this.animation.eventDelay || 400);
+    // 溜めの長い技（死神の鎌）は、技を出してから当たるまでを長くとる（data/skills.js の windupMs）。
+    // 専用の動きの「振り下ろし」のコマと、当たった演出・数字の出る瞬間をそろえるため
+    if (!quick && event.type === "useSkill" && event.skill && event.skill.windupMs) {
+      wait = Math.max(wait, event.skill.windupMs);
+    }
 
     // 「ここまで減った」と見せてよいHPを、この瞬間に反映する
     if (event.revealTarget) {
@@ -628,6 +785,12 @@
     // 状態異常の印も、この瞬間に増やす・消す（_shownStatusesFor）
     if (event.type === "status" || event.type === "statusEnd" || event.statusIds) {
       this._revealStatusMark(event);
+    }
+    // 防御の構えも、この瞬間に出す・解く
+    if (this.shownGuard && event.target) {
+      var guardAt = this.shownGuard.indexOf(event.target);
+      if (event.type === "defend" && guardAt < 0) this.shownGuard.push(event.target);
+      if ((event.type === "defendBroken" || event.type === "defendFailed") && guardAt >= 0) this.shownGuard.splice(guardAt, 1);
     }
 
     this._playActionMotion(event);
@@ -671,13 +834,35 @@
       // 状態異常が入らなかった（確率で外れた・効かない相手）。攻撃が外れたときと同じ「MISS」を出す（作者の指定）
       case "statusImmune":
       case "statusMiss":
+      // 芽吹きの守りで防いだ（v1.0.0）。入らなかったのは同じなので、同じ見せ方
+      case "wardBlocked":
+      // 弱体が、弱体への耐性で入らなかった（2026-10-15）
+      case "modifierMiss":
         this._applyStyle("miss", event.target, "MISS");
         this.game.audio.playSe("miss");
+        break;
+      // 反動（捨て身の体当たり）。自分が受けるダメージ。攻撃のダメージと同じく、見せた瞬間にHPバーを減らす
+      case "recoil":
+        this.animator.revealTo(event.target, event.currentHp);
+        this._applyStyle("damage", event.target, String(event.amount));
+        this.game.audio.playSe("hit");
+        wait = Math.max(wait, this.animator.drainTime(event.amount));
         break;
       case "faint":
         this._applyStyle("faint", event.target, null);
         // 即死で倒れたときは、直前の即死の音が倒れる音を兼ねる（音を持つ状態異常が原因なら鳴らさない）
         if (!this._statusSeOf(event.statusId)) this.game.audio.playSe("faint");
+        // 倒した敵を図鑑に記録する（倒すだけで図鑑が開く種族がある。シニガミ。Discovery.isMonsterDexOpen）
+        if (event.target && this.enemies.indexOf(event.target) >= 0 && this.game.discovery &&
+            this.game.discovery.markMonsterDefeated) {
+          this.game.discovery.markMonsterDefeated(event.target.speciesId);
+          // 倒すだけで図鑑が開く種族は、その種族が覚える技も図鑑に載せる（仲間にしないと技を覚えられないため）
+          var defeatedSpecies = event.target.getSpecies ? event.target.getSpecies() : null;
+          if (defeatedSpecies && defeatedSpecies.dexOnDefeat) {
+            var learnset = defeatedSpecies.learnset || [];
+            for (var ls = 0; ls < learnset.length; ls++) this.game.discovery.markSkillLearned(learnset[ls].skill);
+          }
+        }
         break;
       // 状態異常に掛かった瞬間。音は data/statuses.js の se（無ければ無音）
       case "status":
@@ -694,7 +879,7 @@
       // 印は「その出来事を見せた瞬間」に出す（HPバーと同じ考え方）
       case "modifier":
         this._revealModifier(event);
-        this.game.audio.playSe(event.raised ? "buff" : "debuff");
+        this._playModifierSe(event);
         break;
       case "modifierEnd":
         this._hideModifier(event);
@@ -772,6 +957,9 @@
       }
     }
 
+    // 札だけの出来事（文が無い）は待たない。続く状態異常の文と一緒に札が出る
+    if (event.type === "abilityPopup") wait = 0;
+
     this.playbackTimer = wait;
   };
 
@@ -783,7 +971,7 @@
    *   強化／弱体（modifier）… 「防御力上昇」「攻撃力低下」（緑／赤）
    *   特性・加護・装備が働いた … その名前（「毒のとげ」「疾き初手」）。出どころで色を変える
    *     ability（先手・放電・毒のとげ）／regen・drain（再生・吸精・命の灯・吸う牙）／
-   *     undying（亡者の魂）／partyFirstStrike（加護の先手をまとめたもの）
+   *     undying（亡者の魂）／partyFirstStrike（加護の先手をまとめたもの）／tailwind（追い風）／wardGiven（芽吹き）
    *
    * 札の左端には、誰に起きたかを小さく出す（敵なら「敵の」付き）。
    * 同じ相手・同じ札がまだ出ていれば、並べずに出し直す。
@@ -797,11 +985,21 @@
     var text = null;
     var kind = null;
     if (event.type === "modifier") {
-      // 技に札の言葉が書いてあればそれ（立ち塞がる）。無ければ変わる能力を並べる（「攻撃力・防御力上昇」）
-      text = event.popup || fill(event.raised ? t.popupStatUp : t.popupStatDown,
-                                 { stat: this._popupStatNames(event.effects || []) });
       kind = event.raised ? "buff" : "debuff";
+      // 技に札の言葉が書いてあればそれ（立ち塞がる）。
+      // 無ければ変わる能力ごとに1枚ずつ（「攻撃力上昇」に「防御力上昇」が重なる。v1.0.0・作者の指定）
+      if (event.popup) {
+        text = event.popup;
+      } else {
+        var names = this._popupStatNames(event.effects || []).split("・");
+        for (var n = 0; n < names.length; n++) {
+          this._addEffectPopup(fill(event.raised ? t.popupStatUp : t.popupStatDown, { stat: names[n] }),
+            this._popupOwnerName(event), kind, n, event);
+        }
+        return;
+      }
     } else if (event.type === "ability" || event.type === "undying" || event.type === "partyFirstStrike" ||
+               event.type === "tailwind" || event.type === "wardGiven" || event.type === "abilityPopup" ||
                ((event.type === "regen" || event.type === "drain") && event.abilityName)) {
       text = event.abilityName;
       kind = event.sourceKind || "ability";
@@ -811,18 +1009,59 @@
     var owner = (event.type === "partyFirstStrike")
       ? (event.side === "enemy" ? t.popupEnemyAll : t.popupPartyAll)
       : this._popupOwnerName(event);
+    this._addEffectPopup(text, owner, kind, 0, event);
+  };
 
+  /**
+   * 札を1枚足す。
+   * @param {number} order 同じ出来事から何枚目か。2枚目以降は chainDelay ずつ遅れて滑り込む（前の札に重なって見える）
+   */
+  BattleScene.prototype._addEffectPopup = function (text, owner, kind, order, event) {
+    var P = this.layout.effectPopup;
+    var now = this.game.clock + (order || 0) * (P.chainDelay || 70);
     if (!this.effectPopups) this.effectPopups = [];
-    // 同じ札がまだ出ていれば、出し直すだけ（並べない）
+    // 同じ札がまだ出ていれば、外していちばん上に出し直す（並べない）
     for (var i = 0; i < this.effectPopups.length; i++) {
       var p = this.effectPopups[i];
-      if (p.text === text && p.owner === owner) {
+      if (p.text === text && p.owner === owner && !p.dismissAt) {
         this.effectPopups.splice(i, 1);
         break;
       }
     }
-    this.effectPopups.unshift({ text: text, owner: owner || "", kind: kind, start: this.game.clock });
-    if (this.effectPopups.length > (P.max || 3)) this.effectPopups.length = P.max || 3;
+    // 新しい札は後ろに足す（描くのも後なので、前の札に重なって上に乗る）
+    this.effectPopups.push({ text: text, owner: owner || "", kind: kind, start: now, dismissAt: null });
+
+    // 出ている札が max を超えたら、古いものから消す
+    var live = this.effectPopups.filter(function (q) { return !q.dismissAt; });
+    for (var j = 0; j < live.length - (P.max || 3); j++) live[j].dismissAt = this.game.clock;
+
+    // 特性の名乗り（先手など）は、その者の行動の頭に出る。続く技で札が消えないよう、行動の持ち主にしておく
+    if (event.type === "ability" && event.target) this._popupActor = event.target;
+  };
+
+  /**
+   * 行動の始まりなら、前の行動の札をまとめて消す（v1.0.0・作者の指定）。
+   *   技を出した（useSkill）／眠り・麻痺で動けなかった（statusBlocked）を「行動の始まり」とみなす。
+   *   同じ者の行動が続くとき（先手の名乗り → その者の技）は消さない
+   */
+  BattleScene.prototype._dismissPopupsOnActionStart = function (event) {
+    var actor;
+    if (event.type === "useSkill") actor = event.actor;
+    else if (event.type === "statusBlocked") actor = event.target;
+    else return;
+    if (!actor) return;
+
+    if (actor !== this._popupActor) this._dismissEffectPopups();
+    this._popupActor = actor;
+  };
+
+  /** 出ている札を、すべて素早く薄れさせて消す（消え方は _renderEffectPopups の fadeOut） */
+  BattleScene.prototype._dismissEffectPopups = function () {
+    var list = this.effectPopups || [];
+    var now = this.game.clock;
+    for (var i = 0; i < list.length; i++) {
+      if (!list[i].dismissAt) list[i].dismissAt = now;
+    }
   };
 
   /**
@@ -851,8 +1090,11 @@
   };
 
   /**
-   * 札を描く。新しいものが上、古いものが下へ押し出される。
-   * 出てすぐ少し下からせり上がり、duration を過ぎたら薄れて消える。
+   * 札を描く（v1.0.0 で作り直した。作者の指定）。
+   *   出る … 画面の右端から slideIn ミリ秒で、定位置へ素早く滑り込む（終わりぎわに減速）
+   *   並び … 同じ高さで横に並べ、後から出た札が前の札の右 overlap（1/3）に重なって上に乗る。
+   *          並び全体を真ん中に寄せるので、札が増えるほど前の札は左へ滑ってずれる
+   *   消える … _dismissEffectPopups で消す印（dismissAt）が付いたら、fadeOut ミリ秒で薄れて消える
    */
   BattleScene.prototype._renderEffectPopups = function (ctx, canvasWidth) {
     var P = this.layout.effectPopup;
@@ -860,27 +1102,44 @@
     if (!P || !list || list.length === 0) return;
 
     var now = this.game.clock;
-    var duration = P.duration || 1500;
-    var fadeIn = P.fadeIn || 120;
-    var fadeOut = P.fadeOut || 300;
+    var slideIn = P.slideIn || 80;
+    var fadeOut = P.fadeOut || 140;
+    var maxLife = P.maxLife || 8000;
     var colors = P.colors || {};
     var t = this.theme;
 
-    // 時間の過ぎた札を外す
+    // 消え終わった札・消し忘れの札を外す
     var alive = [];
     for (var i = 0; i < list.length; i++) {
-      if (now - list[i].start < duration) alive.push(list[i]);
+      var q = list[i];
+      if (q.dismissAt && now - q.dismissAt >= fadeOut) continue;
+      if (now - q.start >= maxLife) continue;
+      alive.push(q);
     }
     this.effectPopups = alive;
 
-    var x = (canvasWidth - P.w) / 2;
-    for (var k = 0; k < alive.length; k++) {
-      var p = alive[k];
-      var age = now - p.start;
-      var alpha = Math.min(1, age / fadeIn);
-      if (age > duration - fadeOut) alpha = Math.max(0, (duration - age) / fadeOut);
-      var rise = (age < fadeIn) ? (1 - age / fadeIn) * (P.rise || 6) : 0;
-      var y = P.y + k * (P.h + (P.gap || 4)) + rise;
+    // 出番の来た札（chainDelay で遅らせたものは、出るまで並びに数えない）
+    var shown = [];
+    for (var s = 0; s < alive.length; s++) {
+      if (now - alive[s].start >= 0) shown.push(alive[s]);
+    }
+    // 並び：同じ高さで横に並べ、幅の overlap ぶん前の札に重ねる。全体を真ん中に寄せるので、増えるほど左へずれる
+    var step = P.w * (1 - (P.overlap === undefined ? 1 / 3 : P.overlap));
+    var groupW = P.w + Math.max(0, shown.length - 1) * step;
+    var startX = (canvasWidth - groupW) / 2;
+
+    for (var k = 0; k < shown.length; k++) {
+      var p = shown[k];
+      var targetX = startX + k * step;
+      // 出たばかりの札は右端から。並びが変わったら（札が増えて左へ寄る）、今の位置から滑って移る
+      if (p.toX === undefined) {
+        p.fromX = canvasWidth; p.toX = targetX; p.moveStart = p.start;
+      } else if (p.toX !== targetX) {
+        p.fromX = this._popupX(p, now, slideIn); p.toX = targetX; p.moveStart = now;
+      }
+      var x = this._popupX(p, now, slideIn);
+      var alpha = p.dismissAt ? Math.max(0, 1 - (now - p.dismissAt) / fadeOut) : 1;
+      var y = P.y;
       var color = colors[p.kind] || t.cursorColor || "#ffd75e";
 
       ctx.save();
@@ -901,10 +1160,26 @@
         this.panel.drawText(p.owner, x + (P.barWidth || 5) + 8, baseY,
           { font: t.smallFont, color: t.subTextColor });
       }
-      this.panel.drawText(p.text, x + P.w / 2 + (P.textOffsetX || 30), baseY,
+      // 札の言葉は、次の札に隠れない左の2/3に収める（textX … 札の左端から言葉の真ん中まで）。
+      // 持ち主の名前が長い（「敵のユラツボミ」）ときは、名前に重ならないところまで右へ逃がす
+      var textX = P.textX || 118;
+      if (p.owner) {
+        ctx.font = t.smallFont;
+        var ownerRight = (P.barWidth || 5) + 8 + ctx.measureText(p.owner).width;
+        ctx.font = P.font || t.font;
+        textX = Math.max(textX, ownerRight + 8 + ctx.measureText(p.text).width / 2);
+      }
+      this.panel.drawText(p.text, x + textX, baseY,
         { align: "center", font: P.font || t.font, color: color });
       ctx.restore();
     }
+  };
+
+  /** 札の今の横位置。fromX から toX へ slideIn ミリ秒で滑る（終わりぎわに減速） */
+  BattleScene.prototype._popupX = function (p, now, slideIn) {
+    var tIn = Math.min(1, Math.max(0, (now - p.moveStart) / slideIn));
+    var ease = 1 - Math.pow(1 - tIn, 3);
+    return p.fromX + (p.toX - p.fromX) * ease;
   };
 
   /**
@@ -916,6 +1191,19 @@
    * hitSe、無ければ hit（打撃）。通常攻撃は種族の attackEffect で型が決まるので、斬る種族は斬撃音になる。
    * 技に hitSe を書けば、この判断を上書きできる（"hit" で鳴らす、null で止める）。
    */
+  /**
+   * 強化・弱体が掛かった瞬間の音。ふつうは buff / debuff。
+   * 技に modifierSe を書けば上書きできる（null で鳴らさない。〇〇ベールは技の音だけにする）
+   */
+  BattleScene.prototype._playModifierSe = function (event) {
+    var skill = event.skillId ? this.game.data.getSkill(event.skillId) : null;
+    if (skill && skill.modifierSe !== undefined) {
+      if (skill.modifierSe) this.game.audio.playSe(skill.modifierSe);
+      return;
+    }
+    this.game.audio.playSe(event.raised ? "buff" : "debuff");
+  };
+
   BattleScene.prototype._hitSeFor = function () {
     var skill = this._currentSkill;
     if (!skill) return "hit";
@@ -989,8 +1277,10 @@
       : NS.Motion.forSprite(this.game.data, sprite,
           monster.getMotionId(), clock, monster.getMotionPhase());
 
-    // 防御中は構えた姿勢を重ねる（_defending は BattleSystem が立てる）
-    if (monster._defending && monster.getActionMotionId) {
+    // 防御中は構えた姿勢を重ねる（_defending は BattleSystem が立てる）。
+    // 演出中は「防御」「防御が解けた」の文を見せた瞬間に切り替える（shownGuard。v1.0.0）
+    var guarding = this.shownGuard ? this.shownGuard.indexOf(monster) >= 0 : monster._defending;
+    if (guarding && monster.getActionMotionId) {
       var guardId = monster.getActionMotionId("guard");
       if (guardId) {
         transform = NS.Motion.combine(transform,
@@ -1184,7 +1474,7 @@
 
     if (skill.kind === "resonance") return "resonance";
     if (skill.kind === "breath") return "breath";
-    if (skill.target === "self" || skill.target === "ally") return "buff";
+    if (skill.target === "self" || skill.target === "ally" || skill.target === "allAllies") return "buff";
     return "technique";
   };
 
@@ -1220,10 +1510,14 @@
     }
 
     // ダメージの無い状態異常の技（青い眼光など）は damage が来ないので、状態異常の出来事も合図にする
+    // 治した出来事は、いまの技で治したときだけ（特性「脱皮」で治ったときに、前の技の演出を出さない）
+    if (event.type === "cure" && event.skillId !== this._currentSkill.id) return;
     var statusOnly = isStatusResultEvent(event.type) && !NS.BattleSystem.dealsDamage(this._currentSkill);
     if ((!isHitEvent(event.type) && !statusOnly) || !event.target) return;
     // 威力も持つ弱体の技（ロックスパイク）は、当たった時点でもう演出を出している。弱体で2回目は出さない
-    if (event.type === "modifier" && NS.BattleSystem.dealsDamage(this._currentSkill)) return;
+    if ((event.type === "modifier" || event.type === "modifierMiss") && NS.BattleSystem.dealsDamage(this._currentSkill)) return;
+    // 反動は自分が受けるもの。技の演出は出さない
+    if (event.type === "recoil") return;
 
     var effectId = this._effectIdFor(this._currentSkill, this._currentSkillActor);
     if (!effectId) return;
@@ -1243,8 +1537,16 @@
    * 当たったときの演出（技の effect）とは別で、技を出した瞬間に出る。色は技の属性
    */
   BattleScene.prototype._playCasterEffect = function (skill, actor) {
+    if (!actor) return;
+    // 技に casterEffect があれば、種類の演出の代わりにそれを出す（死神の鎌の前ぶれ。v1.0.0）
+    if (skill && skill.casterEffect) {
+      var own = this._monsterCenter(actor);
+      if (own) this.skillEffects.play(skill.casterEffect, this.game.clock, own.x, own.y,
+        this._skillEffectColor(skill, skill.casterEffect), 1);
+      return;
+    }
     var kind = this.game.data.getSkillKind ? this.game.data.getSkillKind(skill) : null;
-    if (!kind || !kind.casterEffect || !actor) return;
+    if (!kind || !kind.casterEffect) return;
 
     var pos = this._monsterCenter(actor);
     if (!pos) return;
@@ -1381,8 +1683,13 @@
    * バフ／デバフ（modifier）もここに含める。掛かった瞬間に演出を出すため。
    */
   function isHitEvent(type) {
+    // wardSkill … 味方全体に守りを付ける技（芽吹きの加護）。付いた1体ごとに演出を出す
+    // modifierMiss … 弱体が耐性で入らなかった。charge … 力をためた（自分）
+    // cure … 状態異常を治した（ディンド・リカバーなど。治した仲間ごとに演出を出す）
+    // ppDamage … 相手のPPを減らした（ミステリーダンス）
     return type === "damage" || type === "miss"
-        || type === "immune" || type === "modifier";
+        || type === "immune" || type === "modifier" || type === "wardSkill"
+        || type === "modifierMiss" || type === "charge" || type === "cure" || type === "ppDamage";
   }
 
   /** 状態異常だけを付けるブレスか（種類が breath で、ダメージを持たない。どくのいき・眠りの胞子） */
@@ -1461,6 +1768,11 @@
     this._syncModifierMarks();
     // 状態異常の印も個体そのものに戻す（見せきれなかった出来事があってもここで揃う）
     this.shownStatusIds = null;
+    // 防御の構えも個体の _defending に戻す
+    this.shownGuard = null;
+    // このターンの札は、演出が終わったらまとめて消す（v1.0.0）
+    this._dismissEffectPopups();
+    this._popupActor = null;
 
     this.phase = "message";   // 決定キーで次のターンへ進む
   };
@@ -1531,6 +1843,7 @@
       return;
     }
     if (result.value === "go") this._beginCommandPhase();
+    if (result.value === "tactic") this._beginTacticMember(0);
   };
 
   // --- 状態を見る ---
@@ -1608,6 +1921,7 @@
       });
     }
 
+    this._useNormalSubMenu();
     this.subMenu.setRows(rows);
     this.messageLog.clear();
     this.phase = "scoutSwap";
@@ -1734,9 +2048,12 @@
   BattleScene.prototype._advanceChooser = function () {
     var slots = this.system.getFieldSlots();
 
-    while (this.commandIndex < slots.length && !this._canChoose(slots[this.commandIndex])) {
-      // 自動で飛ばした印。取り消しで戻るときの戻り先にしないため
-      this.actions.push({ type: "skip", auto: true });
+    while (this.commandIndex < slots.length &&
+           (!this._canChoose(slots[this.commandIndex]) || this._isTacticAi(slots[this.commandIndex]))) {
+      // 自動で飛ばした印。取り消しで戻るときの戻り先にしないため。
+      // 作戦で動く仲間は、自分の番が来たときに BattleSystem が行動を決める（v1.0.0）
+      var auto = this._isTacticAi(slots[this.commandIndex]) ? "tactic" : "skip";
+      this.actions.push({ type: auto, auto: true });
       this.commandIndex++;
     }
 
@@ -1745,6 +2062,11 @@
       return true;
     }
     return false;
+  };
+
+  /** 作戦で動く仲間か（倒れている者は、交代を選ぶためにコマンドを聞く） */
+  BattleScene.prototype._isTacticAi = function (actor) {
+    return !!(actor && !actor.isFainted() && actor.isTacticAi && actor.isTacticAi());
   };
 
   /** その枠に決めることがあるか。倒れていても、控えがいれば交代を選べる */
@@ -1868,6 +2190,15 @@
   };
 
   BattleScene.prototype._updateSkill = function (input) {
+    // 並べ方の切り替え（Q/E・右の並びの札）
+    if (input.isPressed("prevTab")) { this._changeBattleSkillSort(-1); return; }
+    if (input.isPressed("nextTab")) { this._changeBattleSkillSort(1); return; }
+    var pointer = input.getPointer ? input.getPointer() : null;
+    if (pointer && pointer.clicked && this._skillSortRect && NS.Panel.containsPoint(this._skillSortRect, pointer)) {
+      this._changeBattleSkillSort(1);
+      return;
+    }
+
     this.subMenu.handleInput(input);
 
     if (input.isPressed("cancel")) {
@@ -1886,8 +2217,8 @@
       return;
     }
 
-    // 自分にかける技と範囲全体の技は相手を選ばない。そのまま確定する
-    if (skill && (skill.target === "self" || skill.target === "allEnemies")) {
+    // 自分にかける技と範囲全体の技（相手全体・味方全体）は相手を選ばない。そのまま確定する
+    if (skill && (skill.target === "self" || skill.target === "allEnemies" || skill.target === "allAllies")) {
       this._commitAction({ type: "skill", skillId: selected.value });
       return;
     }
@@ -2019,11 +2350,14 @@
 
   /**
    * その相手に、いま決めている行動を向けられるか（倒れた仲間には向けられない）。
-   * ★ 蘇生の技・道具を足すときは、ここで this.pending の種類を見て、
-   *   その行動のときだけ倒れた仲間も許すようにする
+   * 蘇生の道具（神鳥の羽。v1.0.0）を使うときだけは逆で、倒れた仲間にしか向けられない
    */
   BattleScene.prototype._canTarget = function (monster) {
-    return !!monster && !monster.isFainted();
+    if (!monster) return false;
+    if (this.pending && this.pending.type === "item" && this.itemUsage.isRevive(this.pending.itemId)) {
+      return monster.isFainted() && !monster._undying;
+    }
+    return !monster.isFainted();
   };
 
   /** 狙える相手まで、向き（+1 / -1）へ進めた番号。ぐるっと回っても無ければそのまま */
@@ -2353,8 +2687,11 @@
    */
   BattleScene.prototype._recruitFrom = function (target) {
     var level = this.scoutLevel;
-    if (level === undefined || level === null) return target;
-    if (!(level < target.level)) return target;
+    if (level === undefined || level === null || !(level < target.level)) {
+      // 敵のときだけ使っていた技（data/monsters.js の enemySkills）を、覚える技の一覧に戻す
+      if (target.useLearnedSkills) target.useLearnedSkills();
+      return target;
+    }
 
     var recruit = new NS.MonsterInstance(target.speciesId, level, this.game.data, {
       nature: target.natureId,
@@ -2362,6 +2699,18 @@
     });
     // 種族が見つからないなど、作れなかったときは元の個体をそのまま渡す
     return recruit.getSpecies() ? recruit : target;
+  };
+
+  /**
+   * まだ誘えない相手か（種族の scoutableWhen。v1.0.0 シニガミ）。
+   *   { storyComplete: true } … ストーリーを全部クリアしたあと（Game.isStoryComplete）
+   */
+  BattleScene.prototype._scoutLocked = function (target) {
+    var species = target && target.getSpecies ? target.getSpecies() : null;
+    var when = species && species.scoutableWhen;
+    if (!when) return false;
+    if (when.storyComplete && !(this.game.isStoryComplete && this.game.isStoryComplete())) return true;
+    return false;
   };
 
   BattleScene.prototype._resolveScoutAction = function (step, events) {
@@ -2375,6 +2724,13 @@
 
     events.push({ type: "custom", text: fill(texts.attempt,
       { actor: step.actor.getName(), name: target.getName() }) });
+
+    // 誘える時期が決まっている種族（シニガミ：ストーリーを全部クリアしたあと）は、それまで必ず断られる
+    if (this._scoutLocked(target)) {
+      events.push({ type: "custom", text: fill(texts.locked || texts.refused || "",
+        { name: target.getName() }) });
+      return;
+    }
 
     // 応じてくれるかどうかは、パーティの空きに関係なく判定する。
     // いっぱいだった場合は、どう扱うかを演出のあとで選んでもらう。
@@ -2515,7 +2871,8 @@
     if (this.phase === "command") this._renderCommand();
     else if (this.phase === "turnMenu") this._renderTurnMenu();
     else if (this.phase === "inspect") this._renderInspect();
-    else if (this.phase === "skill" || this.phase === "item" || this.phase === "swap") {
+    else if (this.phase === "skill" || this.phase === "item" || this.phase === "swap" ||
+             this.phase === "tacticMember" || this.phase === "tacticPick") {
       this._renderSubMenu();
     }
     else if (this.phase === "scoutChoice") this._renderScoutChoice();
@@ -2751,7 +3108,7 @@
     // 倒れて枠に残っている仲間は、名前を薄くして「いま戦えない」と分かるようにする
     var fallen = (side === "ally") && shownHp <= 0 && monster.isFainted();
     this.panel.drawText(monster.getName(), origin.x, origin.y + 10,
-      { font: t.smallFont, color: fallen ? t.hintColor : undefined });
+      { font: this._nameFont(monster), color: fallen ? t.hintColor : undefined });
 
     // 掛かっている強化・弱体を名前の横に出す
     this._renderModifierMarks(monster, origin, origin.y + 10);
@@ -2857,6 +3214,18 @@
    * 枠が狭いので「何が」「どちらへ」だけを出し、倍率もターン数も出さない。
    * 詳しくはコマンドの「状態を見る」で見られる。
    */
+  /**
+   * 状態表示の名前の字体。名前は10文字まで付けられる（2026-10-27。漢字も使える）が、
+   * 全角9文字を超えると強化・弱体の印と Lv 表示が入りきらないので、そのときだけ1段小さくする
+   * （全角10文字が 12px で120px → 10px で100px。前の上限の全角8文字 96px とほぼ同じ幅になる）
+   */
+  BattleScene.prototype._nameFont = function (monster) {
+    var font = this.theme.smallFont || "12px monospace";
+    var ctx = this.panel.ctx;
+    ctx.font = font;
+    return ctx.measureText(monster.getName()).width > 100 ? "10px monospace" : font;
+  };
+
   BattleScene.prototype._renderModifierMarks = function (monster, origin, baseY) {
     var mods = this._shownModifiersFor(monster);
     var statuses = this._shownStatusesFor(monster);
@@ -2867,8 +3236,9 @@
     var font = t.smallFont || "12px monospace";
     var data = this.game.data;
 
-    ctx.font = font;
+    ctx.font = this._nameFont(monster);
     var x = origin.x + ctx.measureText(monster.getName()).width + 8;
+    ctx.font = font;
 
     // 状態異常を先に出す。バフ／デバフより重いので、名前のすぐ隣に置く
     x = NS.StatusMarks.draw(this.panel, statuses, x, baseY,
@@ -2974,6 +3344,7 @@
     // いま行動を決めている味方（「戦う／逃げる」の間はまだ誰も決めていない）
     var choosing = (side === "ally")
       && this.phase !== "message" && this.phase !== "done" && this.phase !== "turnMenu"
+      && this.phase !== "tacticMember" && this.phase !== "tacticPick"
       && index === this.commandIndex;
     if (choosing) {
       this.panel.drawText("▼", rect.x + rect.w / 2, rect.y - 6,
@@ -3140,14 +3511,42 @@
     // 選んでいるものの中身を左側に出す
     if (this.phase === "skill") this._renderSkillInfo(origin, rect);
     else if (this.phase === "item") this._renderItemInfo(origin, rect);
+    else if (this.phase === "tacticMember" || this.phase === "tacticPick") this._renderTacticInfo(origin, rect);
     else this._renderSwapHint(origin, rect);
 
     this.subMenu.render(this.game.clock);
+    this._skillSortRect = null;
+    if (this.phase === "skill") this._renderSkillSort(rect);
+  };
+
+  /**
+   * 技を選ぶときの右端：いまの並べ方と、切り替えの案内（2026-10-15）。
+   * 並べ方の札は押しても次の並びに変わる
+   */
+  BattleScene.prototype._renderSkillSort = function (rect) {
+    var list = this.layout.skillMenu || this.layout.subMenu;
+    var t = this.theme;
+    var x = list.x + list.w + 14;
+    var right = rect.x + rect.w - 12;
+    if (right - x < 60) return;
+    var modes = this.texts.skillSortModes || {};
+    var mode = this._battleSkillSort();
+    var y = rect.y + 30;
+
+    this.panel.drawText(this.texts.skillSortTitle || "", x, y, { font: t.smallFont, color: t.hintColor });
+    this._skillSortRect = { x: x - 4, y: y + 6, w: right - x + 8, h: 24 };
+    this.panel.ctx.fillStyle = "rgba(74,107,168,0.25)";
+    this.panel.ctx.fillRect(this._skillSortRect.x, this._skillSortRect.y, this._skillSortRect.w, this._skillSortRect.h);
+    this.panel.drawText(modes[mode] || mode, x + 4, y + 23, { font: t.font, color: t.cursorColor });
+    this.panel.drawText(this.texts.skillSortHint || "", x, rect.y + rect.h - 14, { font: t.smallFont, color: t.hintColor });
   };
 
   BattleScene.prototype._subMenuLabel = function () {
     if (this.phase === "skill") return this.texts.selectSkill;
     if (this.phase === "item") return this.texts.selectItem;
+    if (this.phase === "tacticMember") return this.texts.selectTacticMember;
+    if (this.phase === "tacticPick") return fill(this.texts.selectTactic || "",
+      { name: this._tacticMember ? this._tacticMember.getName() : "" });
     return this.texts.selectSwap;
   };
 

@@ -274,6 +274,180 @@
       result: { item: "slimeNecklace", count: 1 },
       materials: [ { item: "slimeShard", count: 5 } ],
       unlockedBy: "silentDepths"
+    },
+
+    /**
+     * --- 萌芽の穴・若葉の洞で集まる素材で作るもの（v1.0.0）---
+     *
+     * 解放は「毒沼をクリア」（萌芽の穴が開くのと同じとき）。素材は若葉の洞に潜っている最中に集まるので、
+     * 亀裂・深層・毒沼と同じく、その区画のクリアは待たせない。
+     * 揺籃の穴の素材（鉱石のかけら・泥甲羅・灰の羽根）も使う。
+     * ★ 眠りよけの鈴は主の素材を使わない（毒よけの護符と同じ理由。眠りが初めて出る区画なので、主の前に要る）。
+     *   若芽の護符はコダマ（珍しい）、若木の大剣は主を倒さないと素材がそろわない。
+     * ★ 店で素材を買って作って売っても得をしないことを確かめてある（材料の買値の合計 ＞ 売値）
+     */
+
+    sleepWard: {
+      id: "sleepWard",
+      order: 21,
+      result: { item: "sleepWard", count: 1 },
+      materials: [
+        { item: "sleepPollen", count: 2 },
+        { item: "shedHusk", count: 2 }
+      ],
+      unlockedBy: "venomMarsh"
+    },
+
+    leafPlume: {
+      id: "leafPlume",
+      order: 22,
+      result: { item: "leafPlume", count: 1 },
+      materials: [
+        { item: "leafFeather", count: 3 },
+        { item: "ashFeather", count: 1 }
+      ],
+      unlockedBy: "venomMarsh"
+    },
+
+    sproutBlade: {
+      id: "sproutBlade",
+      order: 23,
+      result: { item: "sproutBlade", count: 1 },
+      materials: [
+        { item: "leafFeather", count: 2 },
+        { item: "shedHusk", count: 3 },
+        { item: "oreShard", count: 2 }
+      ],
+      unlockedBy: "venomMarsh"
+    },
+
+    mossShellArmor: {
+      id: "mossShellArmor",
+      order: 24,
+      result: { item: "mossShellArmor", count: 1 },
+      materials: [
+        { item: "mossyShell", count: 2 },
+        { item: "muddyShell", count: 2 }
+      ],
+      unlockedBy: "venomMarsh"
+    },
+
+    // ユラツボミの花粉を使う杖（作者が考えたもの）。
+    // ★ 材料の買値 230G ＜ 売値 300G（作って売ると70G得）。作者に確認したうえで、このままにしてある
+    sleepStaff: {
+      id: "sleepStaff",
+      order: 25,
+      result: { item: "sleepStaff", count: 1 },
+      materials: [
+        { item: "sleepPollen", count: 3 },
+        { item: "leafFeather", count: 1 },
+        { item: "shedHusk", count: 1 }
+      ],
+      unlockedBy: "venomMarsh"
+    },
+
+    // コダマの種を使う。珍しい相手を探す理由になるレシピ
+    sproutCharm: {
+      id: "sproutCharm",
+      order: 26,
+      result: { item: "sproutCharm", count: 1 },
+      materials: [
+        { item: "sproutSeed", count: 1 },
+        { item: "sleepPollen", count: 2 },
+        { item: "shedHusk", count: 1 }
+      ],
+      unlockedBy: "venomMarsh"
+    },
+
+    // 若葉の洞の主の芯を使う。区画を抜けた証になる装備
+    heartwoodBlade: {
+      id: "heartwoodBlade",
+      order: 27,
+      result: { item: "heartwoodBlade", count: 1 },
+      materials: [
+        { item: "heartwood", count: 1 },
+        { item: "mossyShell", count: 2 },
+        { item: "shedHusk", count: 2 }
+      ],
+      unlockedBy: "venomMarsh"
+    },
+
+    /**
+     * --- 萌芽の穴・蔦這う回廊の素材で作るもの（作者の指定 2026-10-27。名前は 2026-10-28 に確定）---
+     *
+     * ★ 解放は「回廊をクリア」（作者の指定）。若葉の洞の作り方（前の区画のクリアで開く）とは違う。
+     * ★ 店で素材を買って作って売っても得をしないことを確かめてある（材料の買値の合計 ＞ 売値）。
+     *   風鳴りの胴衣：買値 240G ＞ 売値 220G ／ 蒼雷の剣：金角のかけらは店に無い
+     *   蔦断ちの護符：絡み主根・弔いの小鐘は店に無い
+     */
+
+    paralysisWard: {
+      id: "paralysisWard",
+      order: 28,
+      result: { item: "paralysisWard", count: 1 },
+      materials: [
+        { item: "blueThunderScale", count: 2 },
+        { item: "mossSpore", count: 2 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+
+    sealWard: {
+      id: "sealWard",
+      order: 29,
+      result: { item: "sealWard", count: 1 },
+      materials: [
+        { item: "windChimeFeather", count: 2 },
+        { item: "rustedBone", count: 2 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+
+    curseWard: {
+      id: "curseWard",
+      order: 30,
+      result: { item: "curseWard", count: 1 },
+      materials: [
+        { item: "twistedVine", count: 3 },
+        { item: "abyssFragment", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+
+    windChimeVest: {
+      id: "windChimeVest",
+      order: 31,
+      result: { item: "windChimeVest", count: 1 },
+      materials: [
+        { item: "windChimeFeather", count: 3 },
+        { item: "twistedVine", count: 2 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+
+    blueThunderBlade: {
+      id: "blueThunderBlade",
+      order: 32,
+      result: { item: "blueThunderBlade", count: 1 },
+      materials: [
+        { item: "blueThunderScale", count: 3 },
+        { item: "goldHornShard", count: 1 },
+        { item: "rustedBone", count: 2 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+
+    // 宝箱でしか出ない絡み主根（B4F）と、ツリガネの落とす弔いの小鐘を使う。回廊を歩き尽くした証になる護符
+    ivyBreakerCharm: {
+      id: "ivyBreakerCharm",
+      order: 33,
+      result: { item: "ivyBreakerCharm", count: 1 },
+      materials: [
+        { item: "tangledTaproot", count: 1 },
+        { item: "glowMoss", count: 3 },
+        { item: "mourningBell", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
     }
   };
 })(window.MyGame);

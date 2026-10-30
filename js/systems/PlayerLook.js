@@ -194,6 +194,154 @@
 
     _customBuilt: null,
 
+    // --- 部品を重ねて作る絵（v1.0.2。js/systems/CharaRig.js） ---
+
+    /**
+     * 地図で新しい絵を使うか。data/player.js の appearance.rig が書かれていて、
+     * CharaRig.js が読めているときだけ（読めていなければ今までの 32×32 の絵で描く）
+     */
+    usesRig: function (gameData) {
+      return !!(this.appearanceOf(gameData).rig && NS.CharaRig);
+    },
+
+    /**
+     * 一覧（data/player.js の appearance[listKey]）から id の定義を探す。"#rrggbb" なら自分で作った色。
+     * 無い id なら既定（appearance[defaultKey]。書かれていなければ最初）。一覧も無ければ null
+     */
+    listDef: function (gameData, listKey, defaultKey, id) {
+      if (this.isCustom(id)) return this.customDef(id);
+      var look = this.appearanceOf(gameData), list = look[listKey] || [], i;
+      for (i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+      for (i = 0; i < list.length; i++) if (list[i].id === look[defaultKey]) return list[i];
+      return list[0] || null;
+    },
+
+    /** ズボンの色（pantsColors）・髪の色（hairColors）・髪型（hairStyles）の定義 */
+    pantsDef: function (gameData, id) { return this.listDef(gameData, "pantsColors", "defaultPants", id); },
+    hairColorDef: function (gameData, id) { return this.listDef(gameData, "hairColors", "defaultHairColor", id); },
+    hairStyleDef: function (gameData, id) { return this.listDef(gameData, "hairStyles", "defaultHair", id); },
+
+    /** 着けている飾りの id のうち、data/player.js の accessories にあるものだけを残す */
+    accIdsOf: function (gameData, ids) {
+      var list = this.appearanceOf(gameData).accessories || [], out = [];
+      for (var i = 0; i < list.length; i++) {
+        if (ids && ids.indexOf(list[i].id) >= 0) out.push(list[i].id);
+      }
+      return out;
+    },
+
+    /**
+     * 飾りの色の id（data/player.js の accColors）か "#rrggbb" を色コードにする。
+     * 選んでいない・無い id なら null（その飾りの「もとの色」になる）
+     */
+    accColorHex: function (gameData, id) {
+      if (this.isCustom(id)) return id.toLowerCase();
+      var list = this.appearanceOf(gameData).accColors || [];
+      for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].base;
+      return null;
+    },
+
+    /**
+     * 選んだもの（{ gender, color, hair, hairColor, pants, acc, accColor }。どれも id。無ければ既定）から、
+     * CharaRig に渡す見た目を作る。名前と見た目を決める画面は、決める前の値でこれを呼ぶ。
+     * accColor は { 飾りの id: 色の id }
+     */
+    rigOptions: function (gameData, sel) {
+      sel = sel || {};
+      var cloth = this.colorDef(gameData, this.resolveColorId(gameData, sel.color));
+      var hair = this.hairStyleDef(gameData, sel.hair);
+      var hairColor = this.hairColorDef(gameData, sel.hairColor);
+      var pants = this.pantsDef(gameData, sel.pants);
+      var accIds = this.accIdsOf(gameData, sel.acc), acc = {};
+      var accList = this.appearanceOf(gameData).accessories || [];
+      for (var i = 0; i < accIds.length; i++) {
+        // 選んだ色 → その飾りの「もとの色」→ CharaRig の既定の色、の順
+        var hex = this.accColorHex(gameData, (sel.accColor || {})[accIds[i]]);
+        for (var k = 0; !hex && k < accList.length; k++) if (accList[k].id === accIds[i]) hex = accList[k].color;
+        acc[accIds[i]] = hex ? { color: hex } : true;
+      }
+      return {
+        body: sel.gender === "female" ? "female" : "male",
+        hair: hair ? hair.id : "short",
+        hairColor: tones(hairColor),
+        cloth: tones(cloth),
+        pants: tones(pants),
+        acc: acc
+      };
+    },
+
+    /** いまの主人公（セーブに入っている選び方）の見た目 */
+    rigOptionsOf: function (game) {
+      return this.rigOptions(game.data, {
+        gender: game.getPlayerGender(), color: game.getPlayerColor(),
+        hair: game.playerHair, hairColor: game.playerHairColor,
+        pants: game.playerPants, acc: game.playerAcc, accColor: game.playerAccColor
+      });
+    },
+
+    /**
+     * 地図で使う絵（4方向 × 歩き4コマ・立ち止まり3コマ）。canvas で返す。
+     * 見た目と大きさが変わったときだけ描き直す（毎フレーム描くと重い）。
+     */
+    rigFrames: function (game, size) {
+      return this.framesFor(this.rigOptionsOf(game), size);
+    },
+
+    /** rigOptions の見た目を、その大きさで4方向ぶん描く。描いたものは覚えておく（少しだけ） */
+    framesFor: function (opts, size) {
+      var key = JSON.stringify(opts) + "@" + size;
+      if (this._frames[key]) return this._frames[key];
+
+      var R = NS.CharaRig, f = R.frames(R.makeLook(opts), size), out = { walk: {}, idle: {} };
+      for (var d = 0; d < R.DIRS.length; d++) {
+        var dir = R.DIRS[d];
+        out.walk[dir] = f.walk[dir].map(function (img) { return R.toCanvas(img, 1); });
+        out.idle[dir] = f.idle[dir].map(function (img) { return R.toCanvas(img, 1); });
+      }
+      // 見た目を決める画面で次々に選び直すと溜まるので、増えすぎたら捨てる
+      if (++this._frameCount > 12) { this._frames = {}; this._frameCount = 1; }
+      this._frames[key] = out;
+      return out;
+    },
+
+    _frames: {},
+    _frameCount: 0,
+
+    // --- 物語の場面の人物（v1.0.2） ---
+
+    /**
+     * 人の見た目（CharaRig.makeLook に渡すもの）。
+     * "player" なら主人公（いまの性別・服の色）、ほかは data/sprites_story.js の charaLooks のid。
+     * 新しい絵が使えない（CharaRig.js が読めていない・主人公の rig が無い）ときは null
+     */
+    personOptions: function (game, id) {
+      if (!NS.CharaRig || !this.assets || !this.assets.put) return null;
+      if (id === "player") return this.usesRig(game.data) ? this.rigOptionsOf(game) : null;
+      return (game.data.charaLooks || {})[id] || null;
+    },
+
+    /**
+     * 物語の場面に立たせる絵（正面・立ち止まり3コマ。64×64）を描画物に登録し、そのidを返す。
+     * 見た目が変わったときだけ描き直す。使えなければ null
+     */
+    personSpriteIds: function (game, id) {
+      var opts = this.personOptions(game, id);
+      if (!opts) return null;
+      var key = JSON.stringify(opts);
+      var cache = this._people[id];
+      if (cache && cache.key === key) return cache.ids;
+
+      var R = NS.CharaRig, look = R.makeLook(opts), ids = [];
+      for (var i = 0; i < R.IDLE.length; i++) {
+        var spriteId = "person_" + id + "_" + i;
+        this.assets.put(spriteId, R.toCanvas(R.render(look, "down", R.IDLE[i], 64, false), 1));
+        ids.push(spriteId);
+      }
+      this._people[id] = { key: key, ids: ids };
+      return ids;
+    },
+    _people: {},
+
     // --- 色の計算（色を作る画面で使う） ---
 
     /** "#rrggbb" → { h:0〜359, s:0〜100, l:0〜100 } */
@@ -225,6 +373,11 @@
       return "#" + rgb.map(function (v) { return hex2(Math.round((v + m) * 255)); }).join("");
     }
   };
+
+  /** 色の定義から、CharaRig に渡す3色だけを抜き出す（無ければ null ＝ CharaRig の既定の色） */
+  function tones(def) {
+    return def ? { base: def.base, light: def.light, shadow: def.shadow } : null;
+  }
 
   function toRgb(hex) {
     var n = parseInt(hex.slice(1), 16);

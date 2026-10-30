@@ -162,6 +162,8 @@
   ShopSystem.prototype.getSellPrice = function (item) {
     var base = (item && item.price) || 0;
     if (base <= 0) return 0;
+    // 値段はあるが売れない品（items.js の unsellable。神鳥の羽：のちの店で買えるが、売れない）
+    if (item.unsellable) return 0;
 
     var rate = (this.config.sellRate === undefined) ? 0.5 : this.config.sellRate;
     return Math.max(1, Math.floor(base * rate));

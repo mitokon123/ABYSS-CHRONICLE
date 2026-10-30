@@ -35,6 +35,7 @@
     this.help      = raw.help      || {}; // 遊び方（よくある質問と答え）
     this.tutorial  = raw.tutorial  || {}; // 初めての場面で出る説明
     this.story     = raw.story     || {}; // 物語の場面
+    this.charaLooks = raw.charaLooks || {}; // 人間の登場人物の見た目（部品を重ねて描く。data/sprites_story.js）
     this.affection = raw.affection || {}; // 愛情度の段階と報酬
     this.audio     = raw.audio     || {}; // BGMと効果音の一覧
     this.home      = raw.home      || {}; // 拠点メニューの項目

@@ -219,6 +219,10 @@
     } else if (result.reason === "fainted") {
       this._showNotice((this.texts.targetFainted || "").replace("{name}", target.getName()));
       this.game.playError();
+    } else if (result.reason === "notFainted") {
+      // 蘇生の道具を、倒れていない仲間に使おうとした（v1.0.0）
+      this._showNotice((this.texts.notFainted || "").replace("{name}", target.getName()));
+      this.game.playError();
     } else {
       this._showNotice(this.texts.cannotUse || "");
       this.game.playError();

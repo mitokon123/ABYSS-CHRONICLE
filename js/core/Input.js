@@ -53,6 +53,9 @@
     var self = this;
 
     window.addEventListener("keydown", function (e) {
+      // 名前の入力欄（js/ui/NameInput.js）に打っているキーは、ゲームの操作にしない。
+      // Z や矢印が「決定」「移動」として働いたり、preventDefault で文字が打てなくなったりするため
+      if (isTextField(e.target)) return;
       var action = self._keyMap[e.code];
       if (!action) return;
       // 押されていない状態からの遷移だけを「押した瞬間」として記録
@@ -205,6 +208,13 @@
       for (var i = 0; i < codes.length; i++) map[codes[i]] = action;
     }
     return map;
+  }
+
+  /** 文字を打つ欄か（input / textarea / 編集できる要素） */
+  function isTextField(target) {
+    if (!target) return false;
+    var tag = (target.tagName || "").toLowerCase();
+    return tag === "input" || tag === "textarea" || target.isContentEditable === true;
   }
 
   // 配列を { 値: true } の形にする（存在チェックを速くするため）

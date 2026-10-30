@@ -127,6 +127,12 @@
       // 主人公の名前と服の色（ファイルごとに違う）
       playerName: state.playerName || null,
       playerColor: state.playerColor || null,
+      // 新しい絵の見た目（v1.0.2）。ズボンの色・髪型・髪の色・飾り（id の配列）・飾りの色（飾りの id → 色）
+      playerPants: state.playerPants || null,
+      playerHair: state.playerHair || null,
+      playerHairColor: state.playerHairColor || null,
+      playerAcc: state.playerAcc || null,
+      playerAccColor: state.playerAccColor || null,
       // 性別と一人称（ゲームの進み方には影響しない。物語の {me} に使う）
       playerGender: state.playerGender || null,
       playerFirstPerson: state.playerFirstPerson || null,
@@ -211,6 +217,11 @@
         // 古いセーブには無い。その場合は既定の名前と色になる
         playerName: payload.playerName || null,
         playerColor: payload.playerColor || null,
+        playerPants: payload.playerPants || null,
+        playerHair: payload.playerHair || null,
+        playerHairColor: payload.playerHairColor || null,
+        playerAcc: payload.playerAcc || null,
+        playerAccColor: payload.playerAccColor || null,
         playerGender: payload.playerGender || null,
         playerFirstPerson: payload.playerFirstPerson || null,
         // 古いセーブには無い。その場合は「まだ何も起きていない」扱い

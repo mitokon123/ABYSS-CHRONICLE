@@ -56,6 +56,27 @@
       usableIn: ["home", "dungeon", "battle"]
     },
 
+    /**
+     * 神鳥の羽（v1.0.0。名前と効き目は作者が決めたもの 2026-10-21）。倒れた仲間1体を、HP55%で起こす。
+     * このゲームで初めての蘇生の道具（効果の種類 revive。ItemUsage）。戦闘中も探索中も拠点でも使える。
+     * 戦闘では倒れた仲間にしか向けられない（BattleScene._canTarget）。
+     * 店では買えない。いまはシニガミが落とす（25%）だけ。
+     * ★ のちに足す、ある部族の店で 2500G で買える予定（作者）。price はその値段にしてある。
+     *   売れない（unsellable。作者の指定。ShopSystem.getSellPrice が0を返す）
+     */
+    divineFeather: {
+      id: "divineFeather",
+      name: "神鳥の羽",
+      icon: "iconItemDivineFeather",
+      category: "heal",
+      description: "神鳥が落としたと伝わる羽。倒れた仲間1体を、HPを半分ほど戻して起こす。",
+      maxStack: 99,
+      price: 2500,
+      unsellable: true,
+      effect: { type: "revive", hpRatio: 0.55 },
+      usableIn: ["home", "dungeon", "battle"]
+    },
+
     potion: {
       id: "potion",
       name: "回復薬",
@@ -302,6 +323,7 @@
      *   いまこれを持つのは毒沼の冠（×0.95）だけ。
      * ★ 素早さを下げる代償も入れない。鈍くする効果は装備から全部外してある
      *   （残っている statMultiplier の速さは、上げる側の深淵の牙 ×1.1 だけ）。
+     *   v1.0.0 の若木の大剣（武器）から、作者の指定で「強いかわりに鈍くなる」代償を戻した（速×0.9）
      */
 
     stoneBand: {
@@ -754,7 +776,7 @@
       price: 280,
       effect: null,
       usableIn: [],
-      // 雷の使い手はビリムシだけなので、これは実質ビリムシ専用の装備になる
+      // 雷の使い手はいまビリムシだけ（蔦這う回廊に雷の竜の子を足す予定）。いまは実質ビリムシ専用の装備
       equip: {
         slot: "accessory",
         effects: [
@@ -810,6 +832,160 @@
         effects: [
           { type: "resistBonus", status: "instantDeath", value: 7 },
           { type: "statBonus", stat: "hp", value: 9 }
+        ]
+      }
+    },
+
+    /**
+     * --- 萌芽の穴・若葉の洞の素材で作る装備（v1.0.0）---
+     * ★ 名前は仮（作者が決める）。数値・値段は作者に見せる案。
+     * 揺籃の穴の装備（武器は攻+17・防具は防+17が一番上）より一段上に置く。第一章は通過点なので、ここから伸ばしていく
+     * （作者「まだまだインフレさせる」）。光の技を使う仲間（ユラツボミ・コダマ）が増える場所なので、光の武器を初めて置く。
+     * 眠りが初めて出る場所なので、毒沼の毒よけの護符と同じく「主の素材を使わない眠りよけ」を作れるようにしてある。
+     */
+
+    // 若葉の洞の素材で作る武器。ゲーム中で初めて光の技を伸ばす武器
+    sproutBlade: {
+      id: "sproutBlade",
+      name: "若枝の剣",
+      icon: "iconItemSproutBlade",
+      category: "equipment",
+      description: "しなやかな若枝を芯に巻いて鍛えた剣。刃に淡い光が通う。",
+      maxStack: 9,
+      price: 440,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "weapon",
+        effects: [
+          { type: "statBonus", stat: "attack", value: 22 },
+          { type: "damageDealt", value: 1.10, element: "light" }
+        ]
+      }
+    },
+
+    // コケガメの甲羅で作る防具。黄泉鱗の鎧（防+17）より大きく硬く、HPも伸びる。水と地に強い（作者の指定）
+    mossShellArmor: {
+      id: "mossShellArmor",
+      name: "苔甲の鎧",
+      icon: "iconItemMossShellArmor",
+      category: "equipment",
+      description: "苔むした甲羅を泥甲羅で裏打ちした鎧。重いが、打たれても苔が衝撃を吸う。",
+      maxStack: 9,
+      price: 480,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "armor",
+        effects: [
+          { type: "statBonus", stat: "defense", value: 33 },
+          { type: "statBonus", stat: "hp", value: 10 },
+          { type: "resistBonus", element: "water", value: 2 },
+          { type: "resistBonus", element: "earth", value: 2 }
+        ]
+      }
+    },
+
+    // 若葉の洞の答え。眠り耐性 +7（通る確率が3割になる）。毒よけの護符と同じ重さ
+    sleepWard: {
+      id: "sleepWard",
+      name: "眠りよけの鈴",
+      icon: "iconItemSleepWard",
+      category: "equipment",
+      description: "眠り花粉を固めた玉を入れた鈴。澄んだ音が眠気を払う。",
+      maxStack: 9,
+      price: 220,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", status: "sleep", value: 7 }
+        ]
+      }
+    },
+
+    // 風乗りの羽飾り（速+5・風×1.1）の上位
+    leafPlume: {
+      id: "leafPlume",
+      name: "若葉の羽飾り",
+      icon: "iconItemLeafPlume",
+      category: "equipment",
+      description: "若葉色の羽根を束ねた飾り。追い風を受けたように体が軽い。",
+      maxStack: 9,
+      price: 300,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "statBonus", stat: "speed", value: 8 },
+          { type: "damageDealt", value: 1.10, element: "wind" }
+        ]
+      }
+    },
+
+    // コダマ（珍しい）の種で作る。ゲーム中で初めて、装備でターンごとにHPが戻る（特性「再生」の 10%・上限50 より少ないが、上限は無い）
+    sproutCharm: {
+      id: "sproutCharm",
+      name: "若芽の護符",
+      icon: "iconItemSproutCharm",
+      category: "equipment",
+      description: "芽吹く前の種を包んだ護符。身につけた者の傷を、少しずつ塞いでいく。",
+      maxStack: 9,
+      price: 380,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "regen", value: 0.05 },
+          { type: "statBonus", stat: "hp", value: 8 }
+        ]
+      }
+    },
+
+    // 若葉の洞の主を倒さないと作れない。若枝の剣より重く、地の技を伸ばす。
+    // ★ 重さの代償として素早さ ×0.9（作者の指定）。RC-1 で「鈍くする装備は外す」としたが、ここから代償つきの強い装備を入れる
+    heartwoodBlade: {
+      id: "heartwoodBlade",
+      name: "若木の大剣",
+      icon: "iconItemHeartwoodBlade",
+      category: "equipment",
+      description: "主の芯から削り出した大剣。若木の力が、振るうたびに地を揺らす。",
+      maxStack: 9,
+      price: 620,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "weapon",
+        effects: [
+          { type: "statBonus", stat: "attack", value: 33 },
+          { type: "damageDealt", value: 1.15, element: "earth" },
+          { type: "statMultiplier", stat: "speed", value: 0.9 }
+        ]
+      }
+    },
+
+    // ユラツボミの花粉で作る杖。攻撃は低いが技を出す回数が増え、殴った相手を眠らせることがある（作者の指定）
+    sleepStaff: {
+      id: "sleepStaff",
+      name: "眠花の杖",
+      icon: "iconItemSleepStaff",
+      category: "equipment",
+      description: "眠り花粉を詰めた花を先に咲かせた杖。打たれた相手は、甘い香りにまぶたを落とす。",
+      maxStack: 9,
+      // 450G → 600G（作者の指定）。★ 材料を店で買うと230Gで売値300Gなので、作って売ると1本70G得をする。
+      //   作者に確認したうえで、このままにしてある（2026-10-08）
+      price: 600,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "weapon",
+        effects: [
+          { type: "statBonus", stat: "attack", value: 12 },
+          { type: "statMultiplier", stat: "pp", value: 1.25 },
+          { type: "onHitStatus", status: "sleep", chance: 0.20, normalAttackOnly: true }
         ]
       }
     },
@@ -1057,6 +1233,338 @@
       price: 80,
       effect: null,
       usableIn: []
+    },
+
+    // --- 萌芽の穴・若葉の洞の素材（v1.0.0。名前は仮）---
+    // 値段は毒沼の素材（35〜60G）より一段上に置いてある
+
+    shedHusk: {
+      id: "shedHusk",
+      name: "若葉の抜け殻",
+      icon: "iconItemShedHusk",
+      from: "sproutHollow",
+      category: "material",
+      description: "フタバムシが脱ぎ捨てた皮。薄いのに、指で押してもなかなか破れない。",
+      maxStack: 99,
+      price: 40,
+      effect: null,
+      usableIn: []
+    },
+
+    sleepPollen: {
+      id: "sleepPollen",
+      name: "眠り花粉",
+      icon: "iconItemSleepPollen",
+      from: "sproutHollow",
+      category: "material",
+      description: "ユラツボミのつぼみに溜まっていた花粉。嗅ぐと、まぶたが重くなる。",
+      maxStack: 99,
+      price: 45,
+      effect: null,
+      usableIn: []
+    },
+
+    leafFeather: {
+      id: "leafFeather",
+      name: "若葉の羽根",
+      icon: "iconItemLeafFeather",
+      from: "sproutHollow",
+      category: "material",
+      description: "ワカバドリの羽根。葉脈のような筋が通っていて、陽にかざすと透ける。",
+      maxStack: 99,
+      price: 55,
+      effect: null,
+      usableIn: []
+    },
+
+    mossyShell: {
+      id: "mossyShell",
+      name: "苔むした甲羅",
+      icon: "iconItemMossyShell",
+      from: "sproutHollow",
+      category: "material",
+      description: "コケガメの甲羅のかけら。剥がしても、苔はまだ青々としている。",
+      maxStack: 99,
+      price: 70,
+      effect: null,
+      usableIn: []
+    },
+
+    // コダマ（珍しい）が落とす。店には並べない（会うこと自体に意味を残すため。黄泉竜の鱗と同じ）
+    sproutSeed: {
+      id: "sproutSeed",
+      name: "若芽の種",
+      icon: "iconItemSproutSeed",
+      from: "sproutHollow",
+      category: "material",
+      description: "コダマが抱えていた種。手のひらに乗せると、かすかに温かく脈打つ。",
+      maxStack: 99,
+      price: 150,
+      effect: null,
+      usableIn: []
+    },
+
+    // 主のドロップ。他の主の素材と同じく、必ず1つ落ちる
+    heartwood: {
+      id: "heartwood",
+      name: "若木の芯",
+      icon: "iconItemHeartwood",
+      from: "sproutHollow",
+      category: "material",
+      description: "若葉の洞の主の芯。切り口から、まだ樹液がにじんでいる。",
+      maxStack: 99,
+      price: 320,
+      effect: null,
+      usableIn: []
+    },
+
+    /**
+     * --- 萌芽の穴・蔦這う回廊の素材（v1.0.1） ---
+     * 値段は 2026-10-28 に作者から任されて決めた（若葉の洞の同じ役の品より 3〜4割高い。回廊は1戦のゴールドも多い）。
+     * 名前・説明・絵も作者が確定（2026-10-28）。
+     * コケ胞子：コケキノコが落とす（28%。名前と率は作者が決めたもの 2026-10-21）。痺れよけの鱗飾りの材料
+     */
+    mossSpore: {
+      id: "mossSpore",
+      name: "コケ胞子",
+      icon: "iconItemMossSpore",
+      from: "ivyCorridor",
+      category: "material",
+      description: "コケキノコの笠から舞う胞子。湿った場所に置くと、一晩で苔が生える。",
+      maxStack: 99,
+      price: 60,
+      effect: null,
+      usableIn: []
+    },
+
+    /**
+     * 風鳴りの羽：ツリガネが落とす（30%。名前と率は作者が決めたもの 2026-10-22）。
+     * 声守りの鈴・風鳴りの胴衣の材料。
+     * 値段は、店で買って風鳴りの胴衣を作って売っても得をしない値（材料 75×3＋45×2＝315G ＞ 売値 310G）
+     */
+    windChimeFeather: {
+      id: "windChimeFeather",
+      name: "風鳴りの羽",
+      icon: "iconItemWindChimeFeather",
+      from: "ivyCorridor",
+      category: "material",
+      description: "ツリガネの翼から抜けた黒い羽。かざすと、風もないのにかすかに鳴る。",
+      maxStack: 99,
+      price: 75,
+      effect: null,
+      usableIn: []
+    },
+
+    /**
+     * 弔いの小鐘：ツリガネが落とす装備（10%。名前と効き目は作者が決めたもの 2026-10-22）。
+     * 倒してしか手に入らない（店にも工房にも並べない）。PP ×1.2 はアクセサリーでは初めて（防具では雷光の羽衣）。
+     * 即死への守りは髑髏の護符（+7）より軽い +4 で、そのかわり呪いも +4 防ぐ。
+     * 値段 800G（売値 400G。2026-10-28）。蔦断ちの護符の材料にもなる
+     */
+    mourningBell: {
+      id: "mourningBell",
+      name: "弔いの小鐘",
+      icon: "iconItemMourningBell",
+      category: "equipment",
+      description: "ツリガネが抱えていた小さな鐘。鳴らすと心が澄み、死の気配を遠ざける。",
+      maxStack: 9,
+      price: 800,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "statMultiplier", stat: "pp", value: 1.2 },
+          { type: "resistBonus", status: "instantDeath", value: 4 },
+          { type: "resistBonus", status: "curse", value: 4 }
+        ]
+      }
+    },
+
+    /**
+     * 蒼雷の鱗・金角のかけら：ザンガルドが落とす（30%・10%。名前と率は作者が決めたもの 2026-10-26）。
+     * 説明・絵は私の案を作者がそのまま確定（2026-10-26）。値段は 2026-10-28 に上げた（60→80・160→220）。
+     * 痺れよけの鱗飾り・蒼雷の剣の材料
+     */
+    blueThunderScale: {
+      id: "blueThunderScale",
+      name: "蒼雷の鱗",
+      icon: "iconItemBlueThunderScale",
+      from: "ivyCorridor",
+      category: "material",
+      description: "ザンガルドの鱗。指でなぞると、ぱちりと青い火花が散る。",
+      maxStack: 99,
+      price: 80,
+      effect: null,
+      usableIn: []
+    },
+    goldHornShard: {
+      id: "goldHornShard",
+      name: "金角のかけら",
+      icon: "iconItemGoldHornShard",
+      from: "ivyCorridor",
+      category: "material",
+      description: "ザンガルドの角が欠けたもの。雷を受けたように、中が金色に光っている。",
+      maxStack: 99,
+      price: 220,
+      effect: null,
+      usableIn: []
+    },
+
+    /**
+     * 灯り苔・絡み主根：回廊の宝箱からだけ出る素材（作者の指定 2026-10-27）。
+     * 灯り苔はほかの素材と同じくらいの確率、絡み主根は B4F だけで 12%（data/dungeons.js の featureTables）。
+     * 値段は最初 作者の指定（40G / 300G）で、2026-10-28 に任されて上げた（55G / 420G）。絡み主根は店に並べない
+     */
+    glowMoss: {
+      id: "glowMoss",
+      name: "灯り苔",
+      icon: "iconItemGlowMoss",
+      from: "ivyCorridor",
+      category: "material",
+      description: "回廊の壁に張りつく苔。光の届かない場所で、自分から淡く光っている。",
+      maxStack: 99,
+      price: 55,
+      effect: null,
+      usableIn: []
+    },
+    tangledTaproot: {
+      id: "tangledTaproot",
+      name: "絡み主根",
+      icon: "iconItemTangledTaproot",
+      from: "ivyCorridor",
+      category: "material",
+      description: "回廊じゅうの蔦をたどった先にある太い根。いまも何かを締めつけるように脈打つ。",
+      maxStack: 99,
+      price: 420,
+      effect: null,
+      usableIn: []
+    },
+
+    /**
+     * --- 蔦這う回廊の素材で作る装備（作者の指定 2026-10-27。名前・説明・絵は 2026-10-28 に作者が確定）---
+     * 値段は 2026-10-28 に任されて決めた（よけ 220→300・胴衣 440→620・剣 520→760・護符 1200）。
+     * 回廊は「動きを奪われる」場所なので、麻痺・封印・呪いの耐性を1つずつ作れるようにしてある
+     * （+7 は通る確率が3割になる重さ。毒よけの護符・眠りよけの鈴と同じ）。
+     * どれも回廊をクリアすると工房に並ぶ（data/recipes.js）。
+     */
+
+    paralysisWard: {
+      id: "paralysisWard",
+      name: "痺れよけの鱗飾り",
+      icon: "iconItemParalysisWard",
+      category: "equipment",
+      description: "蒼雷の鱗を胞子の糊で綴った飾り。雷に慣れた鱗が、痺れを肌の手前で散らす。",
+      maxStack: 9,
+      price: 300,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", status: "paralysis", value: 7 }
+        ]
+      }
+    },
+
+    sealWard: {
+      id: "sealWard",
+      name: "声守りの鈴",
+      icon: "iconItemSealWard",
+      category: "equipment",
+      description: "骨の鈴に風鳴りの羽を下げたもの。鳴り続ける音が、喉を塞ぐ力を払う。",
+      maxStack: 9,
+      price: 300,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", status: "seal", value: 7 }
+        ]
+      }
+    },
+
+    curseWard: {
+      id: "curseWard",
+      name: "呪いよけの蔦輪",
+      icon: "iconItemCurseWard",
+      category: "equipment",
+      description: "ねじれ蔦で深淵の欠片を巻いた輪。絡みつく呪いを、蔦が先に引き受ける。",
+      maxStack: 9,
+      price: 300,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", status: "curse", value: 7 }
+        ]
+      }
+    },
+
+    // 苔甲の鎧（防+33・HP+10）より守りは低いかわりに、素早さが伸びる
+    windChimeVest: {
+      id: "windChimeVest",
+      name: "風鳴りの胴衣",
+      icon: "iconItemWindChimeVest",
+      category: "equipment",
+      description: "風鳴りの羽を蔦で縫いつけた胴衣。動くたびに羽が鳴り、体が風に押される。",
+      maxStack: 9,
+      price: 620,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "armor",
+        effects: [
+          { type: "statBonus", stat: "defense", value: 28 },
+          { type: "statBonus", stat: "speed", value: 10 }
+        ]
+      }
+    },
+
+    // 若枝の剣（攻+22・光×1.1）の雷版で、攻撃は少し上
+    blueThunderBlade: {
+      id: "blueThunderBlade",
+      name: "蒼雷の剣",
+      icon: "iconItemBlueThunderBlade",
+      category: "equipment",
+      description: "蒼雷の鱗を刃に重ね、金角を柄に埋めた剣。振るうたびに青い火花が走る。",
+      maxStack: 9,
+      price: 760,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "weapon",
+        effects: [
+          { type: "statBonus", stat: "attack", value: 27 },
+          { type: "damageDealt", value: 1.10, element: "thunder" }
+        ]
+      }
+    },
+
+    // 回廊の答えをまとめた護符。3つのよけ（各+7）より1つずつは軽いが、1枠で3つ防ぐ。
+    // 値段は作者の表で空欄だったので、任されて決めた（2026-10-28。1200G → 売値600G。
+    // 材料をそのまま売ると 210+27×3+400=691G なので、作って売っても得はしない）
+    ivyBreakerCharm: {
+      id: "ivyBreakerCharm",
+      name: "蔦断ちの護符",
+      icon: "iconItemIvyBreakerCharm",
+      category: "equipment",
+      description: "絡み主根を断ち、灯り苔と小鐘を封じた護符。回廊の闇が伸ばす手を、まとめて退ける。",
+      maxStack: 9,
+      price: 1200,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", status: "paralysis", value: 5 },
+          { type: "resistBonus", status: "seal", value: 5 },
+          { type: "resistBonus", status: "curse", value: 5 },
+          { type: "statBonus", stat: "hp", value: 15 }
+        ]
+      }
     }
   };
 })(window.MyGame);

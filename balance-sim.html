@@ -120,7 +120,10 @@
       mineKeeper: { lv: 7,  members: ["slime", "batty", "rocky"] },
       blazeBeast: { lv: 11, members: ["slime", "rocky", "flamin"] },
       abyssKing:  { lv: 16, members: ["slime", "flamin", "glowBug"] },
-      swampLord:  { lv: 20, members: ["slime", "flamin", "boltBug"] }
+      swampLord:  { lv: 20, members: ["slime", "flamin", "boltBug"] },
+      // 若葉の洞の主（v1.0.0）。作者の目標は「若葉の洞の装備を着けたLv26の3体で勝率15〜20%」
+      hollowLord: { lv: 26, members: ["slime", "flamin", "boltBug"],
+                    gear: { weapon: "sproutBlade", armor: "mossShellArmor", accessory: "sleepWard", accessory2: "leafPlume" } }
     };
     var SETTINGS_KEY = "__balance-sim.settings";
     var BASELINE_KEY = "__balance-sim.baseline";
@@ -226,7 +229,7 @@
         var saved = settings[bossId];
         if (saved) return saved;
         var d = DEFAULT_PARTIES[bossId] || { lv: bosses[bossId].level, members: ["slime", "slime", "slime"] };
-        return { on: true, lv: d.lv, members: d.members.slice(), gear: {} };
+        return { on: true, lv: d.lv, members: d.members.slice(), gear: d.gear ? JSON.parse(JSON.stringify(d.gear)) : {} };
       }
 
       function selectOf(options, value, cls) {
@@ -298,12 +301,18 @@
       // --- 1戦 ---
       function makeBoss(boss, random) {
         var enemy = NS.MonsterInstance.create(boss.species, boss.level, gd, random);
+        // ゲームと同じく、敵のときだけ使う技（enemySkills）があれば入れ替える
+        if (enemy.useEnemySkills) enemy.useEnemySkills();
         if (enemy.setEncounterMultipliers) enemy.setEncounterMultipliers(boss.statMultiplier);
         if (enemy.setActionPattern) enemy.setActionPattern(boss.actionPattern);
         if (enemy.setBossStatusImmunity) {
           var list = ((gd.battle || {}).bossImmuneToStatus || []).slice();
           (boss.immuneToStatus || []).forEach(function (id) { if (list.indexOf(id) < 0) list.push(id); });
           enemy.setBossStatusImmunity(list);
+        }
+        // ゲームと同じく、弱体への耐性（主ごとの値か、全主共通の値）
+        if (enemy.setDebuffResist) {
+          enemy.setDebuffResist(typeof boss.debuffResist === "number" ? boss.debuffResist : (gd.battle || {}).bossDebuffResist);
         }
         return enemy;
       }

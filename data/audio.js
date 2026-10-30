@@ -104,8 +104,12 @@
        *   （ダンジョンごとに変えたいときは今までどおり dungeonThemes.js の bgm）
        */
       dungeon: { file: "abyss_dg.ogg", volume: 0.6 },
-      // 戦闘曲も地方ごとに変える予定（dungeon と同じ扱い。いまは深淵の曲）
+      // 戦闘曲。穴（地方）ごとに変えられる（data/regions.js の battleBgm）。書いていない穴はこの battle
       battle:  { file: "abyss_battle.ogg",     volume: 0.7 },
+      // 萌芽の穴のふつうの戦闘曲（v1.0.0。作者の指定。音楽の卵）
+      // 音量は揺籃の戦闘曲（battle）と聞こえの大きさをそろえた値（2026-10-14 に測定。差は0.13dB）
+      hougaBattle: { file: "houga_battle.ogg", volume: 0.69 },
+      // 主との戦い。萌芽の穴の主もこの曲（作者の指定）
       boss:    { file: "abyss_bossbattle.ogg", volume: 0.8 },
       // 勝ったときの曲。戦闘曲を止めてから流し、繰り返さない（BattleScene の battleEnd）
       victory: { file: "victory.ogg", volume: 0.7, loop: false },
@@ -198,6 +202,8 @@
       bubble:      { file: "se_awa.wav",          volume: 0.45 },   // あわ
       bodyPress:   { file: "se_bodypress.wav",    volume: 0.45 },   // ボディプレス
       venomSting:  { file: "se_dokubari.wav",     volume: 0.45 },   // どくばり
+      // 〇〇ベール（7属性とも同じ音。自作）。ほかの技の音より 2dB ほど大きいので、0.45 から少し下げてそろえた
+      veil:        { file: "se_veil.wav",         volume: 0.37 },
 
       // 状態異常。data/statuses.js の se から指す（掛かった瞬間と毒のダメージで鳴る）。
       // ★ 即死は、この音が「倒れる」音を兼ねる（直後の faint は鳴らさない。BattleScene）
@@ -263,7 +269,7 @@
      */
     credits: [
       { label: "音楽", name: "ユーフルカ", url: "https://youfulca.com/", note: "タイトル・拠点・探索・戦闘・主との戦いのBGM" },
-      { label: "音楽", name: "音楽の卵", url: "https://ontama-m.com/", note: "勝利・敗北のBGM" },
+      { label: "音楽", name: "音楽の卵", url: "https://ontama-m.com/", note: "勝利・敗北・萌芽の穴の戦闘のBGM" },
       { label: "効果音", name: "ポケットサウンド", url: "https://pocket-se.info/", note: "決定・宝箱・階段など" },
       // se_*.wav（技の音・毒以外の状態異常・外れ）はすべて自作なのでクレジット不要。
       // 打撃・斬撃・回復・強化・弱体・泉・帰還（dageki1/2・zangeki1・heal・buff・debuff・izumi・kikan.mp3）は

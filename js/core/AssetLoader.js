@@ -31,6 +31,14 @@
     }
   };
 
+  /**
+   * できあがった描画物（canvas）をそのまま登録する。
+   * 部品を重ねてその場で描く人物の絵（js/systems/CharaRig.js）で使う（v1.0.2）
+   */
+  AssetLoader.prototype.put = function (id, drawable) {
+    this._sprites[id] = drawable;
+  };
+
   // id に対応する描画物を返す（無ければ null）
   AssetLoader.prototype.get = function (id) {
     return this._sprites[id] || null;

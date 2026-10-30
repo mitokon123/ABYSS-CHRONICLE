@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>主人公の見本 - ABYSS CHRONICLE</title>
+  <!--
+    ▼ このファイルについて（開発用。ゲーム本体ではない）
+
+    v1.0.2「主人公の見た目」の見本。js/systems/CharaRig.js が部品を重ねて作った絵を、
+    地図（36×36。data/player.js の appearance.rig.mapSize）・物語（64×64 を2倍＝128）・
+    髪型の一覧で見るためのページ。
+    男女・髪型・髪の色・服とズボンの色・飾りを選ぶと、その場で描き直す。
+    セーブや設定には一切書き込まない。
+    ★ サーバー経由（http://〜/chara-viewer.html）で開くこと。
+  -->
+  <style>
+    body { margin: 0; background: #05070d; color: #c8d0e8; font-family: sans-serif; }
+    #wrap { display: flex; gap: 16px; padding: 12px; align-items: flex-start; flex-wrap: wrap; }
+    #panel { width: 250px; flex: none; }
+    #main { flex: 1; min-width: 320px; }
+    h1 { font-size: 18px; margin: 0 0 8px; color: #ffd75e; }
+    h2 { font-size: 13px; margin: 14px 0 6px; color: #9aa4c0; }
+    section h2 { font-size: 14px; color: #ffd75e; margin: 6px 0; }
+    section { background: #0a0f1c; border: 1px solid #2a3350; padding: 8px 10px; margin-bottom: 12px; }
+    canvas { image-rendering: pixelated; display: block; max-width: 100%; }
+    .row { display: flex; gap: 6px; flex-wrap: wrap; }
+    button { padding: 6px 10px; background: #141b2e; color: #e8ecf8; border: 1px solid #2a3350;
+             border-radius: 6px; cursor: pointer; font-size: 13px; }
+    button:hover { background: #1d2742; }
+    button.on { border-color: #ffd75e; color: #ffd75e; }
+    .sw { width: 26px; height: 26px; padding: 0; border-radius: 4px; }
+    .sw.on { outline: 2px solid #ffd75e; outline-offset: 1px; }
+    input[type=color] { width: 34px; height: 26px; padding: 0; border: 1px solid #2a3350; background: none; }
+    label { font-size: 13px; display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+    .note { font-size: 12px; color: #6b7590; line-height: 1.6; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="panel">
+      <h1>主人公の見本</h1>
+      <h2>体つき</h2>
+      <div class="row" id="bodies"></div>
+      <h2>髪型</h2>
+      <div class="row" id="hairs"></div>
+      <h2>髪の色</h2>
+      <div class="row" id="hairColors"></div>
+      <h2>服の色</h2>
+      <div class="row" id="clothColors"></div>
+      <h2>ズボンの色</h2>
+      <div class="row" id="pantsColors"></div>
+      <h2>飾り</h2>
+      <div id="accs"></div>
+      <h2>速さ</h2>
+      <div class="row" id="speeds"></div>
+      <div class="note">
+        開発用のページ。セーブには触れない。<br>
+        形は js/systems/CharaRig.js。服とズボンの色は data/player.js の colors / pantsColors と同じ。
+      </div>
+    </div>
+
+    <div id="main">
+      <section>
+        <h2>地図の絵（36×36 を4倍で表示）　正面・左・右・後ろ／立ち止まり</h2>
+        <canvas id="walk" width="800" height="176"></canvas>
+      </section>
+      <section>
+        <h2>ダンジョンの上で（実際の大きさ。マスは32。いまの絵と並べて歩かせる）</h2>
+        <canvas id="map" width="400" height="128" style="width:800px"></canvas>
+        <div class="note">左がいまの絵（32×32）、右が新しい絵（36×36。足をマスの下にそろえ、頭は上のマスへ少しはみ出す）。このページだけ2倍に拡大している。</div>
+      </section>
+      <section>
+        <h2>物語の場面（64×64 を2倍＝128）</h2>
+        <canvas id="story" width="800" height="330"></canvas>
+        <div class="note">左から：いまの主人公（32×32 を3倍＝96）、新しい主人公（128）、いまのオルド（96）。会話の窓は見せ方の例。</div>
+      </section>
+      <section>
+        <h2>登場人物（data/sprites_story.js の charaLooks。左がいまの絵 96、右が新しい絵 128）</h2>
+        <canvas id="people" width="800" height="470"></canvas>
+        <div class="note">左から：いまの絵・正面・右向き・後ろ・歩き（正面）。服や体つきは主人公と同じ部品で、色と形の指定だけを変えている。</div>
+      </section>
+      <section>
+        <h2>髪型の一覧（正面・64×64）</h2>
+        <canvas id="list" width="1008" height="300"></canvas>
+      </section>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    var FILES = ["js/namespace.js", "data/player.js", "data/sprites.js", "data/sprites_story.js", "js/systems/CharaRig.js"];
+    loadInOrder(0);
+    function loadInOrder(i) {
+      if (i >= FILES.length) { start(); return; }
+      var s = document.createElement("script");
+      s.src = FILES[i] + "?t=" + Date.now();
+      s.onload = function () { loadInOrder(i + 1); };
+      document.head.appendChild(s);
+    }
+
+    // 髪型の名前・髪の色・飾りは data/player.js（ゲームの見た目を決める画面と同じもの）から start で読む
+    var HAIR_NAMES = {}, HAIR_COLORS = [], ACCS = [];
+
+    var state = {
+      body: "male", hair: "short", hairColor: null, cloth: null, pants: null,
+      acc: { glasses: false, scarf: false, cape: false, band: false },
+      accColor: {}, speed: 1
+    };
+    var R, frames48, frames64, oldFrames, ord;
+    var MAP = 36;   // 地図の絵の大きさ（start で data/player.js から読み直す）
+
+    function start() {
+      R = window.MyGame.CharaRig;
+      var raw = window.MyGame.rawData;
+      var look = raw.player.appearance;
+      state.cloth = look.colors[0];
+      (look.hairStyles || []).forEach(function (h) { HAIR_NAMES[h.id] = h.name; });
+      HAIR_COLORS = (look.hairColors || []).map(function (h) { return { name: h.name, c: h }; });
+      state.hairColor = HAIR_COLORS.length ? HAIR_COLORS[0].c : null;
+      ACCS = (look.accessories || []).map(function (a) { return [a.id, a.name]; });
+      if (look.rig && look.rig.mapSize) MAP = look.rig.mapSize;
+      ACCS.forEach(function (a) { state.accColor[a[0]] = R.DEFAULTS[a[0]]; });
+
+      buttons("bodies", [["male", "男性"], ["female", "女性"]], "body");
+      buttons("hairs", R.HAIR_IDS.map(function (id) { return [id, HAIR_NAMES[id]]; }), "hair");
+      swatches("hairColors", HAIR_COLORS.map(function (h) { return { name: h.name, base: h.c.base, value: h.c }; }), "hairColor");
+      swatches("clothColors", look.colors.map(function (c) { return { name: c.name, base: c.base, value: c }; }), "cloth");
+      // ズボンは既定（defaultPants）を最初に選んだ状態にする
+      var pants = look.pantsColors || [];
+      var pi = Math.max(0, pants.map(function (p) { return p.id; }).indexOf(look.defaultPants));
+      if (pants.length) {
+        state.pants = pants[pi];
+        swatches("pantsColors", pants.map(function (c) { return { name: c.name, base: c.base, value: c }; }), "pants", pi);
+      }
+      accControls();
+      speedButtons();
+
+      // いまの絵（比べる用）
+      oldFrames = [spriteCanvas(raw.sprites.playerWalk1), spriteCanvas(raw.sprites.playerWalk2)];
+      ord = spriteCanvas(raw.sprites.npcOrd);
+      buildPeople(raw);
+
+      rebuild();
+      requestAnimationFrame(loop);
+    }
+
+    // ---- 操作 ----
+    function buttons(id, list, key) {
+      var box = document.getElementById(id);
+      list.forEach(function (it) {
+        var b = document.createElement("button");
+        b.textContent = it[1];
+        b.onclick = function () { state[key] = it[0]; mark(box, b); rebuild(); };
+        if (state[key] === it[0]) b.className = "on";
+        box.appendChild(b);
+      });
+    }
+    function swatches(id, list, key, first) {
+      var box = document.getElementById(id);
+      first = first || 0;
+      list.forEach(function (it, i) {
+        var b = document.createElement("button");
+        b.className = "sw" + (i === first ? " on" : "");
+        b.title = it.name;
+        b.style.background = it.base;
+        b.onclick = function () { state[key] = it.value; mark(box, b); rebuild(); };
+        box.appendChild(b);
+      });
+      var pick = document.createElement("input");
+      pick.type = "color";
+      pick.title = "自分で作る";
+      pick.value = list[first].base;
+      pick.oninput = function () { state[key] = pick.value; mark(box, null); rebuild(); };
+      box.appendChild(pick);
+    }
+    function mark(box, on) {
+      Array.prototype.forEach.call(box.querySelectorAll("button"), function (b) {
+        b.classList.toggle("on", b === on);
+      });
+    }
+    function accControls() {
+      var box = document.getElementById("accs");
+      ACCS.forEach(function (a) {
+        var row = document.createElement("label");
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.onchange = function () { state.acc[a[0]] = cb.checked; rebuild(); };
+        var pick = document.createElement("input");
+        pick.type = "color";
+        pick.value = state.accColor[a[0]];
+        pick.oninput = function () { state.accColor[a[0]] = pick.value; rebuild(); };
+        row.appendChild(cb);
+        row.appendChild(document.createTextNode(a[1]));
+        row.appendChild(pick);
+        box.appendChild(row);
+      });
+    }
+    function speedButtons() {
+      var box = document.getElementById("speeds");
+      [[1, "×1"], [0.5, "×0.5"], [0.25, "×0.25"]].forEach(function (it, i) {
+        var b = document.createElement("button");
+        b.textContent = it[1];
+        if (i === 0) b.className = "on";
+        b.onclick = function () { state.speed = it[0]; mark(box, b); };
+        box.appendChild(b);
+      });
+    }
+
+    function currentLook(body, hair) {
+      var acc = {};
+      ACCS.forEach(function (a) { if (state.acc[a[0]]) acc[a[0]] = { color: state.accColor[a[0]] }; });
+      return R.makeLook({ body: body || state.body, hair: hair || state.hair,
+                          hairColor: state.hairColor, cloth: state.cloth, pants: state.pants, acc: acc });
+    }
+
+    function toCanvases(f) {
+      var out = { walk: {}, idle: {} };
+      R.DIRS.forEach(function (d) {
+        out.walk[d] = f.walk[d].map(function (img) { return R.toCanvas(img, 1); });
+        out.idle[d] = f.idle[d].map(function (img) { return R.toCanvas(img, 1); });
+      });
+      return out;
+    }
+
+    var listCanvas = null;
+    function rebuild() {
+      var look = currentLook();
+      frames48 = toCanvases(R.frames(look, MAP));
+      frames64 = toCanvases(R.frames(look, 64));
+      drawList();
+    }
+
+    // ---- いまの絵（data/sprites.js の書き方）を canvas に ----
+    function spriteCanvas(def) {
+      var h = def.pixels.length, w = def.pixels[0].length;
+      var cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      var ctx = cv.getContext("2d");
+      for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+        var c = def.palette[def.pixels[y][x]];
+        if (!c) continue;
+        ctx.fillStyle = c;
+        ctx.fillRect(x, y, 1, 1);
+      }
+      return cv;
+    }
+
+    // ---- 動きの時間（ゲームと同じ） ----
+    function walkFrame(t) { return R.walkFrame(t); }
+    function idleFrame(t) { return R.idleFrame(t); }
+
+    var t0 = performance.now(), clock = 0, last = t0;
+    function loop(now) {
+      clock += (now - last) * state.speed;
+      last = now;
+      drawWalk(clock);
+      drawMap(clock);
+      drawStory(clock);
+      drawPeople(clock);
+      requestAnimationFrame(loop);
+    }
+
+    // ---- 登場人物 ----
+    var people = [];
+    function buildPeople(raw) {
+      var looks = raw.charaLooks || {};
+      var oldIds = { ord: "npcOrd", irene: "npcIrene", scout: "npcScout" };
+      Object.keys(looks).forEach(function (id) {
+        var look = R.makeLook(looks[id]);
+        var f = R.frames(look, 64);
+        var conv = function (list) { return list.map(function (img) { return R.toCanvas(img, 1); }); };
+        people.push({
+          name: looks[id].name || id,
+          old: raw.sprites[oldIds[id]] ? spriteCanvas(raw.sprites[oldIds[id]]) : null,
+          idle: { down: conv(f.idle.down), right: conv(f.idle.right), up: conv(f.idle.up) },
+          walk: conv(f.walk.down)
+        });
+      });
+    }
+    function drawPeople(t) {
+      var cv = document.getElementById("people"), ctx = cv.getContext("2d");
+      nocrisp(ctx);
+      ctx.fillStyle = "#0e1424";
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      var idle = R.idleFrame(t), walk = R.walkFrame(t);
+      people.forEach(function (p, row) {
+        var y = 6 + row * 156;
+        if (p.old) ctx.drawImage(p.old, 14, y + 28, 96, 96);
+        ctx.drawImage(p.idle.down[idle], 130, y, 128, 128);
+        ctx.drawImage(p.idle.right[idle], 262, y, 128, 128);
+        ctx.drawImage(p.idle.up[idle], 394, y, 128, 128);
+        ctx.drawImage(p.walk[walk], 526, y, 128, 128);
+        ctx.fillStyle = "#ffd75e";
+        ctx.font = "14px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(p.name, 680, y + 70);
+      });
+    }
+
+    function nocrisp(ctx) { ctx.imageSmoothingEnabled = false; }
+
+    function drawWalk(t) {
+      var cv = document.getElementById("walk"), ctx = cv.getContext("2d");
+      nocrisp(ctx);
+      ctx.fillStyle = "#0e1424";
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      var names = { down: "正面", left: "左", right: "右", up: "後ろ" };
+      var f = walkFrame(t);
+      R.DIRS.forEach(function (d, i) {
+        ctx.drawImage(frames48.walk[d][f], 10 + i * 158, 8, MAP * 4, MAP * 4);
+        label(ctx, names[d] + "（歩く）", 82 + i * 158, 170);
+      });
+      ctx.drawImage(frames48.idle.down[idleFrame(t)], 10 + 4 * 158, 8, MAP * 4, MAP * 4);
+      label(ctx, "立ち止まり", 82 + 4 * 158, 170);
+    }
+
+    function label(ctx, text, x, y) {
+      ctx.fillStyle = "#9aa4c0";
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(text, x, y);
+    }
+
+    function drawMap(t) {
+      var cv = document.getElementById("map"), ctx = cv.getContext("2d");
+      nocrisp(ctx);
+      for (var r = 0; r < 4; r++) for (var c = 0; c < 13; c++) {
+        ctx.fillStyle = (r + c) % 2 ? "#232a3c" : "#262e42";
+        ctx.fillRect(c * 32, r * 32, 32, 32);
+        ctx.fillStyle = "#1a2030";
+        ctx.fillRect(c * 32, r * 32 + 31, 32, 1);
+        ctx.fillRect(c * 32 + 31, r * 32, 1, 32);
+      }
+      // 行ったり来たり（1マス 300ms）
+      var span = 4 * 32, period = 4 * 300 * 2;
+      var p = (t % period) / (period / 2);
+      var goingRight = p < 1;
+      var off = goingRight ? p * span : (2 - p) * span;
+      var dir = goingRight ? "right" : "left";
+      var f = walkFrame(t);
+      // いまの絵（正面のまま横へずれる）
+      ctx.drawImage(oldFrames[Math.floor(t / 150) % 2], 16 + off * 0.5, 64, 32, 32);
+      // 新しい絵（足をマスの下にそろえる）
+      var x = 200 + off * 0.5, y = 64;
+      ctx.drawImage(frames48.walk[dir][f], x + (32 - MAP) / 2, y + 32 - MAP, MAP, MAP);
+    }
+
+    function drawStory(t) {
+      var cv = document.getElementById("story"), ctx = cv.getContext("2d");
+      nocrisp(ctx);
+      var g = ctx.createLinearGradient(0, 0, 0, cv.height);
+      g.addColorStop(0, "#1a2140");
+      g.addColorStop(1, "#0a0d18");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = "#121828";
+      ctx.fillRect(0, 210, cv.width, 30);
+
+      var breath = (Math.floor(t / 600) % 2) ? 1 : 0;
+      ctx.drawImage(oldFrames[0], 60, 222 - 96 + breath, 96, 96);
+      ctx.drawImage(frames64.idle.down[idleFrame(t)], 230, 222 - 128 + 6, 128, 128);
+      ctx.drawImage(ord, 560, 222 - 96 + breath, 96, 96);
+
+      // 会話の窓（見せ方の例）
+      ctx.fillStyle = "rgba(8,12,24,0.92)";
+      ctx.fillRect(20, 236, 760, 84);
+      ctx.strokeStyle = "#4a5a8a";
+      ctx.strokeRect(20.5, 236.5, 759, 83);
+      ctx.fillStyle = "#ffd75e";
+      ctx.font = "15px sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText("ソラ", 36, 260);
+      ctx.fillStyle = "#e8ecf8";
+      ctx.fillText("（ここに台詞が出る）", 36, 288);
+    }
+
+    function drawList() {
+      var cv = document.getElementById("list"), ctx = cv.getContext("2d");
+      nocrisp(ctx);
+      ctx.fillStyle = "#0e1424";
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      var bodies = [["male", "男性"], ["female", "女性"]];
+      bodies.forEach(function (b, row) {
+        R.HAIR_IDS.forEach(function (h, col) {
+          var img = R.render(currentLook(b[0], h), "down", {}, 64, false);
+          ctx.drawImage(R.toCanvas(img, 2), 8 + col * 143, 6 + row * 146, 128, 128);
+          label(ctx, b[1] + "・" + HAIR_NAMES[h], 72 + col * 143, 144 + row * 146);
+        });
+      });
+    }
+  })();
+  </script>
+</body>
+</html>

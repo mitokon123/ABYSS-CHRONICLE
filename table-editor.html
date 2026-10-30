@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>表の編集 - ABYSS CHRONICLE</title>
+  <!--
+    ▼ このファイルについて（開発用。ゲーム本体ではない）
+
+    data/ の数字（モンスターの能力・道具の値段・技の威力など）を表で直して、ファイルへ書き込む（v1.0.2）。
+    ・読み書きは開発用サーバー（tools/devserver.py の TABLES）がする。開発用サーバーで開いたときだけ使える
+    ・書き換わるのは数字の文字だけ。注意書き（// …）や並びはそのまま残る
+    ・書き込む前に、変えたところの一覧（前 → 後）を出す。確かめてから書き込む
+    ・書き込むたびに、その直前のファイルを backup/ に残す（目次 dev.html の「この時点に戻す」で戻せる）
+    ・名前の列を押すと、その1件のすべての数字（成長率の段階・装備の効き目など）を、ファイルの行のまま直せる
+    ★ 文字（名前・説明）や、技・道具の組み合わせはここでは直せない（数字だけ）
+  -->
+  <style>
+    body { margin: 0; background: #05070d; color: #c8d0e8; font-family: sans-serif; font-size: 13px; }
+    header { padding: 14px 16px 8px; }
+    h1 { font-size: 20px; color: #ffd75e; margin: 0 0 4px; }
+    h1 a { font-size: 12px; color: #6b7590; margin-left: 12px; font-weight: normal; }
+    .sub { color: #6b7590; font-size: 12px; line-height: 1.6; }
+    #status { margin: 8px 16px; padding: 6px 10px; border: 1px solid #2a3350; background: #0a0f1c; }
+    #status.ok { border-color: #3f7a52; color: #9adfaa; }
+    #status.ng { border-color: #7a3f3f; color: #e8a0a0; }
+    #controls { padding: 4px 16px 8px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+    select, input[type=search], button { background: #141b2e; color: #e8ecf8; border: 1px solid #2a3350; border-radius: 4px; padding: 4px 8px; font-size: 13px; }
+    button { cursor: pointer; white-space: nowrap; }
+    button:hover { border-color: #ffd75e; }
+    button.primary { background: #3a3010; border-color: #ffd75e; color: #ffd75e; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    #groups { padding: 0 16px 8px; display: flex; flex-wrap: wrap; gap: 4px 12px; color: #9aa4c0; font-size: 12px; }
+    #groups label { cursor: pointer; white-space: nowrap; }
+    #wrap { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 16px 80px; align-items: flex-start; }
+    #tableBox { overflow: auto; max-height: calc(100vh - 150px); border: 1px solid #2a3350; flex: 1 1 420px; min-width: 0; }
+    table { border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #1a2238; padding: 2px 4px; white-space: nowrap; }
+    thead th { position: sticky; top: 0; background: #0e1424; z-index: 2; color: #ffd75e; font-weight: normal; text-align: center; vertical-align: bottom; }
+    thead th small { display: block; color: #4e5876; font-size: 10px; }
+    td.name, th.name { position: sticky; left: 0; background: #080c18; z-index: 1; text-align: left; }
+    thead th.name { z-index: 3; }
+    td.name { cursor: pointer; color: #e8ecf8; }
+    td.name small { color: #4e5876; margin-left: 4px; }
+    tr.picked td.name { color: #ffd75e; }
+    tr:hover td { background: #0c1222; }
+    td.empty { color: #2a3350; text-align: center; }
+    input.num { width: 56px; background: #0a0f1c; color: #e8ecf8; border: 1px solid #1e2740; border-radius: 3px; padding: 2px 4px; text-align: right; font-family: monospace; font-size: 12px; }
+    input.num.changed { border-color: #ffd75e; background: #2a2410; color: #ffd75e; }
+    input.num.bad { border-color: #e85a5a; background: #2a1010; color: #ff9a9a; }
+    #detail { flex: 1 1 480px; max-width: 760px; max-height: calc(100vh - 150px); overflow: auto; border: 1px solid #2a3350; background: #080c18; display: none; }
+    #detail.open { display: block; }
+    #detail h2 { font-size: 14px; color: #ffd75e; margin: 0; padding: 8px 10px; position: sticky; top: 0; background: #0e1424; display: flex; justify-content: space-between; align-items: center; }
+    #detail .line { font-family: monospace; font-size: 12px; white-space: pre; padding: 1px 8px; line-height: 22px; }
+    #detail .line .ln { color: #3a4460; display: inline-block; width: 44px; text-align: right; margin-right: 8px; }
+    #detail .line .cm { color: #4e5876; }
+    #detail input.num { width: 50px; padding: 0 3px; }
+    #bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: #0e1424; border-top: 1px solid #2a3350; padding: 10px 16px; display: flex; gap: 12px; align-items: center; }
+    #bar .count { color: #ffd75e; min-width: 120px; }
+    #bar .note { color: #6b7590; font-size: 12px; }
+    #diff { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 10; }
+    #diff.open { display: flex; }
+    #diff .box { background: #0a0f1c; border: 1px solid #ffd75e; border-radius: 8px; padding: 16px; max-width: 760px; width: calc(100% - 32px); max-height: 80vh; display: flex; flex-direction: column; }
+    #diff h2 { font-size: 16px; color: #ffd75e; margin: 0 0 6px; }
+    #diff .list { overflow: auto; margin: 8px 0 12px; }
+    #diff table td { padding: 3px 8px; }
+    #diff .from { color: #9aa4c0; text-align: right; }
+    #diff .to { color: #ffd75e; text-align: right; }
+    #diff .up { color: #8fd18f; } #diff .down { color: #e88a8a; }
+    #diff .buttons { display: flex; gap: 10px; justify-content: flex-end; }
+    #msg { margin: 0 16px 8px; color: #9adfaa; font-size: 12px; min-height: 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>表の編集 <a href="dev.html">← 開発用の目次</a></h1>
+    <div class="sub">
+      data/ の数字を表で直して、ファイルへ書き込む。書き込む前に「前 → 後」の一覧が出る。書き込んだ直前のファイルは backup/ に残る。<br>
+      名前を押すと、その1件の数字をぜんぶ（成長率の段階・装備の効き目なども）ファイルの行のまま直せる。文字（名前・説明）はここでは直せない。
+    </div>
+  </header>
+  <div id="status">サーバーを確かめています…</div>
+  <div id="controls">
+    <label>表 <select id="table"></select></label>
+    <input type="search" id="search" placeholder="名前・id で絞る">
+    <button id="reload">ファイルから読み直す</button>
+  </div>
+  <div id="groups"></div>
+  <div id="msg"></div>
+  <div id="wrap">
+    <div id="tableBox"><table id="grid"></table></div>
+    <div id="detail"></div>
+  </div>
+  <div id="bar">
+    <span class="count" id="count">変更なし</span>
+    <button class="primary" id="review" disabled>変更を確かめる</button>
+    <button id="discard" disabled>変更をぜんぶ取り消す</button>
+    <span class="note">書き込んだ数字は、早見表（ステータス.txt など）には入らない。</span>
+  </div>
+  <div id="diff"><div class="box">
+    <h2>この変更を書き込みます</h2>
+    <div class="sub" id="diffFile"></div>
+    <div class="list"><table id="diffTable"></table></div>
+    <div class="buttons">
+      <button id="back">戻って直す</button>
+      <button class="primary" id="write">書き込む</button>
+    </div>
+  </div></div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    var TABLES = [
+      ["monsters", "モンスター"], ["items", "道具"], ["skills", "技"], ["bosses", "主"],
+      ["abilities", "特性"], ["blessings", "加護"], ["recipes", "作る"], ["dungeons", "ダンジョン"]
+    ];
+    // 列の見出し（data/ の項目名 → 画面の言葉）。書いていない項目は項目名のまま
+    var LABELS = {
+      baseHp: "HP", baseAttack: "攻撃", baseDefense: "防御", baseSpeed: "素早さ", basePp: "PP",
+      maxLevel: "Lv上限", scoutRate: "スカウト率", evasion: "回避", spawnRate: "出現の重み",
+      expReward: "経験値", goldReward: "ゴールド", skillRate: "技を選ぶ率", criticalBonus: "会心+",
+      sizeScale: "大きさ", growthRate: "成長率", price: "値段", maxStack: "持てる数",
+      power: "威力", pp: "PP", accuracy: "命中", level: "Lv", weight: "重み", order: "並び順",
+      windupMs: "溜め(ms)", recoil: "反動", drain: "吸収", floors: "階の数", recommendedLevel: "推奨Lv",
+      resistances: "属性耐性", statusResist: "状態異常耐性", statMultiplier: "倍率", effect: "使ったとき"
+    };
+    var ESC = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]; }); };
+
+    var $ = function (id) { return document.getElementById(id); };
+    var state = { name: null, data: null, edits: {}, picked: null, groupsOn: {} };
+
+    // --- サーバー ---
+    function api(path, body) {
+      var opt = body ? { method: "POST", headers: { "Content-Type": "application/json", "X-Dev-Tool": "1" }, body: JSON.stringify(body) } : {};
+      return fetch(path, opt).then(function (r) { return r.json(); });
+    }
+
+    fetch("/api/ping").then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) throw new Error();
+      $("status").className = "ok";
+      $("status").textContent = "開発用サーバー（" + location.host + "）で開いています。書き込めます。";
+      start();
+    }).catch(function () {
+      $("status").className = "ng";
+      $("status").textContent = "このページは開発用サーバー（abyss-tools・8124 番）で開いたときだけ使えます。";
+    });
+
+    function start() {
+      TABLES.forEach(function (t) {
+        var o = document.createElement("option");
+        o.value = t[0]; o.textContent = t[1] + "（data/" + t[0] + ".js）";
+        $("table").appendChild(o);
+      });
+      try { $("table").value = localStorage.getItem("tableEditor.table") || "monsters"; } catch (e) { /* 覚えられなくてもよい */ }
+      if (!$("table").value) $("table").value = "monsters";
+      $("table").onchange = function () {
+        if (count() && !confirm("書き込んでいない変更があります。捨てて別の表を開きますか？")) { $("table").value = state.name; return; }
+        load($("table").value);
+      };
+      $("reload").onclick = function () {
+        if (count() && !confirm("書き込んでいない変更を捨てて、ファイルから読み直しますか？")) return;
+        load(state.name);
+      };
+      $("search").oninput = renderGrid;
+      $("review").onclick = openDiff;
+      $("discard").onclick = function () {
+        if (!confirm("変更をぜんぶ取り消しますか？")) return;
+        state.edits = {};
+        renderGrid(); renderDetail(); updateBar();
+      };
+      $("back").onclick = function () { $("diff").classList.remove("open"); };
+      $("write").onclick = write;
+      window.addEventListener("beforeunload", function (e) { if (count()) { e.preventDefault(); e.returnValue = ""; } });
+      load($("table").value);
+    }
+
+    function load(name, message) {
+      api("/api/table?name=" + encodeURIComponent(name)).then(function (d) {
+        if (!d.ok) { $("msg").textContent = "読めませんでした：" + d.error; return; }
+        state.name = name; state.data = d; state.edits = {};
+        if (!state.data.entries.some(function (e) { return e.id === state.picked; })) state.picked = null;
+        try { localStorage.setItem("tableEditor.table", name); } catch (e) { /* 同上 */ }
+        $("msg").textContent = message || "";
+        buildGroups(); renderGrid(); renderDetail(); updateBar();
+      });
+    }
+
+    // --- 列 ---
+    // 表に並べるのは [番号] の無い項目だけ（[番号] のある項目は1件ずつの画面で直す）。
+    // 頭の名前（resistances など）ごとにまとめて、出す・出さないを選べる
+    function columns() {
+      return state.data.fields.filter(function (f) { return f.indexOf("[") < 0; });
+    }
+    function groupOf(f) { return f.split(".")[0]; }
+
+    function buildGroups() {
+      var box = $("groups");
+      box.innerHTML = "";
+      var groups = [];
+      columns().forEach(function (f) { if (groups.indexOf(groupOf(f)) < 0) groups.push(groupOf(f)); });
+      var memo = state.groupsOn[state.name];
+      if (!memo) {
+        // はじめは、1つだけの項目（baseHp・price など）を出し、まとまり（resistances など）は閉じておく
+        memo = state.groupsOn[state.name] = {};
+        groups.forEach(function (g) { memo[g] = columns().filter(function (f) { return groupOf(f) === g; }).length === 1; });
+      }
+      if (groups.length) box.appendChild(document.createTextNode("列："));
+      groups.forEach(function (g) {
+        var n = columns().filter(function (f) { return groupOf(f) === g; }).length;
+        var label = document.createElement("label");
+        var cb = document.createElement("input");
+        cb.type = "checkbox"; cb.checked = !!memo[g];
+        cb.onchange = function () { memo[g] = cb.checked; renderGrid(); };
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(" " + (LABELS[g] || g) + (n > 1 ? "（" + n + "）" : "")));
+        box.appendChild(label);
+      });
+    }
+
+    function visibleColumns() {
+      var memo = state.groupsOn[state.name] || {};
+      return columns().filter(function (f) { return memo[groupOf(f)]; });
+    }
+
+    function headerOf(f) {
+      var parts = f.split(".");
+      var main = LABELS[parts[0]] || parts[0];
+      if (parts.length > 1) main = (LABELS[parts[0]] ? main + " " : "") + parts.slice(1).join(".");
+      return "<th>" + ESC(main) + "<small>" + ESC(f) + "</small></th>";
+    }
+
+    // --- 値 ---
+    function key(id, f) { return id + "|" + f; }
+    function count() { return Object.keys(state.edits).length; }
+    function original(id, f) {
+      var e = state.data.entries.find(function (x) { return x.id === id; });
+      return e ? e.values[f] : undefined;
+    }
+    function current(id, f) {
+      var k = key(id, f);
+      return (k in state.edits) ? state.edits[k] : original(id, f);
+    }
+    function parseNum(s) {
+      s = String(s).trim();
+      if (!/^-?\d+(\.\d+)?$/.test(s)) return NaN;
+      return Number(s);
+    }
+
+    function makeInput(id, f) {
+      var input = document.createElement("input");
+      input.className = "num";
+      input.value = current(id, f);
+      input.dataset.k = key(id, f);
+      input.title = id + "." + f + "（ファイルの値 " + original(id, f) + "）";
+      if (key(id, f) in state.edits) input.classList.add("changed");
+      input.oninput = function () { setValue(id, f, input.value, input); };
+      return input;
+    }
+
+    function setValue(id, f, text, from) {
+      var k = key(id, f);
+      var v = parseNum(text);
+      var inputs = document.querySelectorAll("input.num[data-k=\"" + CSS.escape(k) + "\"]");
+      inputs.forEach(function (el) {
+        if (el !== from) el.value = text;
+        el.classList.toggle("bad", isNaN(v));
+      });
+      if (isNaN(v)) { state.edits[k] = text; }
+      else if (v === original(id, f)) { delete state.edits[k]; }
+      else { state.edits[k] = v; }
+      inputs.forEach(function (el) { el.classList.toggle("changed", k in state.edits && !isNaN(v)); });
+      updateBar();
+    }
+
+    function badCount() {
+      return Object.keys(state.edits).filter(function (k) { return typeof state.edits[k] !== "number"; }).length;
+    }
+
+    function updateBar() {
+      var n = count(), bad = badCount();
+      $("count").textContent = n ? ("変更 " + n + " 件" + (bad ? "（数字でないもの " + bad + "）" : "")) : "変更なし";
+      $("review").disabled = !n || bad > 0;
+      $("discard").disabled = !n;
+    }
+
+    // --- 表 ---
+    function renderGrid() {
+      var cols = visibleColumns();
+      var q = $("search").value.trim().toLowerCase();
+      var grid = $("grid");
+      var html = "<thead><tr><th class='name'>名前</th>" + cols.map(headerOf).join("") + "</tr></thead><tbody></tbody>";
+      grid.innerHTML = html;
+      var body = grid.querySelector("tbody");
+      state.data.entries.forEach(function (e) {
+        if (q && (e.id + " " + e.name).toLowerCase().indexOf(q) < 0) return;
+        var tr = document.createElement("tr");
+        if (e.id === state.picked) tr.className = "picked";
+        var name = document.createElement("td");
+        name.className = "name";
+        name.innerHTML = ESC(e.name || e.id) + (e.name ? "<small>" + ESC(e.id) + "</small>" : "");
+        name.title = "押すと、この1件の数字をぜんぶ出す";
+        name.onclick = function () { state.picked = e.id; renderGrid(); renderDetail(); };
+        tr.appendChild(name);
+        cols.forEach(function (f) {
+          var td = document.createElement("td");
+          if (f in e.values) td.appendChild(makeInput(e.id, f));
+          else { td.className = "empty"; td.textContent = "—"; }
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    }
+
+    // --- 1件ずつ（ファイルの行のまま） ---
+    function renderDetail() {
+      var box = $("detail");
+      var e = state.picked && state.data.entries.find(function (x) { return x.id === state.picked; });
+      if (!e) { box.className = ""; box.innerHTML = ""; return; }
+      box.className = "open";
+      box.innerHTML = "";
+      var h = document.createElement("h2");
+      h.innerHTML = "<span>" + ESC(e.name || e.id) + "（" + ESC(e.id) + "）</span>";
+      var close = document.createElement("button");
+      close.textContent = "閉じる";
+      close.onclick = function () { state.picked = null; renderGrid(); renderDetail(); };
+      h.appendChild(close);
+      box.appendChild(h);
+      if (!e.lines.some(function (l) { return l.fields.length; })) {
+        var none = document.createElement("div");
+        none.className = "line";
+        none.textContent = "（この1件には、直せる数字がありません）";
+        box.appendChild(none);
+      }
+      var indent = Math.min.apply(null, e.lines.filter(function (l) { return l.text.trim(); })
+        .map(function (l) { return l.text.match(/^ */)[0].length; }));
+      e.lines.forEach(function (l) {
+        var div = document.createElement("div");
+        div.className = "line";
+        div.innerHTML = "<span class='ln'>" + l.n + "</span>";
+        var at = indent;
+        l.fields.forEach(function (fd) {
+          div.appendChild(textPart(l.text.slice(at, fd.start)));
+          var input = makeInput(e.id, fd.path);
+          input.style.width = Math.max(36, (String(original(e.id, fd.path)).length + 2) * 8) + "px";
+          div.appendChild(input);
+          at = fd.end;
+        });
+        div.appendChild(textPart(l.text.slice(at)));
+        box.appendChild(div);
+      });
+    }
+    // 行の残り。注意書き（// …）は薄く出す
+    function textPart(s) {
+      var span = document.createElement("span");
+      var c = s.indexOf("//");
+      if (c < 0 || /["']/.test(s.slice(0, c).replace(/"[^"]*"|'[^']*'/g, ""))) { span.textContent = s; return span; }
+      span.appendChild(document.createTextNode(s.slice(0, c)));
+      var cm = document.createElement("span");
+      cm.className = "cm";
+      cm.textContent = s.slice(c);
+      span.appendChild(cm);
+      return span;
+    }
+
+    // --- 確かめて書き込む ---
+    function changes() {
+      return Object.keys(state.edits).map(function (k) {
+        var i = k.indexOf("|");
+        var id = k.slice(0, i), f = k.slice(i + 1);
+        return { id: id, field: f, from: original(id, f), to: state.edits[k] };
+      });
+    }
+
+    // その数字が書いてある行（[番号] のある項目は、行を見ないと何の数字か分からないので一覧に添える）
+    function lineOf(id, f) {
+      if (f.indexOf("[") < 0) return null;
+      var e = state.data.entries.find(function (x) { return x.id === id; });
+      return e && e.lines.find(function (l) { return l.fields.some(function (fd) { return fd.path === f; }); });
+    }
+
+    function openDiff() {
+      var list = changes();
+      var names = {};
+      state.data.entries.forEach(function (e) { names[e.id] = e.name; });
+      $("diffFile").textContent = state.data.file + " の " + list.length + " か所。書き込む直前のファイルは backup/ に残ります。";
+      $("diffTable").innerHTML = "<tr><th>名前</th><th>項目</th><th>前</th><th></th><th>後</th><th>差</th></tr>" +
+        list.map(function (c) {
+          var d = Math.round((c.to - c.from) * 1e6) / 1e6;
+          var line = lineOf(c.id, c.field);
+          return "<tr><td>" + ESC(names[c.id] || c.id) + " <small style='color:#4e5876'>" + ESC(c.id) + "</small></td>" +
+            "<td>" + ESC(c.field) + (line ? "<br><small style='color:#6b7590;font-family:monospace'>" + line.n + "行目：" + ESC(line.text.trim()) + "</small>" : "") +
+            "</td><td class='from'>" + c.from + "</td><td>→</td><td class='to'>" + c.to + "</td>" +
+            "<td class='" + (d > 0 ? "up" : "down") + "'>" + (d > 0 ? "+" : "") + d + "</td></tr>";
+        }).join("");
+      $("diff").classList.add("open");
+    }
+
+    function write() {
+      $("write").disabled = true;
+      var list = changes();
+      api("/api/table/save", { name: state.name, changes: list }).then(function (res) {
+        $("write").disabled = false;
+        $("diff").classList.remove("open");
+        if (!res.ok) { alert("書き込めませんでした：" + res.error); return; }
+        state.edits = {};
+        load(state.name, res.count + " か所を " + state.data.file + " に書き込みました（直前のファイルは backup/" + res.backup + "）。ゲームは開き直すと新しい値になります。");
+      }, function () {
+        $("write").disabled = false;
+        alert("サーバーに届きませんでした。");
+      });
+    }
+  })();
+  </script>
+</body>
+</html>

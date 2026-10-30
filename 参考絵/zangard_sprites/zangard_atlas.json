@@ -1,0 +1,83 @@
+{
+  "frame_size": [
+    48,
+    48
+  ],
+  "columns": 8,
+  "rows": 5,
+  "motions": {
+    "idle": {
+      "row": 0,
+      "start_col": 0,
+      "count": 4,
+      "loop": true,
+      "durations_ms": [
+        220,
+        220,
+        220,
+        220
+      ]
+    },
+    "attack": {
+      "row": 1,
+      "start_col": 0,
+      "count": 6,
+      "loop": false,
+      "durations_ms": [
+        120,
+        120,
+        70,
+        70,
+        110,
+        160
+      ]
+    },
+    "magic": {
+      "row": 2,
+      "start_col": 0,
+      "count": 5,
+      "loop": false,
+      "durations_ms": [
+        140,
+        120,
+        120,
+        120,
+        220
+      ]
+    },
+    "skill": {
+      "row": 3,
+      "start_col": 0,
+      "count": 8,
+      "loop": false,
+      "durations_ms": [
+        110,
+        70,
+        80,
+        70,
+        90,
+        70,
+        90,
+        150
+      ]
+    },
+    "sleep": {
+      "row": 4,
+      "start_col": 0,
+      "count": 1,
+      "loop": false,
+      "durations_ms": [
+        500
+      ]
+    },
+    "hit": {
+      "row": 4,
+      "start_col": 1,
+      "count": 1,
+      "loop": false,
+      "durations_ms": [
+        400
+      ]
+    }
+  }
+}

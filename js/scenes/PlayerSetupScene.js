@@ -1,6 +1,6 @@
 /**
  * PlayerSetupScene.js
- * 主人公の名前・服の色・性別・一人称を決める画面。
+ * 主人公の名前・性別・一人称・見た目を決める画面。
  *
  * ▼ 2つの入口から同じ画面を使う
  *   ・新しく始めるとき（セーブファイルを選んだ直後）
@@ -13,28 +13,44 @@
  *            （名前と色が決まらないまま冒険に出ると、あとで直す入口が遠い）
  *   "edit" … あとから変更。Esc でそのまま戻れる
  *
- * ▼ 色は「選んだ姿」をその場で見せる
- *   色の名前だけ並べても、着せたところが想像できない。
- *   選んでいる色の絵を大きく出し、歩かせて見せる。
+ * ▼ 見た目は「選んだ姿」をその場で見せる
+ *   名前だけ並べても、着せたところが想像できない。
+ *   選んでいる姿を左に大きく出し、上下左右へ向きを変えながら歩かせて見せる。
  *
- * ▼ 色は用意した6色のほかに「じぶんで」作れる（RC-1）
+ * ▼ 見た目の欄（v1.0.2。新しい絵 js/systems/CharaRig.js が使えるとき）
+ *   髪型・髪の色・ふくの色・ズボンの色・飾り。
+ *   CharaRig.js が読めていない（古い app.html が残っている）ときは、今までどおり
+ *   ふくの色だけを選ぶ画面になり、左には 32×32 の絵が歩く。
+ *
+ * ▼ 色は用意した色のほかに「じぶんで」作れる（RC-1。v1.0.2 から髪とズボンも）
  *   色見本のいちばん右が「じぶんで」。そこで決定を押すと、色合い・あざやかさ・明るさの
  *   3本のつまみで色を作る窓が開く（phase "color"）。できた色は色コード（#rrggbb）のまま
  *   セーブに入り、絵は js/systems/PlayerLook.js がその場で作る。
  *   色コードを文字で打つ形にしなかったのは、A・D・E などのキーが移動や決定に使われていて、
  *   打った文字と操作がぶつかるため。
  *
+ * ▼ 飾りはいくつでも着けられる
+ *   ほかの欄は「左右で1つ選ぶ」だが、飾りだけは左右で札を選び、決定で着ける／外す。
+ *   その下の「飾りの色」は、飾りの欄で最後に指した飾りの色（飾りごとに別々）。
+ *   いちばん左はその飾りの「もとの色」。着けていない飾りの色を選ぶと、その飾りを着ける
+ *   （色を選んだのに姿に出ないと、効いていないように見えるため）。
+ *
  * ▼ 性別と一人称は、ゲームの進み方には何も影響しない（data/player.js）
- *   一人称だけは、物語の台詞の {me} に差し込まれる。
+ *   一人称だけは、物語の台詞の {me} に差し込まれる。性別は新しい絵の体つきになる。
  *
  * 配置は data/ui.js の playerSetup、文言は data/messages.js の playerSetup。
- * 色・性別・一人称の選択肢は data/player.js。
+ * 選択肢は data/player.js。
  */
 (function (NS) {
   "use strict";
 
-  // 上から並ぶ欄。left/right で選ぶのは color / gender / firstPerson の3つ
-  var ROWS = ["name", "color", "gender", "firstPerson", "done"];
+  // 色見本の欄（用意した色 ＋「じぶんで」）
+  var PALETTES = ["color", "hairColor", "pants", "accColor"];
+  // 札の欄（1つ選ぶ）。飾り（acc）も札だが、いくつでも着けられる
+  var CHIPS = ["gender", "firstPerson", "hair", "acc"];
+  // 見た目を歩かせて見せるときの向きの順と、1つの向きを見せる時間
+  var PREVIEW_DIRS = ["down", "left", "up", "right"];
+  var PREVIEW_TURN_MS = 1500;
 
   function PlayerSetupScene(game, returnScene, mode) {
     this.game = game;
@@ -53,59 +69,81 @@
     this.backButton = new NS.BackButton(this.panel, game.data);
 
     var player = game.data.player || {};
-    this.colors = NS.PlayerLook.colorsOf(game.data);
+    var look = NS.PlayerLook.appearanceOf(game.data);
+    this.useRig = NS.PlayerLook.usesRig(game.data);
     this.genders = player.genders || [];
     this.firstPersons = player.firstPersons || [];
+    this.hairStyles = look.hairStyles || [];
+    this.accessories = look.accessories || [];
 
-    // いまの値から始める（あとから変えるときは、今の名前と色が入っている）
-    this.name = game.getPlayerName();
-
-    // 色見本は用意した色のあとに「じぶんで」が1つ並ぶ（customIndex がその番号）
-    var current = game.getPlayerColor();
-    this.customIndex = this.colors.length;
-    if (NS.PlayerLook.isCustom(current)) {
-      this.colorIndex = this.customIndex;
-      this.customHex = current;
-    } else {
-      this.colorIndex = this._indexOfColor(current);
-      // まだ作っていなければ、いま着ている色から作り始める
-      var preset = this.colors[this.colorIndex];
-      this.customHex = (preset && preset.base) || "#4a7fe0";
+    // 上から並ぶ欄。新しい絵が使えないときは、今までどおり ふくの色 だけ
+    this.rows = this.useRig
+      ? ["name", "gender", "firstPerson", "hair", "hairColor", "color", "pants", "acc", "accColor", "done"]
+      : ["name", "color", "gender", "firstPerson", "done"];
+    // 飾りが1つも無ければ、飾りと飾りの色の欄は出さない
+    if (!this.accessories.length) {
+      this.rows = this.rows.filter(function (k) { return k !== "acc" && k !== "accColor"; });
     }
-    this.editor = null;   // 色を作る窓を開いているあいだの値（_openColorEditor）
-    this._repeatAt = 0;   // 左右を押し続けたときに、次に動かす時刻
+
+    // いまの値から始める（あとから変えるときは、今の名前と見た目が入っている）
+    this.name = game.getPlayerName();
+    this.palettes = {
+      color: makePalette(NS.PlayerLook.colorsOf(game.data), game.getPlayerColor(), "#4a7fe0"),
+      hairColor: makePalette(look.hairColors || [],
+        game.playerHairColor || look.defaultHairColor, "#e8b23a"),
+      pants: makePalette(look.pantsColors || [], game.playerPants || look.defaultPants, "#34323e")
+    };
     this.genderIndex = indexById(this.genders, game.getPlayerGender());
     this.firstPersonIndex = Math.max(0, this.firstPersons.indexOf(game.getPlayerFirstPerson()));
+    this.hairIndex = indexById(this.hairStyles, game.playerHair || look.defaultHair);
+    this.accOn = {};
+    var accIds = NS.PlayerLook.accIdsOf(game.data, game.playerAcc);
+    for (var i = 0; i < accIds.length; i++) this.accOn[accIds[i]] = true;
+    this.accCursor = 0;
 
-    // "main" … 欄を選ぶ / "name" … 文字盤を開いている
+    // 飾りの色は飾りごとに1つずつ色見本を持つ。左端は「もとの色」（id は null ＝ 色を選んでいない）。
+    // 「飾りの色」の欄（palettes.accColor）は、いま指している飾りのものを見せる
+    var accColors = look.accColors || [], savedAcc = game.playerAccColor || {};
+    this.accPalettes = {};
+    for (i = 0; i < this.accessories.length; i++) {
+      var a = this.accessories[i];
+      var list = [{ id: null, name: this.texts.accColorOriginal || "もとの色", base: a.color || "#888888" }].concat(accColors);
+      this.accPalettes[a.id] = makePalette(list, savedAcc[a.id] || null, a.color || "#888888");
+    }
+    var self = this;
+    Object.defineProperty(this.palettes, "accColor", {
+      enumerable: true,
+      get: function () {
+        var acc = self.accessories[self.accCursor];
+        return acc ? self.accPalettes[acc.id] : null;
+      }
+    });
+
+    this.editor = null;   // 色を作る窓を開いているあいだの値（_openColorEditor）
+    this._repeatAt = 0;   // 左右を押し続けたときに、次に動かす時刻
+    this._chipRects = {}; // 札の四角（文字の幅で決まるので、一度測って覚えておく）
+
+    // "main" … 欄を選ぶ / "name" … 文字盤を開いている / "color" … 色を作る窓
     this.phase = "main";
-    this.row = 0;   // ROWS の何番目か
+    this.row = 0;   // this.rows の何番目か
   }
 
-  PlayerSetupScene.prototype.enter = function () {
-    this.phase = "main";
-  };
-
-  PlayerSetupScene.prototype._indexOfColor = function (colorId) {
-    return indexById(this.colors, colorId);
-  };
-
-  /** 選んでいる色のid（用意した色のid か、自分で作った色の色コード） */
-  PlayerSetupScene.prototype._currentColorId = function () {
-    if (this.colorIndex === this.customIndex) return this.customHex;
-    var color = this.colors[this.colorIndex];
-    return color ? color.id : null;
-  };
-
-  /** 選んでいる色の定義（名前・色）。自分で作った色は名前が色コード */
-  PlayerSetupScene.prototype._currentColor = function () {
-    var id = this._currentColorId();
-    return id ? NS.PlayerLook.colorDef(this.game.data, id) : null;
-  };
-
-  PlayerSetupScene.prototype._rowKind = function () {
-    return ROWS[this.row];
-  };
+  /**
+   * 色見本の欄の中身。list の色の右に「じぶんで」（customIndex）が並ぶ。
+   * いまの色が色コードなら「じぶんで」を選んだ状態から始める
+   */
+  function makePalette(list, currentId, fallbackHex) {
+    var p = { list: list, customIndex: list.length };
+    if (NS.PlayerLook.isCustom(currentId)) {
+      p.index = p.customIndex;
+      p.customHex = currentId.toLowerCase();
+    } else {
+      p.index = indexById(list, currentId);
+      // まだ作っていなければ、いま選んでいる色から作り始める
+      p.customHex = (list[p.index] && list[p.index].base) || fallbackHex;
+    }
+    return p;
+  }
 
   function indexById(list, id) {
     for (var i = 0; i < list.length; i++) {
@@ -114,42 +152,104 @@
     return 0;
   }
 
+  PlayerSetupScene.prototype.enter = function () {
+    this.phase = "main";
+  };
+
+  /** 色見本の欄で選んでいる色のid（用意した色のid か、自分で作った色の色コード） */
+  PlayerSetupScene.prototype._paletteId = function (kind) {
+    var p = this.palettes[kind];
+    if (p.index === p.customIndex) return p.customHex;
+    var c = p.list[p.index];
+    return c ? c.id : null;
+  };
+
+  /** ふくの色の定義（左の 32×32 の絵の名前に使う）。自分で作った色は名前が色コード */
+  PlayerSetupScene.prototype._currentColor = function () {
+    var id = this._paletteId("color");
+    return id ? NS.PlayerLook.colorDef(this.game.data, id) : null;
+  };
+
+  /** 着けている飾りの id（data/player.js の並び順） */
+  PlayerSetupScene.prototype._accIds = function () {
+    var out = [];
+    for (var i = 0; i < this.accessories.length; i++) {
+      if (this.accOn[this.accessories[i].id]) out.push(this.accessories[i].id);
+    }
+    return out;
+  };
+
+  /** 飾りごとの色（{ 飾りの id: 色の id か色コード }）。「もとの色」のものは入れない */
+  PlayerSetupScene.prototype._accColors = function () {
+    var out = {};
+    for (var id in this.accPalettes) {
+      var p = this.accPalettes[id];
+      var c = (p.index === p.customIndex) ? p.customHex : (p.list[p.index] || {}).id;
+      if (c) out[id] = c;
+    }
+    return out;
+  };
+
+  /** いま指している飾りを着ける（その飾りの色を選んだとき） */
+  PlayerSetupScene.prototype._wearCurrentAcc = function () {
+    var acc = this.accessories[this.accCursor];
+    if (acc) this.accOn[acc.id] = true;
+  };
+
+  /** いま選んでいる内容（決める前の値）。PlayerLook.rigOptions に渡す */
+  PlayerSetupScene.prototype._selection = function () {
+    var gender = this.genders[this.genderIndex];
+    var hair = this.hairStyles[this.hairIndex];
+    return {
+      gender: gender ? gender.id : null,
+      color: this._paletteId("color"),
+      hair: hair ? hair.id : null,
+      hairColor: this._paletteId("hairColor"),
+      pants: this._paletteId("pants"),
+      acc: this._accIds(),
+      accColor: this._accColors()
+    };
+  };
+
+  PlayerSetupScene.prototype._rowKind = function () {
+    return this.rows[this.row];
+  };
+
   // --- 選択肢（左右で送るもの）---
 
   /**
    * 左右で選ぶ欄の中身。欄ごとに「いくつあるか」「いま何番目か」を1か所で扱う。
+   * 飾りの欄は「どの札を指しているか」（着けているかどうかは決定で切り替える）
    * @returns {{count:number, get:function, set:function}|null}
    */
   PlayerSetupScene.prototype._choiceOf = function (kind) {
     var self = this;
-    if (kind === "color") {
-      // 用意した色 ＋「じぶんで」
-      return { count: this.colors.length + 1,
-               get: function () { return self.colorIndex; },
-               set: function (i) { self.colorIndex = i; } };
+    if (PALETTES.indexOf(kind) >= 0) {
+      var p = this.palettes[kind];
+      if (!p) return null;
+      return { count: p.list.length + 1,
+               get: function () { return p.index; },
+               set: function (i) {
+                 p.index = i;
+                 if (kind === "accColor") self._wearCurrentAcc();
+               } };
     }
-    if (kind === "gender") {
-      return { count: this.genders.length,
-               get: function () { return self.genderIndex; },
-               set: function (i) { self.genderIndex = i; } };
-    }
-    if (kind === "firstPerson") {
-      return { count: this.firstPersons.length,
-               get: function () { return self.firstPersonIndex; },
-               set: function (i) { self.firstPersonIndex = i; } };
-    }
-    return null;
+    var field = { gender: "genderIndex", firstPerson: "firstPersonIndex", hair: "hairIndex", acc: "accCursor" }[kind];
+    if (!field) return null;
+    var list = { gender: this.genders, firstPerson: this.firstPersons,
+                 hair: this.hairStyles, acc: this.accessories }[kind];
+    return { count: list.length,
+             get: function () { return self[field]; },
+             set: function (i) { self[field] = i; } };
   };
 
-  /** 性別・一人称の札に書く文字 */
+  /** 札に書く文字 */
   PlayerSetupScene.prototype._chipLabels = function (kind) {
-    if (kind === "gender") {
-      var names = [];
-      for (var i = 0; i < this.genders.length; i++) names.push(this.genders[i].name || "");
-      return names;
-    }
     if (kind === "firstPerson") return this.firstPersons.slice();
-    return [];
+    var list = { gender: this.genders, hair: this.hairStyles, acc: this.accessories }[kind] || [];
+    var names = [];
+    for (var i = 0; i < list.length; i++) names.push(list[i].name || "");
+    return names;
   };
 
   // --- 更新 ---
@@ -181,8 +281,9 @@
       return;
     }
 
-    if (input.isPressed("up")) this.row = (this.row + ROWS.length - 1) % ROWS.length;
-    if (input.isPressed("down")) this.row = (this.row + 1) % ROWS.length;
+    var n = this.rows.length;
+    if (input.isPressed("up")) this.row = (this.row + n - 1) % n;
+    if (input.isPressed("down")) this.row = (this.row + 1) % n;
 
     // 左右は、選ぶものがある欄にいるときだけ効く（別の欄にいて替わると迷う）
     var choice = this._choiceOf(this._rowKind());
@@ -203,39 +304,52 @@
     var pointer = input.getPointer();
     if (!pointer.inside) return;
 
-    // 色見本・性別・一人称の札
-    var kinds = ["color", "gender", "firstPerson"];
-    for (var k = 0; k < kinds.length; k++) {
-      var choice = this._choiceOf(kinds[k]);
+    for (var r = 0; r < this.rows.length; r++) {
+      var kind = this.rows[r];
+      var choice = this._choiceOf(kind);
+      if (!choice) continue;
       for (var i = 0; i < choice.count; i++) {
-        if (!NS.Panel.containsPoint(this._optionRect(kinds[k], i), pointer)) continue;
+        if (!NS.Panel.containsPoint(this._optionRect(kind, i), pointer)) continue;
         if (pointer.moved || pointer.clicked) {
-          this.row = ROWS.indexOf(kinds[k]);
+          this.row = r;
           choice.set(i);
         }
-        // 「じぶんで」の見本を押したら、色を作る窓を開く
-        if (pointer.clicked && kinds[k] === "color" && i === this.customIndex) this._openColorEditor();
+        if (pointer.clicked) {
+          // 「じぶんで」の見本を押したら色を作る窓を開く。飾りの札は押すと着ける／外す
+          var p = this.palettes[kind];
+          if (p && i === p.customIndex) this._openColorEditor(kind);
+          if (kind === "acc") this._toggleAcc();
+        }
         return;
       }
     }
 
     // 名前の欄と決定のボタン
-    if (NS.Panel.containsPoint(this._rowRect(ROWS.indexOf("name")), pointer)) {
-      if (pointer.moved) this.row = ROWS.indexOf("name");
+    var nameRow = this.rows.indexOf("name");
+    if (NS.Panel.containsPoint(this._rowRect(nameRow), pointer)) {
+      if (pointer.moved) this.row = nameRow;
       if (pointer.clicked) this._openNameInput();
     } else if (NS.Panel.containsPoint(this._doneRect(), pointer)) {
-      if (pointer.moved) this.row = ROWS.indexOf("done");
+      if (pointer.moved) this.row = this.rows.indexOf("done");
       if (pointer.clicked) this._finish();
     }
   };
 
   PlayerSetupScene.prototype._activateRow = function () {
     var kind = this._rowKind();
+    var p = this.palettes[kind];
     if (kind === "name") this._openNameInput();
     else if (kind === "done") this._finish();
+    else if (kind === "acc") this._toggleAcc();
     // 「じぶんで」を選んでいるときだけ、決定で色を作る窓を開く
-    else if (kind === "color" && this.colorIndex === this.customIndex) this._openColorEditor();
+    else if (p && p.index === p.customIndex) this._openColorEditor(kind);
     // ほかの選ぶ欄で決定を押しても何もしない（左右で選ぶものなので）
+  };
+
+  /** 指している飾りを着ける／外す */
+  PlayerSetupScene.prototype._toggleAcc = function () {
+    var acc = this.accessories[this.accCursor];
+    if (acc) this.accOn[acc.id] = !this.accOn[acc.id];
   };
 
   // --- 色を作る窓 ---
@@ -244,17 +358,20 @@
   var EDITOR_ROWS = SLIDERS.length + 1;
   var SLIDER_RANGE = { h: [0, 359], s: [0, 100], l: [5, 95] };
 
-  PlayerSetupScene.prototype._openColorEditor = function () {
-    var hsl = NS.PlayerLook.hexToHsl(this.customHex);
-    this.editor = { h: hsl.h, s: hsl.s, l: Math.max(5, Math.min(95, hsl.l)),
-                    row: 0, button: 0, original: this.customHex, dragging: -1 };
-    this.colorIndex = this.customIndex;
+  /** kind … どの欄の色を作るか（color / hairColor / pants） */
+  PlayerSetupScene.prototype._openColorEditor = function (kind) {
+    var p = this.palettes[kind];
+    var hsl = NS.PlayerLook.hexToHsl(p.customHex);
+    this.editor = { kind: kind, h: hsl.h, s: hsl.s, l: Math.max(5, Math.min(95, hsl.l)),
+                    row: 0, button: 0, original: p.customHex, dragging: -1 };
+    p.index = p.customIndex;
+    if (kind === "accColor") this._wearCurrentAcc();
     this.phase = "color";
   };
 
   /** 窓を閉じる。apply が false なら開く前の色に戻す */
   PlayerSetupScene.prototype._closeColorEditor = function (apply) {
-    if (!apply && this.editor) this.customHex = this.editor.original;
+    if (!apply && this.editor) this.palettes[this.editor.kind].customHex = this.editor.original;
     this.editor = null;
     this.phase = "main";
   };
@@ -262,7 +379,7 @@
   /** つまみの値から色コードを作り直す（左の姿もその場で変わる） */
   PlayerSetupScene.prototype._applyEditor = function () {
     var E = this.editor;
-    this.customHex = NS.PlayerLook.hslToHex(E.h, E.s, E.l);
+    this.palettes[E.kind].customHex = NS.PlayerLook.hslToHex(E.h, E.s, E.l);
   };
 
   PlayerSetupScene.prototype._stepSlider = function (index, direction) {
@@ -376,20 +493,29 @@
   };
 
   PlayerSetupScene.prototype._openNameInput = function () {
-    this.nameInput.open(this.name, this.texts.nameTitle || "");
+    // 主人公の名前は会話の文に入るので、仲間（10文字）より短い 8文字まで（data/naming.js）
+    this.nameInput.open(this.name, this.texts.nameTitle || "",
+      (this.game.data.naming || {}).playerMaxLength || 8);
     this.phase = "name";
   };
 
   /** 決めた内容をゲームへ移して、次の画面へ進む */
   PlayerSetupScene.prototype._finish = function () {
-    var color = this._currentColor();
-    var gender = this.genders[this.genderIndex];
+    var sel = this._selection();
 
     this.game.playerName = this.name;
     // 自分で作った色は色コード（#rrggbb）のまま入る
-    this.game.playerColor = color ? color.id : null;
-    this.game.playerGender = gender ? gender.id : null;
+    this.game.playerColor = sel.color;
+    this.game.playerGender = sel.gender;
     this.game.playerFirstPerson = this.firstPersons[this.firstPersonIndex] || null;
+    // 新しい絵の見た目は、その欄を出したときだけ書き換える（出していなければ選べていないので）
+    if (this.useRig) {
+      this.game.playerHair = sel.hair;
+      this.game.playerHairColor = sel.hairColor;
+      this.game.playerPants = sel.pants;
+      this.game.playerAcc = sel.acc;
+      this.game.playerAccColor = sel.accColor;
+    }
 
     if (this.mode === "edit") {
       this.game.scenes.change(this.returnScene);
@@ -402,27 +528,49 @@
   // --- 位置 ---
 
   PlayerSetupScene.prototype._rowRect = function (index) {
-    var r = this.layout.rows || { x: 310, y: 122, w: 442, h: 62, gap: 12 };
+    var r = this.layout.rows || { x: 264, y: 100, w: 504, h: 40, gap: 6 };
     return { x: r.x, y: r.y + (r.h + (r.gap || 0)) * index, w: r.w, h: r.h };
   };
 
-  /** 選ぶ欄の、i 番目の選択肢の四角（色は色見本、性別・一人称は札） */
+  /**
+   * 選ぶ欄の、i 番目の選択肢の四角。
+   * 色は同じ大きさの見本を並べる。札は文字の幅に合わせる（「ポニーテール」と「ボブ」で幅が違う）
+   */
   PlayerSetupScene.prototype._optionRect = function (kind, i) {
-    if (kind === "color") {
-      var s = this.layout.swatch || { x: 420, y: 210, size: 34, gap: 12 };
-      return { x: s.x + (s.size + (s.gap || 0)) * i, y: s.y, w: s.size, h: s.size };
+    var row = this._rowRect(this.rows.indexOf(kind));
+    if (this.palettes[kind]) {
+      var s = this.layout.swatch || { x: 352, size: 26, gap: 8 };
+      return { x: s.x + (s.size + (s.gap || 0)) * i, y: row.y + Math.floor((row.h - s.size) / 2),
+               w: s.size, h: s.size };
     }
-    var c = this.layout.chip || { x: 420, w: 48, h: 30, gap: 6 };
-    var row = this._rowRect(ROWS.indexOf(kind));
-    return {
-      x: c.x + (c.w + (c.gap || 0)) * i,
-      y: row.y + Math.floor((row.h - c.h) / 2),
-      w: c.w, h: c.h
-    };
+    var rects = this._chipRects[kind] || (this._chipRects[kind] = this._measureChips(kind));
+    var r = rects[i] || { x: 0, w: 0 };
+    var c = this.layout.chip || {};
+    return { x: r.x, y: row.y + Math.floor((row.h - (c.h || 26)) / 2), w: r.w, h: c.h || 26 };
   };
 
+  /** 札の左端と幅（横の並びだけ）。幅は文字の幅＋左右の余白で、w より狭くはしない */
+  PlayerSetupScene.prototype._measureChips = function (kind) {
+    var c = this.layout.chip || {};
+    var ctx = this.panel.ctx;
+    var labels = this._chipLabels(kind);
+    var out = [], x = c.x || 352;
+    ctx.save();
+    ctx.font = c.font || this.theme.smallFont || "13px monospace";
+    for (var i = 0; i < labels.length; i++) {
+      var w = Math.max(c.w || 40, Math.ceil(ctx.measureText(labels[i]).width) + (c.padX || 7) * 2);
+      out.push({ x: x, w: w });
+      x += w + (c.gap || 0);
+    }
+    ctx.restore();
+    return out;
+  };
+
+  /** 決定のボタン。欄の並びのいちばん下（高さだけ done.h） */
   PlayerSetupScene.prototype._doneRect = function () {
-    return this.layout.done || { x: 310, y: 426, w: 442, h: 52 };
+    var rect = this._rowRect(this.rows.indexOf("done"));
+    rect.h = (this.layout.done || {}).h || rect.h;
+    return rect;
   };
 
   // --- 描画 ---
@@ -443,11 +591,19 @@
       { font: subtitle.font, color: subtitle.color });
 
     this._renderPreview();
-    this._renderNameRow();
-    this._renderColorRow();
-    this._renderChipRow("gender", this.texts.genderLabel || "性別");
-    this._renderChipRow("firstPerson", this.texts.firstPersonLabel || "一人称");
-    this._renderDone();
+    var labels = {
+      gender: this.texts.genderLabel || "性別", firstPerson: this.texts.firstPersonLabel || "一人称",
+      hair: this.texts.hairLabel || "髪型", acc: this.texts.accLabel || "飾り",
+      color: this.texts.colorLabel || "ふくの色", hairColor: this.texts.hairColorLabel || "髪の色",
+      pants: this.texts.pantsLabel || "ズボンの色", accColor: this.texts.accColorLabel || "飾りの色"
+    };
+    for (var i = 0; i < this.rows.length; i++) {
+      var kind = this.rows[i];
+      if (kind === "name") this._renderNameRow();
+      else if (kind === "done") this._renderDone();
+      else if (this.palettes[kind]) this._renderPaletteRow(kind, labels[kind]);
+      else this._renderChipRow(kind, labels[kind]);
+    }
     this._renderHint();
 
     if (this.mode === "edit") this.backButton.render();
@@ -460,13 +616,45 @@
     }
   };
 
-  /** 左：選んでいる色で、実際に歩いているところを見せる */
+  /** 左：選んでいる姿で、実際に歩いているところを見せる */
   PlayerSetupScene.prototype._renderPreview = function () {
     var p = this.layout.preview;
     if (!p) return;
 
     this.panel.drawBox({ x: p.boxX, y: p.boxY, w: p.boxW, h: p.boxH });
+    if (this.useRig) this._renderRigPreview(p);
+    else this._renderSpritePreview(p);
+  };
 
+  /** 新しい絵：上下左右へ向きを変えながら歩かせる（どの向きの姿も見られるように） */
+  PlayerSetupScene.prototype._renderRigPreview = function (p) {
+    var R = NS.CharaRig;
+    var opts = NS.PlayerLook.rigOptions(this.game.data, this._selection());
+    var frames = NS.PlayerLook.framesFor(opts, 64);
+    var clock = this.game.clock || 0;
+    var dir = PREVIEW_DIRS[Math.floor(clock / PREVIEW_TURN_MS) % PREVIEW_DIRS.length];
+    var img = frames.walk[dir][R.walkFrame(clock)];
+    var scale = (NS.PlayerLook.appearanceOf(this.game.data).rig || {}).previewScale || 3;
+    var size = 64 * scale;
+    var x = Math.round(p.x - size / 2), y = Math.round(p.y - size / 2);
+    var ctx = this.panel.ctx;
+
+    ctx.save();
+    // 足もとの影（絵の足はおよそ 64 の 61 段目）
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(p.x, y + 60 * scale, 15 * scale, 3 * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, x, y, size, size);
+    ctx.restore();
+
+    this.panel.drawText(this.name || "", p.x, p.labelY,
+      { align: "center", color: this.theme.subTextColor });
+  };
+
+  /** 今までの 32×32 の絵（新しい絵が使えないとき）。ふくの色の名前を下に出す */
+  PlayerSetupScene.prototype._renderSpritePreview = function (p) {
     var color = this._currentColor();
     var sprites = NS.PlayerLook.spritesFor(this.game.data, color ? color.id : null);
     var look = NS.PlayerLook.appearanceOf(this.game.data);
@@ -486,7 +674,7 @@
 
   /** 欄の枠と、左の見出し。選んでいれば枠を光らせる */
   PlayerSetupScene.prototype._renderRowFrame = function (kind, label) {
-    var rect = this._rowRect(ROWS.indexOf(kind));
+    var rect = this._rowRect(this.rows.indexOf(kind));
     var selected = (this._rowKind() === kind) && this.phase === "main";
 
     this.panel.drawBox(rect);
@@ -502,7 +690,7 @@
     var frame = this._renderRowFrame("name", this.texts.nameLabel || "なまえ");
     var rect = frame.rect;
     var t = this.theme;
-    var chips = this.layout.chip || { x: 420 };
+    var chips = this.layout.chip || { x: 352 };
     var baseY = rect.y + rect.h / 2 + 6;
 
     this.panel.drawText(this.name || "", chips.x, baseY,
@@ -511,22 +699,31 @@
       { align: "right", font: t.smallFont, color: t.hintColor });
   };
 
-  PlayerSetupScene.prototype._renderColorRow = function () {
-    this._renderRowFrame("color", this.texts.colorLabel || "ふくの色");
+  /** 色見本の欄（ふく・髪・ズボン・飾り）。いちばん右が「じぶんで」 */
+  PlayerSetupScene.prototype._renderPaletteRow = function (kind, label) {
+    var frame = this._renderRowFrame(kind, label);
     var t = this.theme;
+    var p = this.palettes[kind];
+
+    // 飾りの色は、どの飾りの色かを右端に出す（飾りの欄で指しているもの）
+    if (kind === "accColor") {
+      var acc = this.accessories[this.accCursor];
+      this.panel.drawText(acc ? acc.name : "", frame.rect.x + frame.rect.w - 12, frame.rect.y + frame.rect.h / 2 + 5,
+        { align: "right", font: t.smallFont, color: this.accOn[acc.id] ? t.cursorColor : t.subTextColor });
+    }
 
     var ctx = this.panel.ctx;
-    for (var i = 0; i <= this.colors.length; i++) {
-      var sw = this._optionRect("color", i);
-      var custom = (i === this.customIndex);
+    for (var i = 0; i <= p.list.length; i++) {
+      var sw = this._optionRect(kind, i);
+      var custom = (i === p.customIndex);
       ctx.save();
-      ctx.fillStyle = custom ? this.customHex : (this.colors[i].base || "#888888");
+      ctx.fillStyle = custom ? p.customHex : (p.list[i].base || "#888888");
       ctx.fillRect(sw.x, sw.y, sw.w, sw.h);
       // 選んでいる色だけ枠を付ける。色そのものは変えない（見本なので）
-      ctx.strokeStyle = (i === this.colorIndex)
+      ctx.strokeStyle = (i === p.index)
         ? (t.cursorColor || "#ffd75e")
         : (t.panelBorder || "#3a4560");
-      ctx.lineWidth = (i === this.colorIndex) ? 3 : 1;
+      ctx.lineWidth = (i === p.index) ? 3 : 1;
       ctx.strokeRect(sw.x, sw.y, sw.w, sw.h);
       ctx.restore();
 
@@ -534,9 +731,9 @@
       if (custom) {
         ctx.save();
         ctx.fillStyle = "rgba(10,15,28,0.75)";
-        ctx.fillRect(sw.x + sw.w - 13, sw.y + sw.h - 13, 12, 12);
+        ctx.fillRect(sw.x + sw.w - 12, sw.y + sw.h - 12, 11, 11);
         ctx.restore();
-        this.panel.drawText("+", sw.x + sw.w - 7, sw.y + sw.h - 3,
+        this.panel.drawText("+", sw.x + sw.w - 6.5, sw.y + sw.h - 2.5,
           { align: "center", font: t.smallFont, color: t.cursorColor });
       }
     }
@@ -551,8 +748,13 @@
     var t = this.theme;
     var ctx = this.panel.ctx;
     var box = C.box;
+    var hex = this.palettes[E.kind].customHex;
     var labels = [this.texts.hueLabel || "色合い", this.texts.satLabel || "あざやかさ",
                   this.texts.lightLabel || "明るさ"];
+    var acc = this.accessories[this.accCursor];
+    var titles = { color: this.texts.editorTitle, hairColor: this.texts.editorTitleHair,
+                   pants: this.texts.editorTitlePants,
+                   accColor: (this.texts.editorTitleAcc || "{acc}の色を作る").replace("{acc}", acc ? acc.name : "") };
 
     ctx.save();
     ctx.fillStyle = C.veil || "rgba(4,6,12,0.72)";
@@ -562,7 +764,7 @@
     ctx.restore();
     this.panel.drawBox(box);
 
-    this.panel.drawText(this.texts.editorTitle || "", box.x + 24, box.y + 36,
+    this.panel.drawText(titles[E.kind] || "", box.x + 24, box.y + 36,
       { color: t.cursorColor });
 
     for (var i = 0; i < SLIDERS.length; i++) {
@@ -579,12 +781,12 @@
     var S = C.swatch || {};
     var sx = box.x + S.x, sy = box.y + S.y;
     ctx.save();
-    ctx.fillStyle = this.customHex;
+    ctx.fillStyle = hex;
     ctx.fillRect(sx, sy, S.size, S.size);
     ctx.strokeStyle = t.panelBorder || "#3a4560";
     ctx.strokeRect(sx + 0.5, sy + 0.5, S.size - 1, S.size - 1);
     ctx.restore();
-    this.panel.drawText(this.customHex.toUpperCase(), sx + S.size + 12, sy + S.size / 2 + 5,
+    this.panel.drawText(hex.toUpperCase(), sx + S.size + 12, sy + S.size / 2 + 5,
       { color: t.textColor });
 
     // 決める／やめる
@@ -637,9 +839,12 @@
     ctx.restore();
   };
 
-  /** 性別・一人称の欄。選択肢を札にして横に並べ、選んでいるものだけ光らせる */
+  /**
+   * 札の欄（性別・一人称・髪型・飾り）。選んでいるもの（飾りは着けているもの）を光らせる。
+   * 飾りの欄では、いま指している札の地を明るくする（光る＝着けている、とは別）
+   */
   PlayerSetupScene.prototype._renderChipRow = function (kind, label) {
-    this._renderRowFrame(kind, label);
+    var frame = this._renderRowFrame(kind, label);
 
     var t = this.theme;
     var c = this.layout.chip || {};
@@ -649,9 +854,15 @@
 
     for (var i = 0; i < labels.length; i++) {
       var r = this._optionRect(kind, i);
-      var on = (i === current);
+      var on = (kind === "acc") ? !!this.accOn[this.accessories[i].id] : (i === current);
 
       ctx.save();
+      // 飾りの色の欄にいるときも、どの飾りの色を選んでいるのか分かるよう地を明るくしておく
+      var pointing = frame.selected || (this._rowKind() === "accColor" && this.phase === "main");
+      if (kind === "acc" && pointing && i === current) {
+        ctx.fillStyle = c.cursorFill || "rgba(255,215,94,0.18)";
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+      }
       ctx.strokeStyle = on ? (t.cursorColor || "#ffd75e") : (t.panelBorder || "#3a4560");
       ctx.lineWidth = on ? 2 : 1;
       ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
@@ -690,13 +901,16 @@
     var hint = this.layout.hint;
     if (!hint) return;
 
+    var kind = this._rowKind();
+    var p = this.palettes[kind];
     var text;
     if (this.phase === "name") text = "";   // 文字盤が自分で案内を出す
     else if (this.phase === "color") text = this.texts.hintEditor;
-    else if (this._rowKind() === "color" && this.colorIndex === this.customIndex) {
-      // 「じぶんで」を選んでいるときは、決定で色を作れることを知らせる
-      text = this.texts.hintCustom;
-    } else text = (this.mode === "new" ? this.texts.hintNew : this.texts.hintEdit);
+    // 「じぶんで」を選んでいるときは、決定で色を作れることを知らせる
+    else if (p && p.index === p.customIndex) text = this.texts.hintCustom;
+    else if (kind === "acc") text = this.texts.hintAcc;
+    else if (kind === "accColor") text = this.texts.hintAccColor;
+    else text = (this.mode === "new" ? this.texts.hintNew : this.texts.hintEdit);
 
     this.panel.drawText(text || "", hint.x, hint.y,
       { font: this.theme.smallFont, color: this.theme.hintColor });

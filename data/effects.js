@@ -402,6 +402,43 @@
         maxSize: 7
       },
 
+      // しんくうは。三日月の風の刃が相手ひとりずつへ飛んで切り、切り口へ空気が吸い込まれる
+      //   travel … 刃が飛ぶ距離   bladeRadius … 刃の大きさ   stagger … 相手ごとの遅れ   pullRadius … 吸い込みの輪
+      vacuumWave: {
+        shape: "vacuumWave",
+        duration: 820,
+        glow: 12,
+        travel: 220,
+        bladeRadius: 44,
+        thickness: 7,
+        stagger: 0.08,
+        cutLength: 100,
+        pullRadius: 60,
+        lineWidth: 3,
+        count: 8,
+        minSize: 3,
+        maxSize: 5
+      },
+
+      // 稲妻斬り。斜めの一閃のあと、切り口へ稲妻が落ちて火花が散る（音は当たった瞬間の雷。技の hitSe）
+      //   tilt … 一閃の傾き（回転数）   boltAt … 稲妻が落ち始める時刻   height / jag … 稲妻の長さとジグザグ
+      thunderSlash: {
+        shape: "thunderSlash",
+        duration: 720,
+        glow: 16,
+        length: 130,
+        thickness: 10,
+        tilt: 0.36,
+        boltAt: 0.3,
+        height: 150,
+        segments: 6,
+        jag: 26,
+        boltWidth: 7,
+        glowRadius: 26,
+        sparks: 9,
+        sparkRadius: 46
+      },
+
       // ダークネビュラ。渦を巻く闇の雲が並び全体を呑み込み、中で星が瞬く
       //   turns … 雲が回る量   coreRadius … 相手ごとに沈む闇の大きさ   stars / starColor … 星
       darkNebula: {
@@ -435,6 +472,176 @@
         alpha: 0.3,
         sparks: 8,
         sparkRadius: 40
+      },
+
+      // いなずま（ザンガルドの体技）。ボルトと同じ型で、稲妻を太く・ほぼ同時に落とし、短く強く光らせる
+      lightning: {
+        shape: "thunderstorm",
+        duration: 720,
+        glow: 24,
+        spread: 270,
+        height: 200,
+        stagger: 0.03,
+        segments: 6,
+        jag: 40,
+        boltWidth: 11,
+        alpha: 0.42,
+        sparks: 12,
+        sparkRadius: 52
+      },
+
+      /**
+       * --- 技の大幅追加（2026-10-20）の型 ---
+       * 無属性の技が多いので、灰色にならないよう、意味の分かる色を color で固定したものがある。
+       * 強化・弱体で能力が変わる技（シールド・ブレイブ・鎧くずし など）は、color を書かず statColors の色になる
+       */
+
+      // 二連斬り。× の字に2本走る（1回当たるごとに出る）
+      crossSlash: {
+        shape: "crossSlash", hitSe: "slash", duration: 440, glow: 10,
+        length: 112, thickness: 8, tilt: 0.125, delay: 0.2
+      },
+
+      // 捨て身の体当たり。打つ（impact）の重い版。反動の重さが伝わるよう、赤みのある色で固定
+      crash: {
+        shape: "crash", duration: 620, glow: 12, color: "#ff8a5c",
+        radius: 74, lineWidth: 6, cracks: 7, crackLength: 50, count: 14, gravity: 150, minSize: 4, maxSize: 8
+      },
+
+      // ちからため。力が体に吸い込まれる。攻撃の赤
+      gather: {
+        shape: "gather", duration: 760, glow: 14, color: "#e8542a",
+        radius: 86, count: 18, rings: 3, minSize: 3, maxSize: 6
+      },
+
+      // 鎧くずし。六角の盾が砕ける。色は下がる能力（防御の青）
+      shatter: {
+        shape: "shatter", duration: 760, glow: 10,
+        radius: 46, fly: 42, gravity: 130
+      },
+
+      // しびれ針。針が刺さり、小さな稲妻が散る。麻痺の黄色（data/statuses.js の paralysis.color）
+      needle: {
+        shape: "needle", hitSe: "slash", duration: 560, glow: 12, color: "#ffd75e",
+        length: 70, sparks: 7, sparkLength: 18
+      },
+
+      // シールド。六角の障壁。色は上がる能力（防御の青）
+      barrier: {
+        shape: "barrier", duration: 820, glow: 12, radius: 52
+      },
+
+      // 堅守の陣。障壁と同じ形で、受けるダメージが減ることを防御の青で見せる（能力ではないので色を固定）
+      fortress: {
+        shape: "barrier", duration: 900, glow: 14, color: "#4fb0d1", radius: 56
+      },
+
+      // ブレイブ・鼓舞の舞。矢じりが昇る。色は上がる能力（攻撃の赤）
+      rally: {
+        shape: "rally", duration: 760, glow: 12,
+        radius: 42, rise: 72, count: 9, laneGap: 22, chevron: 9
+      },
+
+      // 足止めの舞。帯が巻きつき、締まりながら足元へずり落ちる。色は下がる能力（素早さの緑）
+      entangle: {
+        shape: "entangle", duration: 900, glow: 10,
+        ribbons: 3, radius: 44, height: 72, turns: 1.6, groundRadius: 42, count: 8, minSize: 3, maxSize: 5
+      },
+
+      // ミステリーダンス。相手の体から光の玉が渦を巻いて抜け出し、頭の上で星が回る。PPの紫（statColors.pp）に桃色を混ぜる
+      mystery: {
+        shape: "mystery", duration: 1000, glow: 14, color: "#8b6fd6", accentColor: "#ff8ad8",
+        count: 12, radius: 70, turns: 1.2, stars: 5, minSize: 4, maxSize: 7
+      },
+
+      // ヘイスト。速い筋が駆け抜ける。色は上がる能力（素早さの緑）
+      haste: {
+        shape: "haste", duration: 700, glow: 10,
+        streaks: 9, width: 130, height: 72, radius: 36
+      },
+
+      // ハウリング。自分のまわりに咆哮の輪。与えるダメージが上がるので攻撃の赤で固定
+      howl: {
+        shape: "roar", duration: 760, glow: 12, color: "#e8542a",
+        waves: 4, radius: 84, flatten: 0.75, lineWidth: 5, spikes: 14
+      },
+
+      // 威圧の咆哮。並び全体に1回だけ広がる咆哮（技の側に effectAt: "center"）。色は下がる能力（攻撃の赤）
+      intimidate: {
+        shape: "roar", duration: 900, glow: 14,
+        waves: 4, radius: 300, flatten: 0.3, lineWidth: 6, spikes: 28
+      },
+
+      // 〇〇ベール。光の幕。色は守る属性（data/elements.js と同じ色）
+      veilFire:    { shape: "veil", duration: 900, glow: 14, color: "#e8542a", width: 64, height: 92, strips: 7, count: 12, minSize: 3, maxSize: 5 },
+      veilWater:   { shape: "veil", duration: 900, glow: 14, color: "#4fb0d1", width: 64, height: 92, strips: 7, count: 12, minSize: 3, maxSize: 5 },
+      veilWind:    { shape: "veil", duration: 900, glow: 14, color: "#7fd9a8", width: 64, height: 92, strips: 7, count: 12, minSize: 3, maxSize: 5 },
+      veilEarth:   { shape: "veil", duration: 900, glow: 14, color: "#c8a35e", width: 64, height: 92, strips: 7, count: 12, minSize: 3, maxSize: 5 },
+      veilThunder: { shape: "veil", duration: 900, glow: 14, color: "#ffd75e", width: 64, height: 92, strips: 7, count: 12, minSize: 3, maxSize: 5 },
+      veilLight:   { shape: "veil", duration: 900, glow: 14, color: "#f2f0d8", width: 64, height: 92, strips: 7, count: 12, minSize: 3, maxSize: 5 },
+      veilDark:    { shape: "veil", duration: 900, glow: 14, color: "#8b6fd6", width: 64, height: 92, strips: 7, count: 12, minSize: 3, maxSize: 5 },
+
+      // 幻惑の息。目をくらます暗い息（盲目の色。data/statuses.js の blind.color）。粒は暗い火の粉
+      blindMist: {
+        shape: "miasma", duration: 1100, glow: 8, color: "#6b625c",
+        accentColor: "#2a2420", particleColor: "#d8d0c8", particle: "spark",
+        spread: 250, height: 70, lift: 8, count: 24, minSize: 16, maxSize: 32, bubbles: 14
+      },
+
+      // しびれ粉。黄色い粉が広がり、きらきらした粒が舞う（麻痺の色）
+      numbCloud: {
+        shape: "miasma", duration: 1100, glow: 14, color: "#e8c84a",
+        accentColor: "#fff3a0", particleColor: "#fffbe0", particle: "spark",
+        spread: 250, height: 64, lift: 10, count: 22, minSize: 14, maxSize: 28, bubbles: 22
+      },
+
+      // サイレス。印の輪が締まる（封印の色。data/statuses.js の seal.color）
+      sealRing: {
+        shape: "sealRing", duration: 820, glow: 12, color: "#a77bd6", radius: 58, marks: 8
+      },
+
+      // 不吉な舞。頭の上の輪から影がしたたる（呪いの色。data/statuses.js の curse.color）
+      hex: {
+        shape: "hex", duration: 960, glow: 12, color: "#c04a7a", accentColor: "#3a1430",
+        headOffset: 46, drips: 7, fall: 80, count: 12, minSize: 8, maxSize: 14
+      },
+
+      // ディンド。朝の光のような、やわらかいきらめき
+      wake: {
+        shape: "sparkle", duration: 760, glow: 14, color: "#ffe9a8", radius: 44, stars: 10, spread: 70, alpha: 0.5
+      },
+
+      // リカバー。澄んだ光が大きくふくらみ、きらめきが多い
+      purify: {
+        shape: "sparkle", duration: 900, glow: 18, color: "#bff4ff", radius: 58, stars: 16, spread: 86, alpha: 0.6
+      },
+
+      // 死神の鎌（シニガミ。2026-10-21 に作り直した）。刃の軌跡と残像 → 閃き → 体を横切る裂け目が割れる → 魂が昇る → 足元の波紋
+      // 時間（作者の指定で長くした）：三日月は 0〜0.2 で走り、crescentHold（0.42）まで残ってから薄れる。
+      //   赤い裂け目は cutAt（0.36）から。前は三日月がすぐ消え、裂け目も 0.16 で出ていた
+      reap: {
+        shape: "reap", duration: 2000, glow: 18, crescentHold: 0.42, cutAt: 0.36, color: "#d8dce8", accentColor: "#c0102a", particleColor: "#140812",
+        soulColor: "#bfe0ff", souls: 7, soulRise: 110,
+        // 三日月を大きく（作者の指定。前は radius 78・width 18）。裂け目・閃き・波紋もそれに合わせて大きくした
+        radius: 125, width: 30, count: 24, minSize: 3, maxSize: 8, flashRadius: 95, cutLength: 130, ringRadius: 150
+      },
+
+      // 死神の鎌の前ぶれ。技を出した瞬間にシニガミのまわりに出す（技の casterEffect）。
+      // 闇が吸い込まれ、足元の輪が縮み、最後に赤い目が強く光る。溜め（技の windupMs 840）と同じ長さ
+      reapOmen: {
+        shape: "reapOmen", duration: 840, glow: 10, color: "#2a0a18", accentColor: "#c0102a",
+        radius: 92, count: 22, minSize: 6, maxSize: 12, eyeOffset: 16, eyeGap: 12
+      },
+
+      // 即死の技（デス・デスラ・死の踊り）。頭の上に赤黒い輪が浮かび、影がしたたって靄が沈む（不吉な舞と同じ形・色だけ違う）
+      deathMark: {
+        shape: "hex", duration: 1000, glow: 14, color: "#c0102a", accentColor: "#120008",
+        headOffset: 46, drips: 9, fall: 86, count: 14, minSize: 8, maxSize: 15
+      },
+
+      // クレンズレイン。澄んだ水色の雨が降り、きらめく
+      cleanseRain: {
+        shape: "rain", duration: 760, glow: 12, color: "#9fe3ff", count: 26, spread: 56, height: 80, minSize: 3, maxSize: 6
       }
     }
   };

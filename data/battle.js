@@ -95,7 +95,9 @@
         resonance: { attackFactor: 0.25, powerFactor: 1.50, defenseFactor: 0.15 },  // 共鳴：攻撃力にあまり頼らず、威力が効く
         breath:    { attackFactor: 0.30, powerFactor: 1.35, defenseFactor: 0.15 },  // ブレス：全体・状態異常のぶん控えめ
         body:      { attackFactor: 0.55, powerFactor: 1.25 },  // 体技：攻撃力も威力もよく効く
-        slash:     { attackFactor: 0.65, powerFactor: 1.10 },  // 斬撃：攻撃力にいちばん大きく頼る
+        // 斬撃：2026-10-22 から斬撃の技は「通常攻撃の基礎 × 倍率（技の power）」で、この係数は使わない（BattleSystem.calcDamage）。
+        // 残しているのは、踊りで計算だけ斬撃の死神の鎌（damageKind: "slash"）のため
+        slash:     { attackFactor: 0.65, powerFactor: 1.10 },
         dance:     { attackFactor: 0.40, powerFactor: 1.35 }   // 踊り：未定（いずれ技ごとの専用の式）。今は以前の値
       },
       defenseFactor: 0.30,  // 防御力に掛ける係数（通常攻撃・体技・斬撃。共鳴とブレスは byKind で 0.15）
@@ -168,6 +170,57 @@
      */
     enemyAi: { skillRate: 0.25 },
 
+    /**
+     * 作戦（v1.0.0。作者の指定 2026-10-13）。仲間ごとに決め、拠点の仲間画面と、戦闘の「作戦」で変えられる。
+     * 名前と説明は仮（作者が決める）。並びはこの順で出る。
+     *
+     * ★ 作戦で動く仲間（ai: true）は、コマンドを聞かれずに、**自分の番が来たとき**に行動を決める
+     *   （直前に仲間が倒れた・回復された、などを見て選ぶ。BattleSystem._chooseTacticAction）。
+     *   選ぶのは 技・通常攻撃・防御 だけ。道具・スカウト・交代・逃げるは主人公が決める（作戦を「命令する」にすれば選べる）。
+     *   防御だけはターンの頭で決める（防御はターンの頭で構える決まりのため。_applyTacticDefend）
+     *
+     * ★ 名前と説明（画面に出る文）は作者が決めたもの（2026-10-13）。動きの決まりも作者の指定で、下に書いたとおり。
+     *   どの作戦でも、即死の技（状態異常 instantDeath を持つ技）は使わない（作者の指定）
+     *
+     * 1つの作戦に書けるもの（書かなければ使わない）
+     *   ai          : false なら今までどおりコマンドで選ぶ（命令する）
+     *   healBelow   : 場の味方に、最大HPのこの割合を下回った者がいれば、回復の技を最優先で使う。
+     *                 回復量と減ったHPに見合った技を選ぶ（全回復できる技のうち無駄のいちばん少ないもの。無ければいちばん多く治すもの）。
+     *                 下回った味方が2体以上で、味方全体を治す技があればそれを使う
+     *   cheapHeal   : true なら、回復の技はPPのいちばん軽いものを使う（全回復を優先しない）
+     *   cure        : true なら、治せる状態異常の味方がいれば治す技を使う（回復の次）。いちばん多く治せる技を選び、
+     *                 掛かっている味方が1体なら単体、2体以上なら全体の技（あれば）を使う
+     *   support     : true なら、強化 → 弱体 → 状態異常 の順に、まだ掛かっていないものを使う（攻撃より先）。
+     *                 同じ種類の中では次の順で比べる（作者の指定）
+     *                   強化     … 範囲＝効果量 ＞ 持続ターン
+     *                   弱体     … 効果量 ＞ 範囲 ＞ 持続ターン
+     *                   状態異常 … 持続ターン＝範囲 ＞ 効き（入る確率。相手の耐性を掛ける）
+     *   attack      : 攻撃の仕方
+     *                   "best"       … 見積もりのダメージ（属性・耐性・防御も見る）がいちばん大きい技。通常攻撃がいちばんなら通常攻撃
+     *                   "finishOnly" … ふだんは通常攻撃。通常攻撃では倒せず、技なら倒せる相手がいるときだけ技を使う（PPのいちばん軽いもの）
+     *   defendBelow : 自分のHPがこの割合を下回り、自分では回復の技を使えず、ほかの仲間が回復の技を使えるとき、ターンの頭で防御する
+     */
+    tactics: {
+      default: "command",
+      order: ["command", "attack", "protect", "support", "savePp"],
+      list: {
+        command: { id: "command", name: "命令する", ai: false,
+                   description: "プレイヤーがコマンドを選択する。" },
+        attack:  { id: "attack", name: "全力で攻める", ai: true,
+                   healBelow: 0.25, attack: "best",
+                   description: "いちばんダメージの出る技で攻める。" },
+        protect: { id: "protect", name: "仲間を守る", ai: true,
+                   healBelow: 0.5, cure: true, attack: "best", defendBelow: 0.2,
+                   description: "味方HPの回復や状態異常を回復する技を優先して使う。" },
+        support: { id: "support", name: "補助中心", ai: true,
+                   healBelow: 0.25, support: true, attack: "best", defendBelow: 0.2,
+                   description: "強化・弱体・状態異常の技を優先して使う。" },
+        savePp:  { id: "savePp", name: "PPを節約", ai: true,
+                   healBelow: 0.3, cheapHeal: true, attack: "finishOnly", defendBelow: 0.2,
+                   description: "技をあまり使用せず、通常攻撃だけで戦う。" }
+      }
+    },
+
     speedVariance: { min: 0.8, max: 1.2 },  // 行動順を決めるときの素早さのぶれ
 
     normalAttackSkill: "normalAttack",  // 「攻撃」コマンドで使う技id
@@ -202,6 +255,19 @@
      *   最初の地方なので効くままにしてある（作者の判断）。次の地方からは、毒と同じように
      *   主ごとに immuneToStatus へ足して効かなくしていく
      */
-    bossImmuneToStatus: ["instantDeath", "seal", "blind"]
+    bossImmuneToStatus: ["instantDeath", "seal", "blind"],
+
+    /**
+     * 主として立ちはだかるあいだの、弱体への耐性（全主共通。2026-10-15 作者の指定で入れた仕組み）。
+     *   相手に掛ける弱体（ちからぬき・鎧くずし など）は、この耐性の倍率の確率でしか入らない（表は状態異常の耐性と同じ）。
+     *   5 なら 50%、10 なら無効。入らなければ「MISS」。
+     *   主ごとに変えたいときは data/bosses.js に debuffResist を書く（そちらが優先）。
+     *   在来種と仲間は debuffResistBase を持つ。種族ごとに変えたいときは data/monsters.js に debuffResist を書く
+     * ★ 値の 5 は私の仮の値（作者が遊んで決める）
+     */
+    bossDebuffResist: 5,
+
+    // 主以外のモンスター（敵の在来種も仲間も）の、弱体への耐性の基礎（2026-10-16 作者の指定）。1 なら 90% で入る
+    debuffResistBase: 1
   };
 })(window.MyGame);
