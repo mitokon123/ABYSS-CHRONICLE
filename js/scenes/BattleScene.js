@@ -1033,7 +1033,7 @@
 
     // 出ている札が max を超えたら、古いものから消す
     var live = this.effectPopups.filter(function (q) { return !q.dismissAt; });
-    for (var j = 0; j < live.length - (P.max || 3); j++) live[j].dismissAt = this.game.clock;
+    for (var j = 0; j < live.length - (P.max || 3); j++) live[j].dismissAt = this._popupDismissAt(live[j], this.game.clock);
 
     // 特性の名乗り（先手など）は、その者の行動の頭に出る。続く技で札が消えないよう、行動の持ち主にしておく
     if (event.type === "ability" && event.target) this._popupActor = event.target;
@@ -1060,8 +1060,17 @@
     var list = this.effectPopups || [];
     var now = this.game.clock;
     for (var i = 0; i < list.length; i++) {
-      if (!list[i].dismissAt) list[i].dismissAt = now;
+      if (!list[i].dismissAt) list[i].dismissAt = this._popupDismissAt(list[i], now);
     }
+  };
+
+  /**
+   * 札が薄れ始める時刻。消す合図が来ても、出てから minShow ミリ秒たつまでは出したままにする
+   * （v1.0.2.1・作者の指定「少なくとも0.8秒は表示」。次の行動がすぐ始まると、読めないうちに消えていた）
+   */
+  BattleScene.prototype._popupDismissAt = function (p, now) {
+    var minShow = this.layout.effectPopup.minShow || 0;
+    return Math.max(now, p.start + minShow);
   };
 
   /**
@@ -1138,7 +1147,8 @@
         p.fromX = this._popupX(p, now, slideIn); p.toX = targetX; p.moveStart = now;
       }
       var x = this._popupX(p, now, slideIn);
-      var alpha = p.dismissAt ? Math.max(0, 1 - (now - p.dismissAt) / fadeOut) : 1;
+      // 消す合図のあとも、薄れ始める時刻（dismissAt）まではそのまま出す
+      var alpha = p.dismissAt ? Math.min(1, Math.max(0, 1 - (now - p.dismissAt) / fadeOut)) : 1;
       var y = P.y;
       var color = colors[p.kind] || t.cursorColor || "#ffd75e";
 

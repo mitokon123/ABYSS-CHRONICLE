@@ -641,31 +641,23 @@
       }
     },
 
-    sporeBed: {
-      id: "sporeBed",
-      order: 7,
-      region: "houga",
-      name: "胞子煙る菌床",
-      subtitle: "",
-      description: "",
-      floors: 4,
-      recommendedLevel: 27,
-      unlockedBy: "ivyCorridor",
-      theme: "spore",
-      generation: { width: 40, height: 28, roomMin: 4, roomMax: 9, roomCount: 12, attempts: 320 },
-      ready: false
-    },
-
+    /**
+     * 千年樹の根底（萌芽の穴の最後の区画。v1.0.3 で入れる。区画を3つにしたのは v1.0.2.1）。
+     * ★ 萌芽の穴の区画は3つ（作者 2026-10-30）。3つ目だった「胞子煙る菌床」はなくし、蔦這う回廊の次がここになった。
+     *   見た目の組 spore（data/dungeonThemes.js）と、きのこの飾りの絵は使わずに残してある。
+     * ★ 主がいる（作者 2026-10-30）。どのモンスターが主かは、まだ決めていない。
+     * 推奨Lv 30・4階は仮（作者の予定は「推奨は30くらいに抑えたい」）。まだ準備中（ready: false）
+     */
     ancientRoots: {
       id: "ancientRoots",
-      order: 8,
+      order: 7,
       region: "houga",
       name: "千年樹の根底",
       subtitle: "",
       description: "",
       floors: 4,
       recommendedLevel: 30,
-      unlockedBy: "sporeBed",
+      unlockedBy: "ivyCorridor",
       theme: "rootdeep",
       generation: { width: 40, height: 28, roomMin: 4, roomMax: 10, roomCount: 11, attempts: 320 },
       ready: false

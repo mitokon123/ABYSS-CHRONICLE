@@ -375,7 +375,7 @@
     /**
      * --- 萌芽の穴・蔦這う回廊の素材で作るもの（作者の指定 2026-10-27。名前は 2026-10-28 に確定）---
      *
-     * ★ 解放は「回廊をクリア」（作者の指定）。若葉の洞の作り方（前の区画のクリアで開く）とは違う。
+     * ★ 解放は前の区画（若葉の洞）のクリア。ほかの区画の作り方と同じ（作者の指定 2026-10-30）。
      * ★ 店で素材を買って作って売っても得をしないことを確かめてある（材料の買値の合計 ＞ 売値）。
      *   風鳴りの胴衣：買値 240G ＞ 売値 220G ／ 蒼雷の剣：金角のかけらは店に無い
      *   蔦断ちの護符：絡み主根・弔いの小鐘は店に無い
@@ -389,7 +389,7 @@
         { item: "blueThunderScale", count: 2 },
         { item: "mossSpore", count: 2 }
       ],
-      unlockedBy: "ivyCorridor"
+      unlockedBy: "sproutHollow"
     },
 
     sealWard: {
@@ -400,7 +400,7 @@
         { item: "windChimeFeather", count: 2 },
         { item: "rustedBone", count: 2 }
       ],
-      unlockedBy: "ivyCorridor"
+      unlockedBy: "sproutHollow"
     },
 
     curseWard: {
@@ -411,7 +411,7 @@
         { item: "twistedVine", count: 3 },
         { item: "abyssFragment", count: 1 }
       ],
-      unlockedBy: "ivyCorridor"
+      unlockedBy: "sproutHollow"
     },
 
     windChimeVest: {
@@ -422,7 +422,7 @@
         { item: "windChimeFeather", count: 3 },
         { item: "twistedVine", count: 2 }
       ],
-      unlockedBy: "ivyCorridor"
+      unlockedBy: "sproutHollow"
     },
 
     blueThunderBlade: {
@@ -434,7 +434,7 @@
         { item: "goldHornShard", count: 1 },
         { item: "rustedBone", count: 2 }
       ],
-      unlockedBy: "ivyCorridor"
+      unlockedBy: "sproutHollow"
     },
 
     // 宝箱でしか出ない絡み主根（B4F）と、ツリガネの落とす弔いの小鐘を使う。回廊を歩き尽くした証になる護符
@@ -447,7 +447,7 @@
         { item: "glowMoss", count: 3 },
         { item: "mourningBell", count: 1 }
       ],
-      unlockedBy: "ivyCorridor"
+      unlockedBy: "sproutHollow"
     }
   };
 })(window.MyGame);

@@ -21,6 +21,7 @@
   // 戦闘中だけ使う一時的な値なので、モンスター自身に持たせる
   var DISPLAY = "_displayHp";
   var TARGET = "_targetHp";
+  var SPEED = "_drainSpeed";   // いまの動きの速さ（1秒あたり）。大きく減るときほど速い
 
   /**
    * @param {object} params battle.animation の内容
@@ -56,6 +57,12 @@
   BattleAnimator.prototype.revealTo = function (monster, hp) {
     if (!monster || hp === undefined || hp === null) return;
     monster[TARGET] = hp;
+    // ふだんは hpDrainPerSecond の速さ。それだと hpMaxDrainTime より長くかかる量なら、
+    // ちょうど hpMaxDrainTime で動き切る速さに上げる（v1.0.2.1・作者の指定「どんなダメージでも0.25秒以内」）
+    var perSecond = this.params.hpDrainPerSecond || 40;
+    var maxTime = this.params.hpMaxDrainTime;
+    var distance = Math.abs(hp - this.getHp(monster));
+    monster[SPEED] = maxTime ? Math.max(perSecond, distance / maxTime * 1000) : perSecond;
   };
 
   /** いま画面に描くべきHP */
@@ -71,7 +78,6 @@
    */
   BattleAnimator.prototype.update = function (dt, monsters) {
     var perSecond = this.params.hpDrainPerSecond || 40;
-    var step = perSecond * (dt / 1000);
 
     for (var i = 0; i < (monsters || []).length; i++) {
       var monster = monsters[i];
@@ -79,6 +85,7 @@
       var goal = (monster[TARGET] === undefined) ? monster.currentHp : monster[TARGET];
 
       if (shown === goal) continue;
+      var step = (monster[SPEED] || perSecond) * (dt / 1000);
 
       if (Math.abs(goal - shown) <= step) monster[DISPLAY] = goal;
       else monster[DISPLAY] = shown + (goal > shown ? step : -step);
@@ -101,12 +108,15 @@
   /**
    * HPバーが動き切るのにかかる時間（ms）。
    * 少しのダメージでも一瞬で終わらないよう、最低時間を設けている。
+   * 大きいダメージでも hpMaxDrainTime より長くはかけない（revealTo で速さを上げる）。
    * @param {number} amount 変化量
    */
   BattleAnimator.prototype.drainTime = function (amount) {
     var perSecond = this.params.hpDrainPerSecond || 40;
     var minTime = this.params.hpMinDrainTime || 0;
-    return Math.max(minTime, Math.abs(amount) / perSecond * 1000);
+    var time = Math.max(minTime, Math.abs(amount) / perSecond * 1000);
+    var maxTime = this.params.hpMaxDrainTime;
+    return maxTime ? Math.min(time, Math.max(minTime, maxTime)) : time;
   };
 
   NS.BattleAnimator = BattleAnimator;
