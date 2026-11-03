@@ -2,7 +2,7 @@
 """
 devserver.py  開発用のサーバー（v1.0.2。ゲーム本体ではない）
 
-  python my-first-app/tools/devserver.py 8124
+  python "ABYSS CHRONICLE/game/tools/devserver.py" 8124
 
 ▼ ふつうのサーバー（8123）との違い
   ・番号（ポート）が違うので、ブラウザのセーブ（localStorage）も別になる。
@@ -33,7 +33,7 @@ import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))   # my-first-app
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # my-first-app
 MOTIONS = os.path.join(ROOT, "data", "motions.js")
 AUDIO_DIR = os.path.join(ROOT, "assets", "audio")
 BACKUP = os.path.join(ROOT, "backup")
