@@ -2691,6 +2691,19 @@
     return { scoutMultiplier: boost.multiplier };
   };
 
+  /** 同じ種族を、パーティと預かり所にあわせて何体持っているか */
+  BattleScene.prototype._ownedCount = function (speciesId) {
+    var count = 0;
+    var lists = [this._partyMembers(),
+      this.game.storage ? this.game.storage.getMembers() : []];
+    for (var i = 0; i < lists.length; i++) {
+      for (var j = 0; j < lists[i].length; j++) {
+        if (lists[i][j] && lists[i][j].speciesId === speciesId) count++;
+      }
+    }
+    return count;
+  };
+
   /**
    * 誘いに応じた相手を、仲間として加える形にして返す。
    *
@@ -2704,6 +2717,13 @@
     if (level === undefined || level === null || !(level < target.level)) {
       // 敵のときだけ使っていた技（data/monsters.js の enemySkills）を、覚える技の一覧に戻す
       if (target.useLearnedSkills) target.useLearnedSkills();
+      // 敵として出ていたあいだの倍率と行動の順番を外す（ヨミリュウ・シニガミなど特殊な出方の在来種）。
+      // 外さないと、セーブを読み直すまで HP×2.25 などのまま仲間として戦っていた
+      target.encounterEffects = [];
+      target.actionPattern = null;
+      target.patternIndex = 0;
+      target.currentHp = Math.min(target.currentHp, target.getMaxHp());
+      target.currentPp = Math.min(target.currentPp, target.getMaxPp());
       return target;
     }
 
@@ -2748,8 +2768,10 @@
 
     // 応じてくれるかどうかは、パーティの空きに関係なく判定する。
     // いっぱいだった場合は、どう扱うかを演出のあとで選んでもらう。
-    // 誘いの香が効いていれば、その倍率を道具として渡す（data/scout.js の式の「道具の倍率」）
-    var result = this.scoutSystem.roll(target, { item: this._scoutItemBonus() });
+    // 誘いの香が効いていれば、その倍率を道具として渡す（data/scout.js の式の「道具の倍率」）。
+    // 同じ種族をもう持っていると誘いにくい（持っている数の倍率）
+    var result = this.scoutSystem.roll(target, { item: this._scoutItemBonus(),
+      owned: this._ownedCount(target.speciesId) });
     if (!result.success) {
       events.push({ type: "custom", text: fill(texts.refused, { name: target.getName() }) });
       return;

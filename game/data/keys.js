@@ -29,7 +29,12 @@
       // 同時に両方の意味を持つ画面は無いのでぶつからない
       prevTab:    ["KeyQ"],
       nextTab:    ["KeyE"],
-      save:       ["KeyF"]
+      save:       ["KeyF"],
+      // 装備の画面・預かり所で並べ替える（v1.0.3）
+      sort:       ["KeyR"],
+      // 預かり所の画面（v1.0.3）。F は探索中のセーブと同じキーだが、預かり所は拠点にしか無いのでぶつからない
+      filter:     ["KeyF"],
+      menu:       ["KeyC"]
       // regenerate（R でマップ作り直し）は生成の確認用だったので外した。
       // また要るときは "regenerate": ["KeyR"] を戻し、
       // DungeonScene.update に呼び出しを足せばよい
@@ -38,7 +43,7 @@
     preventDefault: ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Tab"],
 
     order: ["up", "down", "left", "right", "confirm", "cancel",
-            "party", "items", "store", "equip", "prevTab", "nextTab", "save"],
+            "party", "items", "store", "equip", "prevTab", "nextTab", "save", "sort", "filter", "menu"],
 
     actionLabels: {
       up:         "上へ移動",
@@ -53,13 +58,16 @@
       equip:      "装備を着け替える",
       prevTab:    "左のタブへ（店を変える）",
       nextTab:    "右のタブへ（店を変える）",
-      save:       "セーブ"
+      save:       "セーブ",
+      sort:       "並べ替え（装備の候補・預かり所）",
+      filter:     "絞り込み（預かり所）",
+      menu:       "ほかの操作（預かり所）"
     },
 
     keyLabels: {
       ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→",
       KeyW: "W", KeyA: "A", KeyS: "S", KeyD: "D",
-      KeyZ: "Z", KeyX: "X", KeyP: "P", KeyQ: "Q", KeyE: "E", KeyF: "F", KeyR: "R",
+      KeyZ: "Z", KeyX: "X", KeyP: "P", KeyQ: "Q", KeyE: "E", KeyF: "F", KeyR: "R", KeyC: "C",
       KeyI: "I",
       Enter: "Enter", Space: "Space", Escape: "Esc", Tab: "Tab"
     }

@@ -822,6 +822,20 @@
     return this.addMonster(monster);
   };
 
+  /**
+   * パーティの1体と預かり所の1体を入れ替える（パーティがいっぱいでも加えられるように。v1.0.3）。
+   * それぞれ相手のいた位置へ入る（パーティの並び・預かり所の並びは崩さない）。
+   * @returns {{taken:object, stored:object}|null} taken … パーティに入った個体 / stored … 預けた個体
+   */
+  Game.prototype.swapWithStorage = function (partyIndex, storageIndex) {
+    var stored = this.party.get(partyIndex);
+    var taken = this.storage.get(storageIndex);
+    if (!stored || !taken) return null;
+    this.party.getMembers()[partyIndex] = taken;
+    this.storage.getMembers()[storageIndex] = stored;
+    return { taken: taken, stored: stored };
+  };
+
   // --- 探索中に使う技 ---
 
   /**
@@ -1059,6 +1073,90 @@
     list.splice(index, 1);
     this._refreshVitals(monster);
     return itemId;
+  };
+
+  /**
+   * 枠を1つ指定して、持ち物の装備を着ける（v1.0.3 の装備画面）。
+   * equipItem は「枠が埋まっていればいちばん古いものと入れ替え」だが、
+   * アクセサリーの2枠のどちらを外すかを選べるように、入れ替える位置を受け取る。
+   * 入れ替えた装備は同じ位置に入るので、「アクセ1」「アクセ2」の並びが動かない。
+   *
+   * @param {object} monster
+   * @param {string} itemId
+   * @param {number} replaceIndex monster.equipment の何番目と入れ替えるか。-1 なら空いている枠へ
+   * @returns {{success:boolean, reason?:string, replaced?:string}} equipItem と同じ形
+   */
+  Game.prototype.equipItemAt = function (monster, itemId, replaceIndex) {
+    var list = (monster && monster.equipment) || [];
+    var old = (replaceIndex >= 0) ? list[replaceIndex] : null;
+    if (!old) return this.equipItem(monster, itemId);
+
+    var item = this.data.getItem(itemId);
+    if (!item || !item.equip) return { success: false };
+    if (old === itemId) return { success: false, reason: "duplicate" };
+    for (var i = 0; i < list.length; i++) {
+      if (i !== replaceIndex && list[i] === itemId) return { success: false, reason: "duplicate" };
+    }
+    if (!this.inventory.has(itemId, 1)) return { success: false };
+
+    // 先に新しい方を持ち物から出す。外した方が持ち物へ戻せなければ、元に戻して断る
+    this.inventory.remove(itemId, 1);
+    if (this.inventory.add(old, 1) <= 0) {
+      this.inventory.add(itemId, 1);
+      return { success: false, reason: "stackFull" };
+    }
+    list[replaceIndex] = itemId;
+    this._refreshVitals(monster);
+    return { success: true, replaced: old };
+  };
+
+  /**
+   * ほかの仲間が着けている装備を、こちらへ移す（v1.0.3 の装備画面）。
+   * こちらのその枠に着けていたものは、相手の空いた枠へ渡す（入れ替え）。
+   * 相手が同じものをもう着けていて渡せないときは、持ち物へ戻す。
+   *
+   * @param {object} monster 着ける側
+   * @param {number} replaceIndex monster.equipment の何番目と入れ替えるか。-1 なら空いている枠へ
+   * @param {object} owner いま着けている仲間
+   * @param {number} ownerIndex owner.equipment の何番目か
+   * @returns {{success:boolean, reason?:string, itemId?:string, given?:string, stored?:string}}
+   *   given … 相手へ渡した装備 / stored … 相手へ渡せず持ち物へ戻した装備
+   */
+  Game.prototype.takeEquipmentFrom = function (monster, replaceIndex, owner, ownerIndex) {
+    var mine = (monster && monster.equipment) || [];
+    var theirs = (owner && owner.equipment) || [];
+    var itemId = theirs[ownerIndex];
+    if (!itemId || owner === monster) return { success: false };
+    for (var i = 0; i < mine.length; i++) {
+      if (i !== replaceIndex && mine[i] === itemId) return { success: false, reason: "duplicate" };
+    }
+
+    var old = (replaceIndex >= 0) ? mine[replaceIndex] : null;
+    var give = !!old && theirs.indexOf(old) < 0;
+    if (old && !give && this.inventory.add(old, 1) <= 0) return { success: false, reason: "stackFull" };
+
+    if (give) theirs[ownerIndex] = old;
+    else theirs.splice(ownerIndex, 1);
+    if (old) mine[replaceIndex] = itemId;
+    else mine.push(itemId);
+
+    this._refreshVitals(monster);
+    this._refreshVitals(owner);
+    return { success: true, itemId: itemId, given: give ? old : null, stored: (old && !give) ? old : null };
+  };
+
+  /**
+   * 着けている装備をすべて外して持ち物へ戻す（v1.0.3 の装備画面）。
+   * 戻せないもの（同じ装備を持てる数いっぱいまで持っている）は着けたまま残す。
+   * @returns {{removed:number, kept:number}}
+   */
+  Game.prototype.unequipAll = function (monster) {
+    var list = (monster && monster.equipment) || [];
+    var removed = 0;
+    for (var i = list.length - 1; i >= 0; i--) {
+      if (this.unequipItem(monster, i)) removed++;
+    }
+    return { removed: removed, kept: list.length };
   };
 
   /**

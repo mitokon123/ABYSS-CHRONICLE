@@ -3,7 +3,7 @@
  * スカウト（仲間にする）に関する数値。ゲームバランスの中心。
  *
  * ▼ スカウト成功率の計算式（すべてこのファイルの数値で調整可能）
- *   成功率 = 種族の scoutRate × (1 + (1 - HP割合) × hpBonusMax) × 道具の倍率
+ *   成功率 = 種族の scoutRate × (1 + (1 - HP割合) × hpBonusMax) × 道具の倍率 × 持っている数の倍率
  *   結果は minRate〜maxRate の範囲に収める。
  *
  *   HP が満タンのとき  … scoutRate のまま
@@ -16,6 +16,9 @@
  *   scoutRate の一番小さい値より、はっきり低くしておくこと。
  * maxRate    : 最高成功率（確実に成功する状況を作らない）
  * defaultItemMultiplier : 道具を使わない場合の倍率
+ * ownedMultipliers : 同じ種族をすでに持っている数（パーティ＋預かり所）ごとの倍率（v1.0.3）。
+ *   [0体のとき, 1体のとき, 2体のとき]。それより多いときは最後の値のまま。
+ *   逃がして数が減れば、倍率も戻る。
  *
  * bossJoinLevel : ボスが仲間になったときのレベル。
  *   ボスは高いレベルで戦う相手なので、そのまま仲間にすると強すぎる。
@@ -30,6 +33,7 @@
     minRate: 0.01,
     maxRate: 0.95,
     defaultItemMultiplier: 1.0,
+    ownedMultipliers: [1, 0.5, 0.25],
     bossJoinLevel: 1
   };
 })(window.MyGame);

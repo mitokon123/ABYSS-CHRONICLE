@@ -19,7 +19,8 @@
     canvasHeight: 600,  // 画面の縦幅（px）
     tileSize: 32,       // 1タイルの大きさ（px）
     partyMax: 6,        // 連れていける最大数
-    storageMax: 30,     // 拠点の預かり所に預けられる数
+    storageMax: 300,    // 拠点の預かり所に預けられる数（v1.0.3 で 30 → 300。30体ずつの箱が10個）
+    storageBoxSize: 30, // 預かり所の画面の1箱に並べる数（data/ui.js の party.box.grid の cols × 行）
     battleFieldSize: 3, // 戦闘盤面に同時に出せる数（味方・敵とも）
     abilityMax: 1,      // モンスター1体が持てる特性の数（超えた分は無視される）
 

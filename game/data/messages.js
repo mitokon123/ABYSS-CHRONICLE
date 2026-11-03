@@ -888,7 +888,32 @@
       // 預かり所（拠点にいる仲間）
       tabParty:    "連れていく",
       tabStorage:  "預かり所",
-      storageEmpty:"預けている仲間はいない",
+      // 預かり所の画面（v1.0.3。30体ずつの箱に絵を並べる）
+      boxTitle:        "預かり所",
+      boxCount:        "預けている数 {n}/{max}",            // n, max
+      boxPartyHead:    "連れていく {n}/{max}",              // n, max
+      boxName:         "箱 {n}/{total}",                    // n, total
+      boxNameFiltered: "絞り込み中 {n}/{total}",            // n, total
+      boxEmptyCell:    "空き",
+      boxSort:         "並び：{mode}（R）",                 // mode（下の boxSortLabels）
+      boxSortLabels: { stored: "預けた順", level: "レベルが高い順", dex: "図鑑の順", element: "属性の順" },
+      boxFilter:       "絞り込み：{mode}（F）",             // mode
+      boxFilterAll:    "すべて",
+      boxFilterTitle:  "絞り込み",
+      boxFilterElement:"属性",
+      boxFilterSpecies:"種族",
+      boxFilterCount:  "{n}体",                             // n
+      boxFilteredEmpty:"当てはまる仲間はいない（F で絞り込みを変える）",
+      boxSwapPrompt:   "{name} と入れ替えて預ける仲間を選ぶ",  // name
+      boxSwapped:      "{taken} をパーティに加え、{stored} を預けた", // taken, stored
+      boxMarking:      "印 {n}体",                          // n
+      boxReleaseMarked:"印の仲間を逃がす（C）",
+      boxStopMarking:  "やめる（Esc）",
+      actionReleaseMany: "まとめて逃がす",
+      releaseManyTitle:  "{n}体を逃がしますか?",            // n
+      releasedMany:      "{n}体を逃がした",                 // n
+      releaseManyKept:   "{n}体を逃がした（{name} は装備を持ち物に戻せないので残した）", // n, name
+      releaseManyNone:   "印をつけた仲間がいない",
       // 決定を押したときに出る項目
       actionInspect:"様子を見る",
       actionDeposit:"預かり所へ預ける",
@@ -965,8 +990,31 @@
       slotEmpty:    "-",
       // 一覧の詳細欄（狭い）では、空いている枠を数でまとめる
       slotsEmpty:   "空き {n}",                         // n
-      equipTitle:   "{name} に着けるもの",              // name
       unequipLabel: "外す",
+      // 装備の画面（v1.0.3）
+      equipScreenTitle: "装備",
+      equipCandidates:  "{slot}の候補",                 // slot（「アクセサリー1」など）
+      equipSort:        "並び：{mode}（R）",            // mode（下の equipSortLabels）
+      equipSortLabels: {
+        inventory: "持ち物の順", attack: "攻撃が上がる順", defense: "防御が上がる順",
+        speed: "素早さが上がる順", hp: "HPが上がる順", pp: "PPが上がる順"
+      },
+      equipNoCandidates: "この枠に着けられる装備がない",
+      unequipAll:       "すべて外す",
+      unequipAllNote:   "決定で、この仲間の装備をすべて持ち物へ戻す",
+      unequippedAll:    "{name} の装備をすべて外した",  // name
+      equipNothingToRemove: "外す装備がない",
+      equipCompareNow:  "今",
+      equipCompareNext: "着けたら",
+      equipCompareHint: "候補を選ぶと、着けたときの変わり方が出る",
+      equipCompareEmpty:"（なし）",
+      // ほかの仲間が着けているものを移す
+      equipFromOwner:   "{owner} から移す",              // owner
+      equipGiveOwner:   "{owner} には {item} を渡す",    // owner, item
+      equipStoreOld:    "{item} は持ち物へ戻す",         // item
+      equipTaken:       "{owner} の {item} を {name} に着けた",                 // owner, item, name
+      equipTakenSwap:   "{owner} の {item} を {name} に着け、{owner} に {given} を渡した", // owner, item, name, given
+      equipTakenStore:  "{owner} の {item} を {name} に着け、{stored} は持ち物へ戻した", // owner, item, name, stored
       equipped:     "{name} に {item} を着けた",        // name, item
       // 枠が埋まっていたので、先に着けていたものと入れ替えた
       equipSwapped: "{out} を外して {item} を着けた",   // out, item
@@ -979,13 +1027,17 @@
       stackFull:    "これ以上は持てないので外せない",
       allElements:  "全",
 
-      hintNormal:  "↑↓: 選択    ←→: 表の切替    決定: この仲間を選ぶ    Esc: 閉じる",
+      hintNormal:  "↑↓: 選択    ←→: 預かり所    決定: この仲間を選ぶ    Esc: 閉じる",
+      hintBox:       "決定: 出し入れ   C: ほかの操作   Q/E: 箱   R: 並べ替え   F: 絞り込み   Esc: 戻る",
+      hintBoxSwap:   "↑↓: 預ける仲間を選ぶ    決定: 入れ替える    Esc: やめる",
+      hintBoxMark:   "決定: 印をつける・外す    C: 印の仲間を逃がす    Esc: やめる",
+      hintBoxFilter: "↑↓: 選ぶ    決定: 絞り込む    Esc: やめる",
       // 探索中（預かり所へ手が届かないとき）
       hintNoStorage: "↑↓: 選択    決定: この仲間を選ぶ    Esc: 探索へ戻る",
       hintAction:  "↑↓: 選択    決定: 決定    Esc: やめる",
       hintReorder: "↑↓: 移動先を選ぶ    決定: そこへ入れ替え    Esc: やめる",
-      hintStorageEmpty: "預けている仲間はいない    ←→: パーティへ",
-      hintEquip:   "↑↓: 選択   決定: 着ける / 外す   Esc: 戻る",
+      hintEquipSlots: "↑↓: 枠を選ぶ    ←→: 仲間を切替    決定: 候補へ    R: 並べ替え    Esc: 戻る",
+      hintEquipItems: "↑↓: 候補を選ぶ    ←→: 仲間を切替    決定: 着ける・外す    R: 並べ替え    Esc: 枠へ",
       hintInspect: "↑↓: 別の仲間    ←→: ページ切替    決定・愛情度を押す: 愛情度の詳細    Esc: 戻る",
       // 様子を見るのページ（左上の札）。モンスター説明は図鑑と同じ説明と、愛情度の記録
       inspectPageStats: "ステータス",

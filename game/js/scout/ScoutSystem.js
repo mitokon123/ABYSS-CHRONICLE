@@ -30,9 +30,10 @@
    * スカウト成功率を計算する（判定は行わない。UI表示にも使える）。
    * @param {object} target 誘う相手
    * @param {object} [item] 使用する道具（scoutMultiplier を持つ）
+   * @param {number} [owned] 同じ種族をすでに持っている数（省略時は 0。倍率は ownedMultiplier）
    * @returns {number} 0〜1 の成功率
    */
-  ScoutSystem.prototype.calcRate = function (target, item) {
+  ScoutSystem.prototype.calcRate = function (target, item, owned) {
     var config = this.data.scout || {};
     var species = target.getSpecies ? target.getSpecies() : null;
     if (!species) return 0;
@@ -46,11 +47,23 @@
       ? item.scoutMultiplier
       : (config.defaultItemMultiplier === undefined ? 1 : config.defaultItemMultiplier);
 
-    var rate = baseRate * (1 + (1 - hpRatio) * hpBonusMax) * itemMultiplier;
+    var rate = baseRate * (1 + (1 - hpRatio) * hpBonusMax) * itemMultiplier
+             * this.ownedMultiplier(owned);
 
     var minRate = config.minRate === undefined ? 0 : config.minRate;
     var maxRate = config.maxRate === undefined ? 1 : config.maxRate;
     return Math.max(minRate, Math.min(maxRate, rate));
+  };
+
+  /**
+   * 同じ種族をすでに持っている数ごとの倍率（data/scout.js の ownedMultipliers）。
+   * 0体なら先頭の値、表より多いときは最後の値のまま。
+   */
+  ScoutSystem.prototype.ownedMultiplier = function (owned) {
+    var list = (this.data.scout || {}).ownedMultipliers;
+    if (!list || !list.length) return 1;
+    var n = Math.max(0, Math.floor(owned || 0));
+    return list[Math.min(n, list.length - 1)];
   };
 
   /**
@@ -62,11 +75,12 @@
    *   「判定」と「加える」は必ず別の手順になる。加えるのは join()。
    *
    * @param {object} target 誘う相手
-   * @param {object} [options] { item }
+   * @param {object} [options] { item, owned }
    * @returns {{success:boolean, reason:string, rate:number, target:object}}
    */
   ScoutSystem.prototype.roll = function (target, options) {
-    var rate = this.calcRate(target, (options || {}).item);
+    var opts = options || {};
+    var rate = this.calcRate(target, opts.item, opts.owned);
     var success = this.random.next() < rate;
 
     return {

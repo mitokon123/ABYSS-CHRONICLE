@@ -3,11 +3,11 @@
  * パーティ編成画面。手持ちの一覧表示と並び替えを行う。
  * 先頭に近い個体から戦闘に出るため、並び順の変更がそのまま編成になる。
  *
- * 拠点の「預かり所」との出し入れもここで行う（左右キーで表を切り替える）。
+ * 拠点の「預かり所」との出し入れもここで行う（左右キーで預かり所の画面を開く。v1.0.3 から箱に絵を並べる画面）。
  *
  * ▼ 操作
  *   上下   … カーソル移動
- *   左右   … 連れていく仲間 / 預かり所 の切り替え
+ *   左右   … 預かり所の画面を開く（操作は「預かり所の画面」の節）
  *   決定   … その仲間に対して何をするかを選ぶ（下記）
  *   Esc/X  … 1つ前へ戻る、または画面を閉じる
  *
@@ -48,15 +48,17 @@
 
     this.index = 0;         // カーソル位置
     this.tab = "party";     // "party" | "storage"
-    // "list"（一覧）/ "action"（何をするか）/ "reorder"（並び替え先）/ "equip"（装備を選ぶ）
+    // "list"（一覧）/ "action"（何をするか）/ "reorder"（並び替え先）/ "equip"（装備の画面）
     this.mode = "list";
     this.reorderFrom = -1;  // 並び替えの移動元
 
-    this.equipList = new NS.ScrollList(this.panel, this.layout.equipList || this.layout.detail,
-      { sprites: this.sprites });
+    var self = this;
+    // 装備の画面の候補（v1.0.3）。行は _renderEquipRow が描く
+    this.equipList = new NS.ScrollList(this.panel, this._equipListRect(), {
+      renderRow: function (row, index, y, selected) { self._renderEquipRow(row, y, selected); }
+    });
     // 仲間・預かり所の一覧。行（絵とHPバーの箱）は _renderRow が描き、
     // スクロール・ホイール・右端のバーは ScrollList に任せる（他の一覧と同じ動き）
-    var self = this;
     this.listView = new NS.ScrollList(this.panel, this._listViewRect(), {
       renderRow: function (row, index, y) { self._renderRow(row.monster, index, y); }
     });
@@ -73,6 +75,19 @@
       { label: this.texts.releaseNo  || "no",  value: "no" },
       { label: this.texts.releaseYes || "yes", value: "yes" }
     ]);
+    // 預かり所の画面（v1.0.3。30体ずつの箱に絵を並べる）。状態は _openBoxView で整える
+    this.boxView = false;
+    this.boxFocus = "box";      // "party"（左の連れていく列）/ "box"（箱のマス）
+    this.boxPartyIndex = 0;
+    this.boxPage = 0;           // いま見ている箱
+    this.boxCell = 0;           // 箱の中のマス
+    this.storageSort = 0;       // STORAGE_SORTS の何番目か（閉じても覚えておく）
+    this.storageFilter = null;  // { kind: "element" | "species", id }
+    this.marking = false;       // まとめて逃がす：印をつけている最中
+    this.marks = [];            // 印をつけた個体
+    this.swapMonster = null;    // パーティがいっぱいのとき、入れ替えで加える個体
+    this.filterList = new NS.ScrollList(this.panel, (this.layout.box || {}).filter ||
+      { x: 240, y: 100, w: 300, h: 330, rowHeight: 24 });
     this.backButton = new NS.BackButton(this.panel, game.data);
     // 名前をつける入力欄（Canvas の上に本物の入力欄を重ねる。漢字・英字も打てる）
     this.nameInput = new NS.NameInput(this.panel, game.data);
@@ -86,6 +101,9 @@
     this.reorderFrom = -1;
     this._notice = null;
     this.listView.resetScroll();
+    this.boxView = false;
+    this.marking = false;
+    this.marks = [];
   };
 
   /** いま見ている側の一覧 */
@@ -113,14 +131,19 @@
 
     // 「戻る」ボタン。何かを選んでいる途中なら一覧へ戻す
     if (this.backButton.handleInput(input)) {
-      if (this.mode === "list") this.game.scenes.change(this.returnScene);
+      if (this.mode === "list" && this.boxView) this._cancelBoxView();
+      else if (this.mode === "list") this.game.scenes.change(this.returnScene);
       else if (this.mode === "affection") this.mode = "inspect";   // 愛情度の詳細は「様子を見る」へ戻す
+      else if (this.mode === "boxSwap") this._cancelBoxSwap();
       else { this.mode = "list"; this.reorderFrom = -1; }
       return;
     }
 
     if (this.mode === "affection") { this._updateAffectionMode(input); return; }
     if (this.mode === "release") { this._updateReleaseMode(input); return; }
+    if (this.mode === "releaseMany") { this._updateReleaseManyMode(input); return; }
+    if (this.mode === "boxSwap")   { this._updateBoxSwap(input); return; }
+    if (this.mode === "boxFilter") { this._updateBoxFilter(input); return; }
     if (this.mode === "tactic")      { this._updateTacticMode(input); return; }
     if (this.mode === "fieldSkill")  { this._updateFieldSkillMode(input); return; }
     if (this.mode === "fieldTarget") { this._updateFieldTargetMode(input); return; }
@@ -128,12 +151,13 @@
     if (this.mode === "action")  { this._updateActionMode(input); return; }
     if (this.mode === "reorder") { this._updateReorderMode(input); return; }
     if (this.mode === "inspect") { this._updateInspectMode(input); return; }
+    if (this.boxView) { this._updateBoxView(input); return; }
 
     this._moveCursor(input);
 
-    // 左右で 連れていく仲間 / 預かり所 を切り替える（預かり所が使えるときだけ）
+    // 左右で預かり所の画面を開く（預かり所が使えるときだけ。v1.0.3 から別の画面）
     if (this.allowStorage) {
-      if (input.isPressed("left") || input.isPressed("right")) this._switchTab();
+      if (input.isPressed("left") || input.isPressed("right")) { this._openBoxView(); return; }
       if (this._clickedTab(input)) return;
     }
 
@@ -211,7 +235,7 @@
     for (var i = 0; i < tabs.length; i++) {
       var rect = { x: pos.x + pos.gap * i - 8, y: pos.y - 16, w: pos.gap - 12, h: 24 };
       if (!NS.Panel.containsPoint(rect, pointer)) continue;
-      if (this.tab !== tabs[i]) this._switchTab();
+      if (tabs[i] === "storage") this._openBoxView();
       return true;
     }
     return false;
@@ -246,7 +270,8 @@
       if (this.allowStorage) {
         items.push({ label: this.texts.actionDeposit || "deposit", value: "deposit" });
       }
-      items.push({ label: this.texts.actionReorder || "reorder", value: "reorder" });
+      // 並び替えは仲間の一覧でだけ（預かり所の画面の左の列は、出し入れのための列）
+      if (!this.boxView) items.push({ label: this.texts.actionReorder || "reorder", value: "reorder" });
     } else {
       items.push({ label: this.texts.actionTake || "take", value: "take" });
     }
@@ -259,6 +284,10 @@
     // 逃がすのは拠点でだけ（探索中に連れている仲間を手放すと、挑戦の記録と食い違うため）
     if (this.allowStorage) {
       items.push({ label: this.texts.actionRelease || "release", value: "release" });
+    }
+    // 預かり所の仲間は、印をつけてまとめて逃がせる（v1.0.3）
+    if (this.boxView && this.tab === "storage") {
+      items.push({ label: this.texts.actionReleaseMany || "release many", value: "releaseMany" });
     }
     items.push({ label: this.texts.actionCancel || "cancel", value: "cancel" });
     return items;
@@ -409,8 +438,10 @@
   /** 「逃がしますか?」の窓。後ろを暗く落として、問いかけだけに目を向けさせる */
   PartyScene.prototype._renderReleaseConfirm = function (ctx) {
     var C = this.layout.releaseConfirm;
-    var monster = this._selected();
-    if (!C || !monster) return;
+    // まとめて逃がすときは、印をつけた仲間ぜんぶ（v1.0.3）
+    var many = (this.mode === "releaseMany");
+    var targets = many ? this.marks : [this._selected()];
+    if (!C || !targets[0]) return;
     var t = this.theme;
 
     ctx.save();
@@ -426,14 +457,16 @@
     ctx.font = t.font || "14px monospace";
     // 元に戻せない操作なので、見出しは危ない色にする
     ctx.fillStyle = t.dangerColor || "#e8542a";
-    ctx.fillText(fill(this.texts.releaseTitle, { name: monster.getName() }), C.title.x, C.title.y);
+    ctx.fillText(many ? fill(this.texts.releaseManyTitle, { n: targets.length })
+                      : fill(this.texts.releaseTitle, { name: targets[0].getName() }), C.title.x, C.title.y);
 
     ctx.font = t.smallFont || "12px monospace";
     ctx.fillStyle = t.textColor || "#e8eaf0";
     ctx.fillText(this.texts.releaseBody || "", C.body.x, C.body.y);
 
     // 装備を着けているときだけ「持ち物に戻る」と添える
-    if ((monster.equipment || []).length > 0) {
+    var equipped = targets.some(function (m) { return (m.equipment || []).length > 0; });
+    if (equipped) {
       ctx.fillStyle = t.hintColor || "#5b6688";
       ctx.fillText(this.texts.releaseNoteEquip || "", C.note.x, C.note.y);
     }
@@ -451,11 +484,21 @@
       return;
     }
     if (result.type !== "confirm") return;
+    this._runAction(result.value);
+  };
 
-    switch (result.value) {
+  /** 「この仲間をどうするか」の項目を実行する（預かり所の画面の下の札からも呼ぶ） */
+  PartyScene.prototype._runAction = function (value) {
+    this.mode = "list";
+    switch (value) {
       case "inspect": this.mode = "inspect"; this.inspectPage = "stats"; break;
-      case "deposit": this._depositToStorage(); this.mode = "list"; break;
-      case "take":    this._takeFromStorage();  this.mode = "list"; break;
+      case "deposit": this._depositToStorage(); break;
+      case "take":
+        // 預かり所の画面でパーティがいっぱいなら、入れ替える相手を選ぶ
+        if (this.boxView && this.game.party.isFull()) this._beginBoxSwap(this._selected());
+        else this._takeFromStorage();
+        break;
+      case "releaseMany": this._beginMarking(); break;
       case "reorder": this._beginReorder(); break;
       case "equip":   this._beginEquip(); break;
       case "name":    this._beginNaming(); break;
@@ -627,144 +670,780 @@
 
   // --- 装備 ---
 
+  // --- 装備の画面（v1.0.3。画面ぜんぶを使う） ---
+  //
+  //   左上 … 仲間（◀ ▶ と ←→ で、いま見ている表の中の仲間を切り替える）
+  //   左   … 枠（武器・防具・アクセサリー1・2）と「すべて外す」
+  //   右   … 選んでいる枠の候補：外す → 持ち物の装備 → ほかの仲間が着けているもの
+  //   下   … 見比べ（今の装備 ／ 選んでいる候補 ／ ステータスの 前 → 後）
+  //
+  // 操作は「枠を選ぶ → 決定で候補へ → 決定で着ける」。着けたら枠へ戻る。
+  // ほかの仲間が着けているものを選ぶと、こちらのその枠のものと入れ替える（Game.takeEquipmentFrom）。
+  // 候補は R（並べ替え）で「持ち物の順」「攻撃が上がる順」などに並べ替えられる。
+
+  /** 候補の並べ替えの順番。label は data/messages.js の party.equipSortLabels */
+  var EQUIP_SORTS = ["inventory", "attack", "defense", "speed", "hp", "pp"];
+  // _statChanges が返す並び（HP・攻撃・防御・素早さ・PP）の何番目か
+  var EQUIP_SORT_STAT = { hp: 0, attack: 1, defense: 2, speed: 3, pp: 4 };
+
   /**
-   * 選んでいる仲間に着けるものを選ぶ。
+   * 選んでいる仲間の装備の画面を開く。
    * 着けられるものが1つも無くても画面は開く（押しても何も起きない、を避けるため）。
    */
   PartyScene.prototype._beginEquip = function () {
     var monster = this._currentList().get(this.index);
     if (!monster) return;
 
-    this.equipList.setRows(this._buildEquipRows(monster));
     this.mode = "equip";
+    this.equipFocus = "slots";   // "slots"（枠を選ぶ）/ "items"（候補を選ぶ）
+    this.equipSlotIndex = 0;
+    this.equipSort = this.equipSort || 0;   // 並べ替えは画面を閉じても覚えておく
     this._notice = null;
+    this._rebuildEquipRows();
+  };
+
+  PartyScene.prototype._equipMonster = function () {
+    return this._currentList().get(this.index);
   };
 
   /**
-   * 装備の候補。枠（武器・防具・アクセサリー）ごとに見出しを挟んで並べる。
-   * 各枠の中では、いま着けているもの（外す用）を先に、持ち物の装備をそのあとに置く。
-   * 枠が埋まっている装備を選ぶと、その枠の古いものと入れ替わる（Game.equipItem）。
-   * @returns {object[]} ScrollList の行
+   * 枠の位置ごとの行（data/config.js の equipSlots の順）。
+   * アクセサリーのように同じ種類が2つある枠は、着けた順に1つ目・2つ目へ入る。
+   * @returns {Array<{slot:string, label:string, index:number, itemId:string|null}>}
+   *   index … monster.equipment の何番目か（空いていれば -1）
    */
-  PartyScene.prototype._buildEquipRows = function (monster) {
-    var rows = [];
-    var t = this.theme;
+  PartyScene.prototype._equipSlotRows = function (monster) {
     var data = this.game.data;
-    var equipped = monster.equipment || [];
-    var slots = this.game.inventory.getSlots();
-    var order = this._slotOrder();
+    var slots = (data.config || {}).equipSlots || [];
+    var list = (monster && monster.equipment) || [];
+    var used = {};
+    var nth = {};
+    var rows = [];
 
-    for (var s = 0; s < order.length; s++) {
-      var slot = order[s];
-      var capacity = NS.EffectSystem.slotCapacity(data, slot);
-      var entries = [];
-      var i;
-
-      // 着けているもの（外す用）
-      for (i = 0; i < equipped.length; i++) {
-        var worn = data.getItem(equipped[i]);
-        if (!worn || NS.EffectSystem.slotOf(worn) !== slot) continue;
-        entries.push({
-          type: "entry",
-          label: worn.name,
-          icon: worn.icon,
-          right: this.texts.unequipLabel || "",
-          color: t.cursorColor,
-          value: { action: "unequip", index: i }
-        });
+    for (var s = 0; s < slots.length; s++) {
+      var slot = slots[s];
+      var found = -1;
+      for (var i = 0; i < list.length; i++) {
+        if (used[i]) continue;
+        var item = data.getItem(list[i]);
+        if (item && item.equip && NS.EffectSystem.slotOf(item) === slot) { found = i; break; }
       }
-      var wornCount = entries.length;
+      if (found >= 0) used[found] = true;
 
-      // 持ち物の中の、この枠の装備
-      for (i = 0; i < slots.length; i++) {
-        var item = data.getItem(slots[i].itemId);
-        if (!item || !item.equip || NS.EffectSystem.slotOf(item) !== slot) continue;
-        entries.push({
-          type: "entry",
-          label: item.name,
-          icon: item.icon,
-          right: "x" + slots[i].count,
-          value: { action: "equip", itemId: item.id }
-        });
-      }
-      if (entries.length === 0) continue;
+      nth[slot] = (nth[slot] || 0) + 1;
+      var label = NS.EffectSystem.slotNameOf(slot, data);
+      if (NS.EffectSystem.slotCapacity(data, slot) > 1) label += nth[slot];
 
-      // 見出しに「何個中いくつ着けているか」を出す
-      rows.push({
-        type: "header",
-        label: "- " + NS.EffectSystem.slotNameOf(slot, data) + " " + wornCount + "/" + capacity + " -",
-        color: t.subTextColor
-      });
-      rows = rows.concat(entries);
+      rows.push({ slot: slot, label: label, index: found, itemId: found >= 0 ? list[found] : null });
     }
     return rows;
   };
 
-  /** 枠の並び（重複を除いた data/config.js の equipSlots の順） */
-  PartyScene.prototype._slotOrder = function () {
-    var slots = (this.game.data.config || {}).equipSlots || [];
-    var order = [];
-    for (var i = 0; i < slots.length; i++) {
-      if (order.indexOf(slots[i]) < 0) order.push(slots[i]);
-    }
-    return order;
+  /** 左の「すべて外す」の行を選んでいるか（枠の行の次にある） */
+  PartyScene.prototype._onUnequipAllRow = function (monster) {
+    return this.equipSlotIndex >= this._equipSlotRows(monster).length;
   };
 
-  PartyScene.prototype._updateEquipMode = function (input) {
-    // ScrollList が扱うのは上下移動だけ。決定・取消はここで見る
-    this.equipList.handleInput(input);
-
-    if (input.isPressed("cancel") || input.isPressed("equip")) {
-      this.mode = "list";
-      return;
-    }
-    if (!input.isPressed("confirm") && !this.equipList.clickedEntry(input)) return;
-
-    var selected = this.equipList.getSelected();
-    if (!selected) return;
-
-    this._applyEquipChoice(selected.value);
+  /** 選んでいる枠の行（「すべて外す」を選んでいれば null） */
+  PartyScene.prototype._currentEquipSlot = function (monster) {
+    return this._equipSlotRows(monster)[this.equipSlotIndex] || null;
   };
 
-  PartyScene.prototype._applyEquipChoice = function (choice) {
-    var monster = this._currentList().get(this.index);
-    if (!monster || !choice) return;
+  /** ほかの仲間（いま見ている表と、拠点なら預かり所も） */
+  PartyScene.prototype._otherMembers = function (monster) {
+    var lists = [this.game.party];
+    if (this.allowStorage) lists.push(this.game.storage);
+    var result = [];
+    for (var l = 0; l < lists.length; l++) {
+      var members = lists[l].getMembers();
+      for (var i = 0; i < members.length; i++) {
+        if (members[i] !== monster) result.push(members[i]);
+      }
+    }
+    return result;
+  };
 
-    if (choice.action === "unequip") {
-      var removed = this.game.unequipItem(monster, choice.index);
-      this._notice = removed
-        ? fill(this.texts.unequipped, { name: this.game.data.getItem(removed).name })
-        : (this.texts.stackFull || null);
-      if (!removed) this.game.playError();
-    } else {
-      var item = this.game.data.getItem(choice.itemId);
-      var result = this.game.equipItem(monster, choice.itemId);
-      if (result.success && result.replaced) {
-        var out = this.game.data.getItem(result.replaced);
-        this._notice = fill(this.texts.equipSwapped, { out: out ? out.name : result.replaced, item: item.name });
-      } else if (result.success) {
-        this._notice = fill(this.texts.equipped, { name: monster.getName(), item: item.name });
-      } else if (result.reason === "duplicate") {
-        this._notice = fill(this.texts.equipDuplicate, { item: item.name });
-        this.game.playError();
-      } else {
-        this._notice = this.texts.stackFull || null;
-        this.game.playError();
+  /**
+   * 選んでいる枠の候補。外す → 持ち物の装備 → ほかの仲間が着けているもの。
+   * 並べ替えは「外す」を除いた候補にだけ掛ける。
+   * @returns {object[]} ScrollList の行（描くのは _renderEquipRow）
+   */
+  PartyScene.prototype._buildEquipRows = function (monster, slotRow) {
+    if (!monster || !slotRow) return [];
+    var data = this.game.data;
+    var rows = [];
+    var entries = [];
+    var i, j;
+
+    if (slotRow.index >= 0) {
+      rows.push({ type: "entry", kind: "unequip", label: this.texts.unequipLabel || "",
+                  value: { action: "unequip", index: slotRow.index } });
+    }
+
+    var slots = this.game.inventory.getSlots();
+    for (i = 0; i < slots.length; i++) {
+      var item = data.getItem(slots[i].itemId);
+      if (!item || !item.equip || NS.EffectSystem.slotOf(item) !== slotRow.slot) continue;
+      entries.push({ type: "entry", kind: "item", itemId: item.id, label: item.name, icon: item.icon,
+                     right: "x" + slots[i].count, value: { action: "equip", itemId: item.id } });
+    }
+
+    var others = this._otherMembers(monster);
+    for (i = 0; i < others.length; i++) {
+      var worn = others[i].equipment || [];
+      for (j = 0; j < worn.length; j++) {
+        var w = data.getItem(worn[j]);
+        if (!w || !w.equip || NS.EffectSystem.slotOf(w) !== slotRow.slot) continue;
+        entries.push({ type: "entry", kind: "other", itemId: w.id, label: w.name, icon: w.icon,
+                       right: others[i].getName(), owner: others[i],
+                       value: { action: "take", owner: others[i], ownerIndex: j } });
       }
     }
 
-    // 中身が変わったので作り直す（空になっても画面は開いたままにする）
-    this.equipList.setRows(this._buildEquipRows(monster));
+    // 並べ替え：選んだ能力が上がる順（同じなら元の並び）
+    var own = monster.equipment || [];
+    for (i = 0; i < entries.length; i++) {
+      entries[i].order = i;
+      // ほかの枠にもう着けている（選んでも「もう着けている」になる）ものは薄く描く
+      var at = own.indexOf(entries[i].itemId);
+      entries[i].worn = at >= 0 && at !== slotRow.index;
+      entries[i].changes = this._statChanges(monster, this._equipmentAfter(monster, slotRow, entries[i].value));
+    }
+    var stat = EQUIP_SORT_STAT[EQUIP_SORTS[this.equipSort || 0]];
+    if (stat !== undefined) {
+      entries.sort(function (a, b) {
+        var da = a.changes[stat].after - a.changes[stat].before;
+        var db = b.changes[stat].after - b.changes[stat].before;
+        return (db - da) || (a.order - b.order);
+      });
+    }
+    return rows.concat(entries);
   };
 
-  PartyScene.prototype._switchTab = function () {
-    this.tab = (this.tab === "party") ? "storage" : "party";
-    this._clampIndex();
+  /** 候補を作り直す。keepIndex を渡すと、なるべく同じ位置にカーソルを残す */
+  PartyScene.prototype._rebuildEquipRows = function (keepIndex) {
+    var monster = this._equipMonster();
+    var slotRow = monster ? this._currentEquipSlot(monster) : null;
+    this.equipList.setRows(this._buildEquipRows(monster, slotRow));
+    if (keepIndex !== undefined && this.equipList.rows.length > 0) {
+      this.equipList.setIndex(Math.min(keepIndex, this.equipList.rows.length - 1));
+    }
+  };
+
+  PartyScene.prototype._updateEquipMode = function (input) {
+    var monster = this._equipMonster();
+    if (!monster) { this.mode = "list"; return; }
+
+    // マウス：◀ ▶・並べ替え・枠の行
+    if (this._handleEquipPointer(input, monster)) return;
+
+    if (input.isPressed("left"))  { this._switchEquipMonster(-1); return; }
+    if (input.isPressed("right")) { this._switchEquipMonster(1); return; }
+    if (input.isPressed("sort"))  { this._cycleEquipSort(); return; }
+    if (input.isPressed("equip")) { this.mode = "list"; return; }
+
+    if (this.equipFocus === "slots") {
+      var count = this._equipSlotRows(monster).length + 1;   // 最後は「すべて外す」
+      if (input.isPressed("up"))   this._selectEquipSlot((this.equipSlotIndex - 1 + count) % count);
+      if (input.isPressed("down")) this._selectEquipSlot((this.equipSlotIndex + 1) % count);
+
+      // 候補の上にマウスを重ねたら、候補を選んでいる状態にする（キーの上下は枠に使う）
+      if (this.equipList.handleInput(input, { keys: false })) this.equipFocus = "items";
+      if (this.equipList.clickedEntry(input)) { this._applyEquipChoice(this.equipList.getSelected()); return; }
+
+      if (input.isPressed("cancel")) { this.mode = "list"; return; }
+      if (input.isPressed("confirm")) {
+        if (this._onUnequipAllRow(monster)) this._unequipAll(monster);
+        else if (this.equipList.hasEntries()) this.equipFocus = "items";
+        else { this._notice = this.texts.equipNoCandidates || null; this.game.playError(); }
+      }
+      return;
+    }
+
+    this.equipList.handleInput(input);
+    if (input.isPressed("cancel")) { this.equipFocus = "slots"; return; }
+    if (input.isPressed("confirm") || this.equipList.clickedEntry(input)) {
+      this._applyEquipChoice(this.equipList.getSelected());
+    }
+  };
+
+  /** 枠を選ぶ（候補を作り直す） */
+  PartyScene.prototype._selectEquipSlot = function (index) {
+    if (index === this.equipSlotIndex) return;
+    this.equipSlotIndex = index;
+    this._rebuildEquipRows();
+  };
+
+  /** ←→・◀ ▶：いま見ている表の中で、隣の仲間へ（枠の選択はそのまま） */
+  PartyScene.prototype._switchEquipMonster = function (direction) {
+    var size = this._currentList().size();
+    if (size <= 1) return;
+    this.index = (this.index + direction + size) % size;
     this._notice = null;
-    // 別の一覧になったので、一番上から見せる（選択がその先にあればそこまで送る）
+    this._rebuildEquipRows();
+  };
+
+  PartyScene.prototype._cycleEquipSort = function () {
+    this.equipSort = ((this.equipSort || 0) + 1) % EQUIP_SORTS.length;
+    this._rebuildEquipRows();
+  };
+
+  /**
+   * マウスで ◀ ▶・並べ替え・枠の行を押したか。押したらその操作をして true。
+   * 枠の行は、重ねただけで選ぶ（候補が入れ替わる）。押すと候補へ移る
+   */
+  PartyScene.prototype._handleEquipPointer = function (input, monster) {
+    if (!input.getPointer) return false;
+    var pointer = input.getPointer();
+    if (!pointer.inside) return false;
+    var hit = this._equipHitRects || {};
+
+    if (pointer.clicked) {
+      if (NS.Panel.containsPoint(hit.prev, pointer)) { this._switchEquipMonster(-1); return true; }
+      if (NS.Panel.containsPoint(hit.next, pointer)) { this._switchEquipMonster(1); return true; }
+      if (NS.Panel.containsPoint(hit.sort, pointer)) { this._cycleEquipSort(); return true; }
+    }
+    if (!pointer.moved && !pointer.clicked) return false;
+
+    var slotRects = hit.slots || [];
+    for (var i = 0; i < slotRects.length; i++) {
+      if (!NS.Panel.containsPoint(slotRects[i], pointer)) continue;
+      this.equipFocus = "slots";
+      this._selectEquipSlot(i);
+      if (pointer.clicked) {
+        if (this._onUnequipAllRow(monster)) this._unequipAll(monster);
+        else if (this.equipList.hasEntries()) this.equipFocus = "items";
+      }
+      return pointer.clicked;
+    }
+    return false;
+  };
+
+  /** 「すべて外す」 */
+  PartyScene.prototype._unequipAll = function (monster) {
+    if (!(monster.equipment || []).length) {
+      this._notice = this.texts.equipNothingToRemove || null;
+      this.game.playError();
+      return;
+    }
+    var result = this.game.unequipAll(monster);
+    if (result.kept > 0) {
+      this._notice = this.texts.stackFull || null;
+      this.game.playError();
+    } else {
+      this._notice = fill(this.texts.unequippedAll, { name: monster.getName() });
+    }
+    this._rebuildEquipRows();
+  };
+
+  /** 候補を決定した：外す・着ける・ほかの仲間から移す。済んだら枠へ戻る */
+  PartyScene.prototype._applyEquipChoice = function (row) {
+    var monster = this._equipMonster();
+    var slotRow = monster ? this._currentEquipSlot(monster) : null;
+    if (!monster || !slotRow || !row) return;
+    var data = this.game.data;
+    var choice = row.value;
+    var keep = this.equipList.index;
+    var ok = true;
+
+    if (choice.action === "unequip") {
+      var removed = this.game.unequipItem(monster, choice.index);
+      ok = !!removed;
+      this._notice = removed
+        ? fill(this.texts.unequipped, { name: data.getItem(removed).name })
+        : (this.texts.stackFull || null);
+    } else if (choice.action === "take") {
+      var taken = this.game.takeEquipmentFrom(monster, slotRow.index, choice.owner, choice.ownerIndex);
+      ok = taken.success;
+      if (taken.success) {
+        var names = { name: monster.getName(), owner: choice.owner.getName(),
+                      item: data.getItem(taken.itemId).name,
+                      given: taken.given ? data.getItem(taken.given).name : "",
+                      stored: taken.stored ? data.getItem(taken.stored).name : "" };
+        var takenText = taken.given ? this.texts.equipTakenSwap
+                      : taken.stored ? this.texts.equipTakenStore : this.texts.equipTaken;
+        this._notice = fill(takenText, names);
+      } else {
+        this._notice = this._equipFailText(taken.reason, row.label);
+      }
+    } else {
+      var result = this.game.equipItemAt(monster, choice.itemId, slotRow.index);
+      ok = result.success;
+      if (result.success && result.replaced) {
+        var out = data.getItem(result.replaced);
+        this._notice = fill(this.texts.equipSwapped, { out: out ? out.name : result.replaced, item: row.label });
+      } else if (result.success) {
+        this._notice = fill(this.texts.equipped, { name: monster.getName(), item: row.label });
+      } else {
+        this._notice = this._equipFailText(result.reason, row.label);
+      }
+    }
+
+    if (!ok) {
+      this.game.playError();
+      this._rebuildEquipRows(keep);
+      return;
+    }
+    // 着けたら枠へ戻る（続けて次の枠を選べるように）
+    this.equipFocus = "slots";
+    this._rebuildEquipRows();
+  };
+
+  PartyScene.prototype._equipFailText = function (reason, itemName) {
+    if (reason === "duplicate") return fill(this.texts.equipDuplicate, { item: itemName });
+    return this.texts.stackFull || null;
+  };
+
+  // --- 預かり所の画面（v1.0.3。30体ずつの箱に絵を並べる） ---
+  //
+  //   左 … 連れていく仲間（決定で預ける）
+  //   中 … 箱（6×5 のマス。決定でパーティに加える。いっぱいなら入れ替える相手を選ぶ）
+  //   右 … 選んでいる仲間の詳細。下 … 並べ方・絞り込み・この仲間への操作の札
+  //
+  // 預かり所の中身は1本の並び（MonsterStorage.members。セーブの形は前と同じ）。
+  // 箱はその並びを30体ずつに区切って見せているだけで、並べ替え・絞り込みも見せ方だけを変える。
+
+  /** 並べ方。label は data/messages.js の party.boxSortLabels */
+  var STORAGE_SORTS = ["stored", "level", "dex", "element"];
+
+  PartyScene.prototype._boxLayout = function () { return this.layout.box || {}; };
+  PartyScene.prototype._boxSize = function () { return (this.game.data.config || {}).storageBoxSize || 30; };
+  PartyScene.prototype._boxCols = function () { return (this._boxLayout().grid || {}).cols || 6; };
+
+  PartyScene.prototype._openBoxView = function () {
+    this.boxView = true;
+    this.mode = "list";
+    this.boxFocus = this.game.storage.isEmpty() ? "party" : "box";
+    this.boxPartyIndex = Math.max(0, Math.min(this.index, this.game.party.size() - 1));
+    this.boxPage = 0;
+    this.boxCell = 0;
+    this.marking = false;
+    this.marks = [];
+    this._notice = null;
+    this._syncBoxSelection();
+  };
+
+  /** Esc・戻る：印をつけている最中ならそれをやめ、そうでなければ仲間の一覧へ戻る */
+  PartyScene.prototype._cancelBoxView = function () {
+    if (this.marking) { this._stopMarking(); return; }
+    this.boxView = false;
+    this.tab = "party";
+    this.index = Math.max(0, Math.min(this.boxPartyIndex, this.game.party.size() - 1));
+    this.mode = "list";
+    this._notice = null;
     this.listView.resetScroll();
-    this.listView.index = -1;
-    this._syncListView();
+  };
+
+  /** 種族の属性 */
+  PartyScene.prototype._monsterElement = function (monster) {
+    var species = monster.getSpecies ? monster.getSpecies() : null;
+    return (species && species.element) || "none";
+  };
+
+  PartyScene.prototype._matchesStorageFilter = function (monster, filter) {
+    if (!filter) return true;
+    if (filter.kind === "element") return this._monsterElement(monster) === filter.id;
+    return monster.speciesId === filter.id;
+  };
+
+  /**
+   * 箱に並べる順の、預かり所の位置の並び（絞り込みと並べ方を掛けたあと）。
+   * @returns {number[]} storage.members の何番目か
+   */
+  PartyScene.prototype._storageView = function () {
+    var members = this.game.storage.getMembers();
+    var data = this.game.data;
+    var view = [];
+    for (var i = 0; i < members.length; i++) {
+      if (this._matchesStorageFilter(members[i], this.storageFilter)) view.push(i);
+    }
+
+    var mode = STORAGE_SORTS[this.storageSort || 0];
+    if (mode === "stored") return view;
+
+    var dex = {};
+    Object.keys(data.monsters || {}).forEach(function (id, n) { dex[id] = n; });
+    var elements = data.elements || {};
+    var self = this;
+    var elementOrder = function (m) { var e = elements[self._monsterElement(m)]; return e ? (e.order || 0) : 999; };
+    view.sort(function (a, b) {
+      var ma = members[a], mb = members[b];
+      var d = 0;
+      if (mode === "level") d = mb.level - ma.level;
+      else if (mode === "element") d = elementOrder(ma) - elementOrder(mb);
+      // 同じなら図鑑の順、それも同じなら預けた順
+      return d || ((dex[ma.speciesId] || 0) - (dex[mb.speciesId] || 0)) || (a - b);
+    });
+    return view;
+  };
+
+  /** 箱の数。絞り込んでいなければ上限ぶん（300なら10箱）、絞り込み中は当てはまる数ぶん */
+  PartyScene.prototype._boxPageCount = function (view) {
+    var size = this._boxSize();
+    var max = this.game.storage.maxSize;
+    var count = (this.storageFilter || !max) ? view.length + (max ? 0 : 1) : max;
+    return Math.max(1, Math.ceil(count / size));
+  };
+
+  /** その箱のマスにいる個体の、預かり所の位置（空きなら -1） */
+  PartyScene.prototype._boxCellIndex = function (view, page, cell) {
+    var k = page * this._boxSize() + cell;
+    return (k < view.length) ? view[k] : -1;
+  };
+
+  /**
+   * 箱のカーソルを、ほかの操作（様子を見る・装備など）が使う tab / index に写す。
+   * 空きのマスは index -1（_selected() が null になる）
+   */
+  PartyScene.prototype._syncBoxSelection = function () {
+    if (this.boxFocus === "party") {
+      this.tab = "party";
+      this.boxPartyIndex = Math.max(0, Math.min(this.boxPartyIndex, this.game.party.size() - 1));
+      this.index = this.boxPartyIndex;
+    } else {
+      this.tab = "storage";
+      this.index = this._boxCellIndex(this._storageView(), this.boxPage, this.boxCell);
+    }
+    this._boxSynced = { tab: this.tab, index: this.index };
+  };
+
+  /**
+   * ほかの画面（様子を見るの↑↓・装備の←→）で選びが変わって戻ってきたら、箱のカーソルをそこへ合わせる
+   */
+  PartyScene.prototype._adoptBoxSelection = function () {
+    var s = this._boxSynced;
+    if (!s || (s.tab === this.tab && s.index === this.index)) return;
+    if (this.tab === "party") {
+      this.boxFocus = "party";
+      this.boxPartyIndex = this.index;
+    } else if (this.index >= 0) {
+      var at = this._storageView().indexOf(this.index);
+      if (at >= 0) {
+        this.boxFocus = "box";
+        this.boxPage = Math.floor(at / this._boxSize());
+        this.boxCell = at % this._boxSize();
+      }
+    }
+    this._syncBoxSelection();
+  };
+
+  PartyScene.prototype._updateBoxView = function (input) {
+    this._adoptBoxSelection();
+    var pages = this._boxPageCount(this._storageView());
+    if (this.boxPage >= pages) this.boxPage = pages - 1;
+
+    if (this._handleBoxPointer(input)) return;
+
+    if (input.isPressed("prevTab")) this._switchBox(-1);
+    if (input.isPressed("nextTab")) this._switchBox(1);
+    if (input.isPressed("sort")) this._cycleStorageSort();
+    if (input.isPressed("filter")) { this._beginStorageFilter(); return; }
+
+    this._moveBoxCursor(input);
+    this._syncBoxSelection();
+
+    if (input.isPressed("confirm")) { this._boxConfirm(); return; }
+    if (input.isPressed("menu")) {
+      if (this.marking) this._beginReleaseMarked();
+      else this._beginAction();
+      return;
+    }
+    if (input.isPressed("cancel") || input.isPressed("party")) this._cancelBoxView();
+  };
+
+  /**
+   * ↑↓←→。箱の左端から←で左の列へ、右端から→でも左の列へ回る（列 → 箱 → 列 の輪）。
+   * 印をつけている間は箱の中だけを回る
+   */
+  PartyScene.prototype._moveBoxCursor = function (input) {
+    var cols = this._boxCols();
+    var rows = Math.ceil(this._boxSize() / cols);
+    var partySize = this.game.party.size();
+
+    if (this.boxFocus === "party") {
+      if (partySize > 0) {
+        if (input.isPressed("up"))   this.boxPartyIndex = (this.boxPartyIndex - 1 + partySize) % partySize;
+        if (input.isPressed("down")) this.boxPartyIndex = (this.boxPartyIndex + 1) % partySize;
+      }
+      var row = Math.min(rows - 1, this.boxPartyIndex);
+      if (input.isPressed("right")) { this.boxFocus = "box"; this.boxCell = row * cols; }
+      if (input.isPressed("left"))  { this.boxFocus = "box"; this.boxCell = row * cols + cols - 1; }
+      return;
+    }
+
+    var col = this.boxCell % cols;
+    var r = Math.floor(this.boxCell / cols);
+    var toParty = !this.marking && partySize > 0;
+    if (input.isPressed("up"))   r = (r - 1 + rows) % rows;
+    if (input.isPressed("down")) r = (r + 1) % rows;
+    if (input.isPressed("left")) {
+      if (col === 0 && toParty) { this.boxFocus = "party"; this.boxPartyIndex = Math.min(r, partySize - 1); return; }
+      col = (col - 1 + cols) % cols;
+    }
+    if (input.isPressed("right")) {
+      if (col === cols - 1 && toParty) { this.boxFocus = "party"; this.boxPartyIndex = Math.min(r, partySize - 1); return; }
+      col = (col + 1) % cols;
+    }
+    this.boxCell = Math.min(this._boxSize() - 1, r * cols + col);
+  };
+
+  PartyScene.prototype._switchBox = function (direction) {
+    var pages = this._boxPageCount(this._storageView());
+    this.boxPage = (this.boxPage + direction + pages) % pages;
+    this.boxFocus = "box";
+    this._syncBoxSelection();
+  };
+
+  PartyScene.prototype._cycleStorageSort = function () {
+    this.storageSort = ((this.storageSort || 0) + 1) % STORAGE_SORTS.length;
+    this._syncBoxSelection();
+  };
+
+  /** 決定：左の列なら預ける。箱なら加える（いっぱいなら入れ替え）。印をつけている間は印を付け外し */
+  PartyScene.prototype._boxConfirm = function () {
+    if (this.boxFocus === "party") {
+      if (this.marking) return;
+      this._depositToStorage();
+      this._syncBoxSelection();
+      return;
+    }
+    var monster = this._selected();
+    if (!monster) return;
+    if (this.marking) { this._toggleMark(monster); return; }
+    if (this.game.party.isFull()) { this._beginBoxSwap(monster); return; }
+    this._takeFromStorage();
+    this._syncBoxSelection();
+  };
+
+  // 入れ替え：パーティがいっぱいのとき、加える仲間と入れ替えて預ける仲間を左の列から選ぶ
+
+  PartyScene.prototype._beginBoxSwap = function (monster) {
+    if (!monster) return;
+    this.swapMonster = monster;
+    this.swapReturn = { page: this.boxPage, cell: this.boxCell };
+    this.mode = "boxSwap";
+    this.boxFocus = "party";
+    this._syncBoxSelection();
+    this._notice = fill(this.texts.boxSwapPrompt, { name: monster.getName() });
+  };
+
+  PartyScene.prototype._cancelBoxSwap = function () {
+    this.mode = "list";
+    this.swapMonster = null;
+    this.boxFocus = "box";
+    if (this.swapReturn) { this.boxPage = this.swapReturn.page; this.boxCell = this.swapReturn.cell; }
+    this._notice = null;
+    this._syncBoxSelection();
+  };
+
+  PartyScene.prototype._updateBoxSwap = function (input) {
+    var size = this.game.party.size();
+    var clicked = false;
+    var pointer = input.getPointer ? input.getPointer() : null;
+    var rects = (this._boxHitRects || {}).party || [];
+    if (pointer && pointer.inside && (pointer.moved || pointer.clicked)) {
+      for (var i = 0; i < rects.length; i++) {
+        if (!NS.Panel.containsPoint(rects[i], pointer)) continue;
+        this.boxPartyIndex = i;
+        clicked = pointer.clicked;
+      }
+    }
+    if (size > 0) {
+      if (input.isPressed("up"))   this.boxPartyIndex = (this.boxPartyIndex - 1 + size) % size;
+      if (input.isPressed("down")) this.boxPartyIndex = (this.boxPartyIndex + 1) % size;
+    }
+    this._syncBoxSelection();
+
+    if (input.isPressed("cancel")) { this._cancelBoxSwap(); return; }
+    if (!input.isPressed("confirm") && !clicked) return;
+
+    var storageIndex = this.game.storage.getMembers().indexOf(this.swapMonster);
+    var done = this.game.swapWithStorage(this.boxPartyIndex, storageIndex);
+    var notice = done ? fill(this.texts.boxSwapped, { taken: done.taken.getName(), stored: done.stored.getName() }) : null;
+    this._cancelBoxSwap();
+    this._notice = notice;
+  };
+
+  // 絞り込み：属性か種族を1つ選ぶ（預かり所にいるものだけ並ぶ）
+
+  PartyScene.prototype._beginStorageFilter = function () {
+    var data = this.game.data;
+    var members = this.game.storage.getMembers();
+    var texts = this.texts;
+    var countText = function (n) { return fill(texts.boxFilterCount, { n: n }); };
+    var byElement = {}, bySpecies = {};
+    for (var i = 0; i < members.length; i++) {
+      var e = this._monsterElement(members[i]);
+      byElement[e] = (byElement[e] || 0) + 1;
+      bySpecies[members[i].speciesId] = (bySpecies[members[i].speciesId] || 0) + 1;
+    }
+
+    var rows = [{ type: "entry", label: texts.boxFilterAll || "", value: null, right: countText(members.length) }];
+    var elements = data.elements || {};
+    var elementIds = Object.keys(byElement).sort(function (a, b) {
+      return ((elements[a] || {}).order || 0) - ((elements[b] || {}).order || 0);
+    });
+    if (elementIds.length) rows.push({ type: "header", label: texts.boxFilterElement || "" });
+    elementIds.forEach(function (id) {
+      rows.push({ type: "entry", label: (elements[id] || {}).name || id,
+                  value: { kind: "element", id: id }, right: countText(byElement[id]) });
+    });
+    var speciesIds = Object.keys(data.monsters || {}).filter(function (id) { return bySpecies[id]; });
+    if (speciesIds.length) rows.push({ type: "header", label: texts.boxFilterSpecies || "" });
+    speciesIds.forEach(function (id) {
+      rows.push({ type: "entry", label: data.monsters[id].name || id,
+                  value: { kind: "species", id: id }, right: countText(bySpecies[id]) });
+    });
+
+    this.filterList.setRows(rows);
+    var current = this.storageFilter;
+    for (var r = 0; r < rows.length; r++) {
+      var v = rows[r].value;
+      if (rows[r].type === "entry" && ((!v && !current) || (v && current && v.kind === current.kind && v.id === current.id))) {
+        this.filterList.setIndex(r);
+        break;
+      }
+    }
+    this.mode = "boxFilter";
+  };
+
+  PartyScene.prototype._updateBoxFilter = function (input) {
+    this.filterList.handleInput(input);
+    if (input.isPressed("cancel")) { this.mode = "list"; return; }
+    if (!input.isPressed("confirm") && !this.filterList.clickedEntry(input)) return;
+    var row = this.filterList.getSelected();
+    if (!row) return;
+    this.storageFilter = row.value;
+    this.boxPage = 0;
+    this.boxCell = 0;
+    this.boxFocus = "box";
+    this.mode = "list";
+    this._syncBoxSelection();
+  };
+
+  /** 絞り込みの札に出す名前 */
+  PartyScene.prototype._storageFilterLabel = function () {
+    var f = this.storageFilter;
+    var data = this.game.data;
+    if (!f) return this.texts.boxFilterAll || "";
+    if (f.kind === "element") return ((data.elements || {})[f.id] || {}).name || f.id;
+    return ((data.monsters || {})[f.id] || {}).name || f.id;
+  };
+
+  // まとめて逃がす：箱のマスに印をつけ、C（または下の札）でまとめて逃がす
+
+  PartyScene.prototype._beginMarking = function () {
+    this.marking = true;
+    this.marks = [];
+    this.boxFocus = "box";
+    var selected = this._selected();
+    if (selected && this.tab === "storage" && !selected.partner) this.marks.push(selected);
+    this._notice = null;
+    this._syncBoxSelection();
+  };
+
+  PartyScene.prototype._stopMarking = function () {
+    this.marking = false;
+    this.marks = [];
+    this._notice = null;
+  };
+
+  PartyScene.prototype._toggleMark = function (monster) {
+    if (monster.partner) {
+      this._notice = fill(this.texts.cannotReleasePartner, { name: monster.getName() });
+      this.game.playError();
+      return;
+    }
+    var at = this.marks.indexOf(monster);
+    if (at >= 0) this.marks.splice(at, 1);
+    else this.marks.push(monster);
+    this._notice = null;
+  };
+
+  PartyScene.prototype._beginReleaseMarked = function () {
+    if (this.marks.length === 0) {
+      this._notice = this.texts.releaseManyNone || null;
+      this.game.playError();
+      return;
+    }
+    this.releaseMenu.index = 0;   // 既定は「やめる」
+    this.mode = "releaseMany";
+    this._notice = null;
+  };
+
+  PartyScene.prototype._updateReleaseManyMode = function (input) {
+    var result = this.releaseMenu.handleInput(input);
+    if (!result) return;
+    this.mode = "list";
+    if (result.type === "cancel" || result.value !== "yes") return;
+
+    // 1体ずつ Game.releaseMonster を通す（装備を持ち物へ戻せない仲間はそこで残す）
+    var released = 0, kept = null;
+    var marks = this.marks.slice();
+    for (var i = 0; i < marks.length; i++) {
+      var at = this.game.storage.getMembers().indexOf(marks[i]);
+      if (at < 0) continue;
+      var done = this.game.releaseMonster("storage", at);
+      if (done.success) released++;
+      else if (!kept) kept = marks[i];
+    }
+    this._stopMarking();
+    this._notice = kept ? fill(this.texts.releaseManyKept, { n: released, name: kept.getName() })
+                        : fill(this.texts.releasedMany, { n: released });
+    if (kept) this.game.playError();
+    this._syncBoxSelection();
+  };
+
+  /**
+   * マウス：左の列・箱のマスは重ねると選び、押すと決定と同じ。
+   * ◀ ▶（箱）・並べ方・絞り込み・下の札は押すと働く。箱の上でホイールを回すと箱を送る
+   * @returns {boolean} 何かをしたら true（このフレームのキーは見ない）
+   */
+  PartyScene.prototype._handleBoxPointer = function (input) {
+    var pointer = input.getPointer ? input.getPointer() : null;
+    if (!pointer || !pointer.inside) return false;
+    var hit = this._boxHitRects || {};
+    var i;
+
+    if (pointer.wheel && NS.Panel.containsPoint(hit.grid, pointer)) {
+      this._switchBox(pointer.wheel > 0 ? 1 : -1);
+      return true;
+    }
+    if (pointer.clicked) {
+      if (NS.Panel.containsPoint(hit.prev, pointer)) { this._switchBox(-1); return true; }
+      if (NS.Panel.containsPoint(hit.next, pointer)) { this._switchBox(1); return true; }
+      if (NS.Panel.containsPoint(hit.sort, pointer)) { this._cycleStorageSort(); return true; }
+      if (NS.Panel.containsPoint(hit.filter, pointer)) { this._beginStorageFilter(); return true; }
+      var actions = hit.actions || [];
+      for (i = 0; i < actions.length; i++) {
+        if (!NS.Panel.containsPoint(actions[i].rect, pointer)) continue;
+        if (actions[i].value === "releaseMarked") this._beginReleaseMarked();
+        else if (actions[i].value === "stopMarking") this._stopMarking();
+        else this._runAction(actions[i].value);
+        return true;
+      }
+    }
+    if (!pointer.moved && !pointer.clicked) return false;
+
+    var party = hit.party || [];
+    for (i = 0; i < party.length; i++) {
+      if (!NS.Panel.containsPoint(party[i], pointer)) continue;
+      this.boxFocus = "party";
+      this.boxPartyIndex = i;
+      this._syncBoxSelection();
+      if (pointer.clicked) this._boxConfirm();
+      return pointer.clicked;
+    }
+    var cells = hit.cells || [];
+    for (i = 0; i < cells.length; i++) {
+      if (!NS.Panel.containsPoint(cells[i], pointer)) continue;
+      this.boxFocus = "box";
+      this.boxCell = i;
+      this._syncBoxSelection();
+      if (pointer.clicked) this._boxConfirm();
+      return pointer.clicked;
+    }
+    return false;
   };
 
   // --- 出し入れ ---
@@ -847,30 +1526,38 @@
       return;
     }
 
-    this.panel.drawText(this.texts.title || "party",
-      L.title.x, L.title.y, { font: t.largeFont });
+    // 装備も画面ぜんぶを使う（v1.0.3）
+    if (this.mode === "equip") {
+      this._renderEquipScreen(this._equipMonster());
+      this._renderHint(L, t);
+      this.backButton.render();
+      return;
+    }
 
-    this._renderTabs(L, t);
-
-    var list = this._currentList();
-    var empty = (this.tab === "storage") ? this.texts.storageEmpty : this.texts.empty;
-
-    if (!list || list.isEmpty()) {
-      this.panel.drawText(empty || "", L.list.x, L.list.y + 30);
+    if (this.boxView) {
+      // 預かり所（v1.0.3）：左に連れていく仲間、中に箱、右に詳細
+      this._renderBoxView();
     } else {
-      // 預かり所は6体より多く入るので、枠の中でスクロールさせる（ScrollList）
-      this._syncListView();
-      this.listView.render(this.game.clock);
+      this.panel.drawText(this.texts.title || "party",
+        L.title.x, L.title.y, { font: t.largeFont });
 
-      // 装備を選んでいる間は、詳細の代わりに候補の一覧を出す
-      if (this.mode === "equip") this._renderEquipList(list.get(this.index));
-      else this._renderDetail(list.get(this.index));
+      this._renderTabs(L, t);
+
+      var list = this._currentList();
+      if (!list || list.isEmpty()) {
+        this.panel.drawText(this.texts.empty || "", L.list.x, L.list.y + 30);
+      } else {
+        this._syncListView();
+        this.listView.render(this.game.clock);
+
+        this._renderDetail(list.get(this.index));
+      }
     }
 
     // 「この仲間に何をするか」の項目
     if (this.mode === "action") this.actionMenu.render(this.game.clock);
     // 「逃がしますか?」は一覧の手前に重ねる（操作説明はその上に出す）
-    if (this.mode === "release") this._renderReleaseConfirm(ctx);
+    if (this.mode === "release" || this.mode === "releaseMany") this._renderReleaseConfirm(ctx);
     // 探索中に使う技と、その相手
     if (this.mode === "fieldSkill") this.fieldSkillMenu.render(this.game.clock);
     if (this.mode === "tactic") this.tacticMenu.render(this.game.clock);
@@ -888,99 +1575,300 @@
     this.backButton.render();
   };
 
-  /** 装備の候補一覧（詳細欄の位置に重ねて出す） */
-  PartyScene.prototype._renderEquipList = function (monster) {
+  /** 装備の候補の枠（見出しの行を除いた、行を並べるところ） */
+  PartyScene.prototype._equipListRect = function () {
+    var r = (this.layout.equip || {}).items || { x: 348, y: 58, w: 420, h: 248, rowHeight: 26, headHeight: 30 };
+    var head = r.headHeight || 30;
+    var rows = Math.max(1, Math.floor((r.h - head - 6) / r.rowHeight));
+    return { x: r.x, y: r.y + head, w: r.w, h: rows * r.rowHeight,
+             rowHeight: r.rowHeight, visibleRows: rows, frame: false };
+  };
+
+  /** 装備の画面ぜんぶ */
+  PartyScene.prototype._renderEquipScreen = function (monster) {
+    if (!monster) return;
+    var E = this.layout.equip || {};
     var t = this.theme;
-    var rect = this.layout.equipList || this.layout.detail;
+    this._equipHitRects = {};
 
-    this.equipList.render(this.game.clock);
+    this.panel.drawText(this.texts.equipScreenTitle || this.texts.equipLabel || "",
+      this.layout.title.x, this.layout.title.y, { font: t.largeFont });
 
-    var label = fill(this.texts.equipTitle, { name: monster ? monster.getName() : "" });
-    this.panel.drawText(label, rect.x + (t.padding || 8), rect.y - 8,
-      { font: t.smallFont, color: t.cursorColor });
+    var slotRows = this._equipSlotRows(monster);
+    this._renderEquipMonster(monster, E.monster || { x: 32, y: 58, w: 300, h: 84 });
+    this._renderEquipSlots(monster, slotRows, E.slots || { x: 32, y: 150, w: 300, h: 156, rowHeight: 26 });
+    this._renderEquipCandidates(monster, slotRows[this.equipSlotIndex] || null,
+      E.items || { x: 348, y: 58, w: 420, h: 248, headHeight: 30 });
+    this._renderEquipCompare(monster, slotRows[this.equipSlotIndex] || null,
+      E.compare || { x: 32, y: 316, w: 736, h: 226 });
+  };
 
-    // 選んでいる装備の効果を下に出す
-    var selected = this.equipList.getSelected();
-    if (!selected) {
-      // 着けられるものが1つも無い場合は、その理由を枠の中に出す
-      this.panel.drawText(this.texts.noEquipment || "",
-        rect.x + (t.padding || 8), rect.y + 30,
-        { font: t.smallFont, color: t.hintColor });
-      this.panel.drawText(this.texts.noEquipmentHint || "",
-        rect.x + (t.padding || 8), rect.y + 30 + (t.lineHeight || 18),
+  /** 左上：◀ 絵・名前・Lv ▶（仲間が1体なら矢印は出さない） */
+  PartyScene.prototype._renderEquipMonster = function (monster, box) {
+    var t = this.theme;
+    this.panel.drawBox(box);
+
+    var size = box.spriteSize || 48;
+    var spriteId = monster.getSpriteId();
+    this.sprites.drawMotion(spriteId, box.x + 36, box.y + (box.h - size) / 2, size, size,
+      NS.Motion.forSprite(this.game.data, spriteId, monster.getMotionId(),
+        this.game.clock, monster.getMotionPhase()));
+
+    var textX = box.x + 36 + size + 14;
+    this.panel.drawText(monster.getName(), textX, box.y + box.h / 2 - 2);
+    var size2 = this._currentList().size();
+    this.panel.drawText("Lv" + monster.level + "    " + (this.index + 1) + "/" + size2,
+      textX, box.y + box.h / 2 + 18, { font: t.smallFont, color: t.subTextColor });
+
+    if (size2 <= 1) return;
+    var midY = box.y + box.h / 2 + 6;
+    this.panel.drawText("◀", box.x + 12, midY, { color: t.cursorColor });
+    this.panel.drawText("▶", box.x + box.w - 12, midY, { align: "right", color: t.cursorColor });
+    this._equipHitRects.prev = { x: box.x, y: box.y, w: 30, h: box.h };
+    this._equipHitRects.next = { x: box.x + box.w - 30, y: box.y, w: 30, h: box.h };
+  };
+
+  /** 左：枠ごとに今の装備。最後に「すべて外す」 */
+  PartyScene.prototype._renderEquipSlots = function (monster, slotRows, box) {
+    var t = this.theme;
+    var data = this.game.data;
+    var rowHeight = box.rowHeight || 26;
+    var labelX = box.x + (box.labelX || 30);
+    var nameX = box.x + (box.nameX || 128);
+    var focused = (this.equipFocus === "slots");
+    this.panel.drawBox(box);
+    this._equipHitRects.slots = [];
+
+    var rows = slotRows.concat([{ unequipAll: true }]);
+    for (var i = 0; i < rows.length; i++) {
+      var top = box.y + 8 + rowHeight * i;
+      var y = top + rowHeight - 8;
+      var selected = (i === this.equipSlotIndex);
+      this._equipHitRects.slots.push({ x: box.x, y: top, w: box.w, h: rowHeight });
+
+      if (selected) {
+        this.panel.drawText("▶", box.x + 10, y, { color: focused ? t.cursorColor : t.hintColor });
+      }
+      if (rows[i].unequipAll) {
+        this.panel.drawText(this.texts.unequipAll || "", labelX, y,
+          { color: selected && focused ? t.cursorColor : t.subTextColor });
+        continue;
+      }
+
+      this.panel.drawText(rows[i].label, labelX, y, { font: t.smallFont, color: t.subTextColor });
+      var item = rows[i].itemId ? data.getItem(rows[i].itemId) : null;
+      if (!item) {
+        this.panel.drawText(this.texts.slotEmpty || "-", nameX, y, { color: t.hintColor });
+        continue;
+      }
+      NS.StatusMarks.drawIcon(this.sprites, item.icon, nameX, y, 16);
+      this.panel.ctx.font = t.font || "14px monospace";
+      this.panel.drawText(clipText(this.panel.ctx, item.name, box.x + box.w - 12 - (nameX + 20)), nameX + 20, y,
+        { color: selected && focused ? t.cursorColor : t.textColor });
+    }
+  };
+
+  /** 右：選んでいる枠の候補。見出しに枠の名前と並べ方（押すと並べ替え） */
+  PartyScene.prototype._renderEquipCandidates = function (monster, slotRow, box) {
+    var t = this.theme;
+    this.panel.drawBox(box);
+
+    var headY = box.y + 22;
+    var title = slotRow
+      ? fill(this.texts.equipCandidates, { slot: slotRow.label })
+      : (this.texts.unequipAll || "");
+    this.panel.drawText(title, box.x + 12, headY, { font: t.smallFont, color: t.subTextColor });
+
+    var sortLabels = this.texts.equipSortLabels || {};
+    var sortText = fill(this.texts.equipSort, { mode: sortLabels[EQUIP_SORTS[this.equipSort || 0]] || "" });
+    this.panel.drawText(sortText, box.x + box.w - 12, headY,
+      { align: "right", font: t.smallFont, color: t.cursorColor });
+    this.panel.ctx.font = t.smallFont || "12px monospace";
+    var sortW = this.panel.ctx.measureText(sortText).width;
+    this._equipHitRects.sort = { x: box.x + box.w - 12 - sortW - 4, y: box.y + 4, w: sortW + 12, h: 26 };
+
+    if (!slotRow) {
+      this.panel.drawText(this.texts.unequipAllNote || "", box.x + 16, headY + 34,
         { font: t.smallFont, color: t.hintColor });
       return;
     }
+    if (!this.equipList.hasEntries()) {
+      this.panel.drawText(this.texts.equipNoCandidates || "", box.x + 16, headY + 34,
+        { font: t.smallFont, color: t.hintColor });
+      this.panel.drawText(this.texts.noEquipmentHint || "", box.x + 16, headY + 54,
+        { font: t.smallFont, color: t.hintColor });
+      return;
+    }
+    this.equipList.render(this.game.clock);
+  };
 
-    var unequipping = (selected.value.action === "unequip");
-    var itemId = unequipping
-      ? (monster.equipment || [])[selected.value.index]
-      : selected.value.itemId;
+  /**
+   * 候補の1行：▶ 絵 名前　主な効果　右端に所持数（ほかの仲間のものは、その仲間の名前）。
+   * 枠を選んでいる間は、カーソルを薄く出す
+   */
+  PartyScene.prototype._renderEquipRow = function (row, top, selected) {
+    var t = this.theme;
+    var rect = this.equipList.rect;
+    var box = (this.layout.equip || {}).items || {};
+    var ctx = this.panel.ctx;
+    var y = top + rect.rowHeight - 8;
+    var focused = (this.equipFocus === "items");
+    var x = rect.x + 10;
+    var rightX = rect.x + rect.w - 12 - this.equipList.barSpace();
 
-    var item = this.game.data.getItem(itemId);
-    if (!item) return;
+    if (selected) this.panel.drawText("▶", x, y, { color: focused ? t.cursorColor : t.hintColor });
 
-    var x = rect.x + (t.padding || 8);
-    var lh = t.lineHeight || 18;
-    var y = rect.y + rect.h + 16;
-    var i;
+    var nameX = x + 22;
+    if (row.icon) { NS.StatusMarks.drawIcon(this.sprites, row.icon, nameX, y, 16); nameX += 20; }
+    var effectX = rect.x + (box.effectX || 196);
 
-    // 効果の内容
-    var lines = this._describeEquip(item);
-    for (i = 0; i < lines.length; i++) {
-      this.panel.drawText(lines[i], x, y, { font: t.smallFont, color: t.subTextColor });
-      y += lh;
+    var color = t.textColor;
+    if (row.kind === "unequip") color = t.subTextColor;
+    if (row.kind === "other") color = t.subTextColor;
+    if (row.worn) color = t.hintColor;
+    if (selected && focused && !row.worn) color = t.cursorColor;
+
+    ctx.font = t.font || "14px monospace";
+    var nameMax = (row.kind === "unequip") ? rightX - nameX : effectX - 8 - nameX;
+    this.panel.drawText(clipText(ctx, row.label, nameMax), nameX, y, { color: color });
+
+    var rightW = 0;
+    if (row.right) {
+      ctx.font = t.smallFont || "12px monospace";
+      rightW = ctx.measureText(row.right).width;
+      this.panel.drawText(row.right, rightX, y, { align: "right", font: t.smallFont,
+        color: row.kind === "other" ? (t.hintColor) : t.subTextColor });
     }
 
-    // 着けた（外した）ときにステータスがどう変わるか
-    y += 6;
-    var changes = this._statChanges(monster, this._equipmentAfter(monster, selected.value));
-
-    for (i = 0; i < changes.length; i++) {
-      var change = changes[i];
-      var color = t.subTextColor;
-      if (change.after > change.before) color = t.hpBarHigh || "#5fd18c";
-      else if (change.after < change.before) color = t.hpBarLow || "#e8542a";
-
-      this.panel.drawText(change.label, x, y, { font: t.smallFont, color: t.hintColor });
-      this.panel.drawText(change.before + " → " + change.after,
-        rect.x + rect.w - (t.padding || 8), y,
-        { align: "right", font: t.smallFont, color: color });
-      y += lh;
+    // 主な効果（装備の効果を「・」でつないで、入るだけ）
+    if (row.itemId) {
+      var item = this.game.data.getItem(row.itemId);
+      var text = this._describeEquip(item).map(function (l) { return l.replace(/^・/, ""); }).join("・");
+      ctx.font = t.smallFont || "12px monospace";
+      this.panel.drawText(clipText(ctx, text, rightX - rightW - 10 - effectX), effectX, y,
+        { font: t.smallFont, color: t.subTextColor });
     }
   };
 
   /**
-   * その選択をしたあとの装備の並び（実際には着け替えない。見せるためだけ）。
-   * Game.equipItem と同じ決まり：枠が埋まっていれば、その枠の古いものが外れる。
+   * 下：見比べ。左に今の装備、中に選んでいる候補（候補を選んでいるときだけ）、右にステータスの 前 → 後。
+   * ほかの仲間から移すときは、その仲間に何を渡すかも書く
+   */
+  PartyScene.prototype._renderEquipCompare = function (monster, slotRow, box) {
+    var t = this.theme;
+    var data = this.game.data;
+    var lh = box.lineHeight || 20;
+    var colA = box.x + 16;
+    var colB = box.x + (box.colB || 250);
+    var colS = box.x + (box.colStats || 520);
+    var bottom = box.y + box.h - 10;
+    var self = this;
+    this.panel.drawBox(box);
+
+    function itemLines(item, x, y, maxW) {
+      if (!item) {
+        self.panel.drawText(self.texts.equipCompareEmpty || "-", x, y, { color: t.hintColor });
+        return;
+      }
+      NS.StatusMarks.drawIcon(self.sprites, item.icon, x, y, 16);
+      self.panel.ctx.font = t.font || "14px monospace";
+      self.panel.drawText(clipText(self.panel.ctx, item.name, maxW - 20), x + 20, y);
+      var lines = self._describeEquip(item);
+      self.panel.ctx.font = t.smallFont || "12px monospace";
+      for (var i = 0; i < lines.length && y + lh * (i + 1) <= bottom; i++) {
+        self.panel.drawText(clipText(self.panel.ctx, lines[i], maxW), x, y + lh * (i + 1),
+          { font: t.smallFont, color: t.subTextColor });
+      }
+    }
+
+    var headY = box.y + 24;
+    var firstY = headY + lh + 4;
+
+    // 左：今の装備
+    this.panel.drawText(this.texts.equipCompareNow || "", colA, headY, { font: t.smallFont, color: t.hintColor });
+    if (slotRow) itemLines(slotRow.itemId ? data.getItem(slotRow.itemId) : null, colA, firstY, colB - colA - 16);
+
+    // 中：選んでいる候補（候補を選んでいるときだけ）
+    var row = (this.equipFocus === "items" && slotRow) ? this.equipList.getSelected() : null;
+    this.panel.drawText(this.texts.equipCompareNext || "", colB, headY, { font: t.smallFont, color: t.hintColor });
+    if (!row) {
+      var note = slotRow ? this.texts.equipCompareHint : this.texts.unequipAllNote;
+      this.panel.ctx.font = t.smallFont || "12px monospace";
+      var wrapped = wrapByWidth(this.panel.ctx, note || "", colS - colB - 20, t.smallFont);
+      for (var w = 0; w < wrapped.length; w++) {
+        this.panel.drawText(wrapped[w], colB, firstY + lh * w, { font: t.smallFont, color: t.hintColor });
+      }
+    } else if (row.kind === "unequip") {
+      this.panel.drawText(this.texts.unequipLabel || "", colB, firstY, { color: t.subTextColor });
+    } else {
+      itemLines(data.getItem(row.itemId), colB, firstY, colS - colB - 20);
+      // ほかの仲間から移すときの、相手側のこと
+      if (row.kind === "other") {
+        var old = slotRow.itemId ? data.getItem(slotRow.itemId) : null;
+        var gives = old && (row.owner.equipment || []).indexOf(old.id) < 0;
+        var text = fill(this.texts.equipFromOwner, { owner: row.owner.getName() });
+        if (gives) text += "　" + fill(this.texts.equipGiveOwner, { owner: row.owner.getName(), item: old.name });
+        else if (old) text += "　" + fill(this.texts.equipStoreOld, { item: old.name });
+        this.panel.ctx.font = t.smallFont || "12px monospace";
+        this.panel.drawText(clipText(this.panel.ctx, text, box.x + box.w - 16 - colB), colB, bottom,
+          { font: t.smallFont, color: t.cursorColor });
+      }
+    }
+
+    // 右：ステータス（候補を選んでいれば 前 → 後、そうでなければ今の値）
+    var changes = row
+      ? (row.changes || this._statChanges(monster, this._equipmentAfter(monster, slotRow, row.value)))
+      : this._statChanges(monster, monster.equipment || []);
+    var right = box.x + box.w - 16;
+    for (var i = 0; i < changes.length; i++) {
+      var c = changes[i];
+      var y = firstY + lh * i;
+      var color = t.textColor;
+      if (c.after > c.before) color = t.hpBarHigh || "#5fd18c";
+      else if (c.after < c.before) color = t.hpBarLow || "#e8542a";
+      this.panel.drawText(c.label, colS, y, { font: t.smallFont, color: t.hintColor });
+      this.panel.drawText(row ? c.before + " → " + c.after : String(c.before), right, y,
+        { align: "right", color: row ? color : t.textColor });
+    }
+  };
+
+  /**
+   * その候補を選んだあとの、この仲間の装備の並び（実際には着け替えない。見せるためだけ）。
+   * 選んでいる枠の位置に入る（空いていれば足す）。外すならその位置を抜く
    *
    * @param {object} monster
-   * @param {{action:string, index?:number, itemId?:string}} choice
+   * @param {object} slotRow _equipSlotRows の1行
+   * @param {{action:string, index?:number, itemId?:string, owner?:object, ownerIndex?:number}} choice
    * @returns {string[]}
    */
-  PartyScene.prototype._equipmentAfter = function (monster, choice) {
+  PartyScene.prototype._equipmentAfter = function (monster, slotRow, choice) {
     var list = (monster.equipment || []).slice();
     if (choice.action === "unequip") {
       list.splice(choice.index, 1);
       return list;
     }
-
-    var data = this.game.data;
-    var item = data.getItem(choice.itemId);
-    if (!item || list.indexOf(choice.itemId) >= 0) return list;   // 同じものは着けられない
-
-    var slot = NS.EffectSystem.slotOf(item);
-    var capacity = NS.EffectSystem.slotCapacity(data, slot);
-    var worn = [];
+    var itemId = (choice.action === "take")
+      ? (choice.owner.equipment || [])[choice.ownerIndex]
+      : choice.itemId;
     for (var i = 0; i < list.length; i++) {
-      var w = data.getItem(list[i]);
-      if (w && w.equip && NS.EffectSystem.slotOf(w) === slot) worn.push(list[i]);
+      if (i !== slotRow.index && list[i] === itemId) return list;   // 同じものは2つ着けられない
     }
-    if (worn.length >= capacity && worn.length > 0) list.splice(list.indexOf(worn[0]), 1);
-
-    list.push(choice.itemId);
+    if (slotRow.index >= 0) list[slotRow.index] = itemId;
+    else list.push(itemId);
     return list;
   };
+
+  /** 幅に収まらない文字列を切り詰めて「…」を付ける（呼ぶ前に ctx.font を合わせておく） */
+  function clipText(ctx, text, maxWidth) {
+    text = String(text || "");
+    if (maxWidth <= 0) return "";
+    if (ctx.measureText(text).width <= maxWidth) return text;
+    for (var len = text.length - 1; len > 0; len--) {
+      var cut = text.slice(0, len) + "…";
+      if (ctx.measureText(cut).width <= maxWidth) return cut;
+    }
+    return "…";
+  }
 
   /**
    * その装備にしたときの、ステータスの変化を返す。
@@ -1033,6 +1921,205 @@
   };
 
   /** 上部の「パーティ / 預かり所」切り替え表示 */
+  /** 預かり所の画面ぜんぶ（v1.0.3） */
+  PartyScene.prototype._renderBoxView = function () {
+    var B = this._boxLayout();
+    var t = this.theme;
+    var storage = this.game.storage;
+    var view = this._storageView();
+    this._boxHitRects = { party: [], cells: [], actions: [] };
+
+    this.panel.drawText(this.texts.boxTitle || "", this.layout.title.x, this.layout.title.y, { font: t.largeFont });
+    var grid = B.grid || { x: 214, y: 58, w: 326, h: 306 };
+    this.panel.drawText(fill(this.texts.boxCount, { n: storage.size(), max: storage.maxSize || "-" }),
+      grid.x + grid.w, this.layout.title.y, { align: "right", font: t.smallFont, color: t.subTextColor });
+
+    this._renderBoxParty(B.party || { x: 32, y: 58, w: 170, h: 306, rowHeight: 46, spriteSize: 32 });
+    this._renderBoxGrid(grid, view);
+    this._renderBoxFooter(B.footer || { x: 32, y: 374, w: 508, h: 168 }, view);
+
+    var detail = B.detail || { x: 552, y: 58, w: 216, h: 484 };
+    var selected = this._selected();
+    if (selected) {
+      this._renderDetail(selected, detail);
+    } else {
+      this.panel.drawBox(detail);
+      this.panel.drawText(this.texts.boxEmptyCell || "", detail.x + detail.w / 2, detail.y + 40,
+        { align: "center", font: t.smallFont, color: t.hintColor });
+    }
+
+    if (this.mode === "boxFilter") this._renderBoxFilter(B);
+  };
+
+  /** 左：連れていく仲間（入れ替えの相手を選んでいる間は、選んでいる行を強く出す） */
+  PartyScene.prototype._renderBoxParty = function (P) {
+    var t = this.theme;
+    var party = this.game.party;
+    var ctx = this.panel.ctx;
+    var rowHeight = P.rowHeight || 46;
+    var size = P.spriteSize || 32;
+    var fieldSize = this.game.data.config.battleFieldSize || 3;
+    var swapping = (this.mode === "boxSwap");
+    this.panel.drawBox(P);
+
+    this.panel.drawText(fill(this.texts.boxPartyHead, { n: party.size(), max: party.maxSize }),
+      P.x + 10, P.y + 20, { font: t.smallFont, color: swapping ? t.cursorColor : t.subTextColor });
+
+    for (var i = 0; i < party.size(); i++) {
+      var m = party.get(i);
+      var top = P.y + 28 + rowHeight * i;
+      var rect = { x: P.x + 6, y: top, w: P.w - 12, h: rowHeight - 4 };
+      this._boxHitRects.party.push(rect);
+      var selected = (this.boxFocus === "party" && i === this.boxPartyIndex);
+
+      if (selected) this._strokeRect(rect, swapping ? (t.dangerColor || "#e8542a") : t.cursorColor);
+      var sprite = m.getSpriteId();
+      this.sprites.drawMotion(sprite, rect.x + 4, rect.y + (rect.h - size) / 2, size, size,
+        selected ? NS.Motion.forSprite(this.game.data, sprite, m.getMotionId(), this.game.clock, m.getMotionPhase()) : null);
+
+      var textX = rect.x + size + 12;
+      ctx.font = t.font || "14px monospace";
+      this.panel.drawText(clipText(ctx, m.getName(), rect.x + rect.w - 6 - textX), textX, rect.y + 18,
+        { color: selected ? t.cursorColor : t.textColor });
+      this.panel.drawText("Lv" + m.level, textX, rect.y + 34, { font: t.smallFont, color: t.subTextColor });
+      if (i < fieldSize) {
+        this.panel.drawText((this.layout.fieldDivider || {}).label || "", rect.x + rect.w - 6, rect.y + 34,
+          { align: "right", font: t.smallFont, color: (this.layout.fieldDivider || {}).color || t.cursorColor });
+      }
+    }
+  };
+
+  /** 中：箱。見出しに ◀ 箱 n/10 ▶、下に 6×5 のマス */
+  PartyScene.prototype._renderBoxGrid = function (G, view) {
+    var t = this.theme;
+    var B = this._boxLayout();
+    var ctx = this.panel.ctx;
+    var cols = this._boxCols();
+    var size = this._boxSize();
+    var cell = G.cell || 50, gap = G.gap || 2;
+    var sprite = G.spriteSize || 36;
+    var pages = this._boxPageCount(view);
+    this.panel.drawBox(G);
+    this._boxHitRects.grid = G;
+
+    var headY = G.y + 22;
+    var title = this.storageFilter ? fill(this.texts.boxNameFiltered, { n: this.boxPage + 1, total: pages })
+                                   : fill(this.texts.boxName, { n: this.boxPage + 1, total: pages });
+    this.panel.drawText(title, G.x + G.w / 2, headY, { align: "center" });
+    if (pages > 1) {
+      this.panel.drawText("◀", G.x + 14, headY, { color: t.cursorColor });
+      this.panel.drawText("▶", G.x + G.w - 14, headY, { align: "right", color: t.cursorColor });
+      this._boxHitRects.prev = { x: G.x, y: G.y, w: 60, h: G.headHeight || 34 };
+      this._boxHitRects.next = { x: G.x + G.w - 60, y: G.y, w: 60, h: G.headHeight || 34 };
+    }
+
+    var left = G.x + Math.floor((G.w - cols * cell - (cols - 1) * gap) / 2);
+    var top0 = G.y + (G.headHeight || 34);
+    var members = this.game.storage.getMembers();
+    var markColor = B.markColor || t.dangerColor || "#e8542a";
+
+    for (var c = 0; c < size; c++) {
+      var rect = { x: left + (c % cols) * (cell + gap), y: top0 + Math.floor(c / cols) * (cell + gap), w: cell, h: cell };
+      this._boxHitRects.cells.push(rect);
+      ctx.fillStyle = B.cellColor || "#121a2e";
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+
+      var at = this._boxCellIndex(view, this.boxPage, c);
+      var m = at >= 0 ? members[at] : null;
+      var selected = (this.boxFocus === "box" && c === this.boxCell);
+      var marked = m && this.marks.indexOf(m) >= 0;
+      if (m) {
+        var id = m.getSpriteId();
+        this.sprites.drawMotion(id, rect.x + (cell - sprite) / 2, rect.y + 3, sprite, sprite,
+          selected ? NS.Motion.forSprite(this.game.data, id, m.getMotionId(), this.game.clock, m.getMotionPhase()) : null);
+        NS.StatusMarks.drawElement(this.sprites, this.game.data, this._monsterElement(m), rect.x + 3, rect.y + 12, { size: 10 });
+        this.panel.drawText(String(m.level), rect.x + cell - 3, rect.y + cell - 3,
+          { align: "right", font: B.levelFont || "10px monospace", color: t.subTextColor });
+        if (m === this.swapMonster && this.mode === "boxSwap") this._strokeRect(rect, t.cursorColor);
+      }
+      if (marked) {
+        this._strokeRect(rect, markColor);
+        this.panel.drawText("✓", rect.x + 3, rect.y + cell - 3, { font: t.smallFont, color: markColor });
+      }
+      if (selected) this._strokeRect(rect, t.cursorColor);
+    }
+  };
+
+  /** 下：並べ方・絞り込みの札と、選んでいる仲間への操作の札（押すとその操作） */
+  PartyScene.prototype._renderBoxFooter = function (F, view) {
+    var t = this.theme;
+    var ctx = this.panel.ctx;
+    var lh = F.lineHeight || 24;
+    this.panel.drawBox(F);
+
+    var x = F.x + 12, y = F.y + 24;
+    var sortText = fill(this.texts.boxSort, { mode: (this.texts.boxSortLabels || {})[STORAGE_SORTS[this.storageSort || 0]] || "" });
+    var filterText = fill(this.texts.boxFilter, { mode: this._storageFilterLabel() });
+    ctx.font = t.smallFont || "12px monospace";
+    var sortW = ctx.measureText(sortText).width;
+    this.panel.drawText(sortText, x, y, { font: t.smallFont, color: t.cursorColor });
+    this._boxHitRects.sort = { x: x - 4, y: y - 16, w: sortW + 8, h: 22 };
+    var fx = x + sortW + 28;
+    this.panel.drawText(filterText, fx, y, { font: t.smallFont, color: this.storageFilter ? t.cursorColor : t.subTextColor });
+    this._boxHitRects.filter = { x: fx - 4, y: y - 16, w: ctx.measureText(filterText).width + 8, h: 22 };
+
+    y += lh;
+    var chips;
+    if (this.marking) {
+      this.panel.drawText(fill(this.texts.boxMarking, { n: this.marks.length }), x, y + 4,
+        { color: (this._boxLayout().markColor || t.dangerColor) });
+      chips = [{ label: this.texts.boxReleaseMarked || "", value: "releaseMarked" },
+               { label: this.texts.boxStopMarking || "", value: "stopMarking" }];
+      y += lh;
+    } else if (this.storageFilter && view.length === 0) {
+      this.panel.drawText(this.texts.boxFilteredEmpty || "", x, y + 4, { font: t.smallFont, color: t.hintColor });
+      return;
+    } else if (this._selected() && this.mode !== "boxSwap") {
+      chips = this._buildActionItems().filter(function (item) { return item.value !== "cancel"; });
+    } else {
+      return;
+    }
+
+    // 札を左から並べ、入らなければ次の行へ
+    var cx = x, cy = y;
+    for (var i = 0; i < chips.length; i++) {
+      ctx.font = t.smallFont || "12px monospace";
+      var w = ctx.measureText(chips[i].label).width + 18;
+      if (cx + w > F.x + F.w - 10) { cx = x; cy += 30; }
+      var rect = { x: cx, y: cy, w: w, h: 24 };
+      ctx.fillStyle = this._boxLayout().chipColor || "#18213a";
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+      this._strokeRect(rect, t.panelBorder || "#3a4266");
+      this.panel.drawText(chips[i].label, rect.x + 9, rect.y + 16, { font: t.smallFont });
+      this._boxHitRects.actions.push({ rect: rect, value: chips[i].value });
+      cx += w + 8;
+    }
+  };
+
+  /** 絞り込みの一覧（箱の上に重ねる） */
+  PartyScene.prototype._renderBoxFilter = function (B) {
+    var ctx = this.panel.ctx;
+    var r = this.filterList.rect;
+    ctx.save();
+    ctx.fillStyle = "rgba(4,6,12,0.6)";
+    ctx.fillRect(0, 0, this.game.canvas.width, this.game.canvas.height);
+    ctx.restore();
+    // 見出しの帯（一覧の枠のすぐ上。下の箱の見出しと重ならないように地を塗る）
+    this.panel.drawBox({ x: r.x, y: r.y - 30, w: r.w, h: 32 });
+    this.panel.drawText(this.texts.boxFilterTitle || "", r.x + 12, r.y - 9, { color: this.theme.cursorColor });
+    this.filterList.render(this.game.clock);
+  };
+
+  /** 枠線だけを描く（マス・札の縁、選んでいるものの印） */
+  PartyScene.prototype._strokeRect = function (rect, color) {
+    var ctx = this.panel.ctx;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2);
+    ctx.restore();
+  };
+
   PartyScene.prototype._renderTabs = function (L, t) {
     var pos = L.tabs || { x: L.title.x + 160, y: L.title.y, gap: 130 };
     var party = this.game.party;
@@ -1067,19 +2154,18 @@
     }
 
     var hint;
-    if (this.mode === "equip") hint = this.texts.hintEquip;
+    if (this.mode === "equip") hint = (this.equipFocus === "items") ? this.texts.hintEquipItems : this.texts.hintEquipSlots;
     else if (this.mode === "inspect") hint = this.texts.hintInspect;
     else if (this.mode === "affection") hint = this.texts.hintAffection;
     else if (this.mode === "action") hint = this.texts.hintAction;
-    else if (this.mode === "release") hint = this.texts.hintRelease;
+    else if (this.mode === "release" || this.mode === "releaseMany") hint = this.texts.hintRelease;
+    else if (this.mode === "boxSwap") hint = this.texts.hintBoxSwap;
+    else if (this.mode === "boxFilter") hint = this.texts.hintBoxFilter;
     else if (this.mode === "fieldSkill") hint = this.texts.hintFieldSkill;
     else if (this.mode === "tactic") hint = this.texts.hintTactic;
     else if (this.mode === "fieldTarget") hint = this.texts.hintFieldTarget;
     else if (this.mode === "reorder") hint = this.texts.hintReorder;
-    else if (this.tab === "storage" && this.game.storage.isEmpty()) {
-      // 何も預けていないときは「どうすれば預けられるか」を出す
-      hint = this.texts.hintStorageEmpty;
-    }
+    else if (this.boxView) hint = this.marking ? this.texts.hintBoxMark : this.texts.hintBox;
     // 探索中は表の切り替えが無いので、その案内を出さない
     else if (!this.allowStorage) hint = this.texts.hintNoStorage || this.texts.hintNormal;
     else hint = this.texts.hintNormal;
@@ -1159,13 +2245,16 @@
       { color: monster.isFainted() ? t.hpBarLow : t.subTextColor, font: t.smallFont });
   };
 
-  /** 選択中の個体の詳細を描く */
-  PartyScene.prototype._renderDetail = function (monster) {
+  /**
+   * 選択中の個体の詳細を描く
+   * @param {object} [box] 枠（省略時は一覧の右の欄 layout.detail。預かり所の画面は layout.box.detail）
+   */
+  PartyScene.prototype._renderDetail = function (monster, box) {
     if (!monster) return;
 
     var L = this.layout;
     var t = this.theme;
-    var rect = L.detail;
+    var rect = box || L.detail;
     this.panel.drawBox(rect);
 
     var x = rect.x + (t.padding || 8);

@@ -1044,9 +1044,39 @@
       // 下端は「戻る」ボタン（theme.backButton の y 552）の少し上まで。
       // 中身が多い仲間は行間を詰めて収める（PartyScene._detailLineHeight）
       detail: { x: 540, y: 58, w: 228, h: 484 },
-      // 装備を選ぶときの一覧（詳細欄の位置に重ねて出す）
-      //   下の余白にステータスの変化（着ける前 → 着けたあと）を出す
-      equipList: { x: 540, y: 58, w: 228, h: 230, rowHeight: 26, visibleRows: 7 },
+      /**
+       * 装備の画面（v1.0.3。画面ぜんぶを使う。js/scenes/PartyScene.js の _renderEquipScreen）
+       *   monster … 左上の ◀ 絵・名前 ▶（spriteSize は絵の大きさ）
+       *   slots   … 左の枠の一覧と「すべて外す」。labelX は枠の名前、nameX は装備の名前の位置（枠の左端から）
+       *   items   … 右の候補。headHeight は見出し（枠の名前・並べ方）の高さ、effectX は主な効果の列（枠の左端から）
+       *   compare … 下の見比べ。colB は「着けたら」の列、colStats はステータスの列（枠の左端から）
+       */
+      equip: {
+        monster: { x: 32, y: 58, w: 300, h: 84, spriteSize: 48 },
+        slots:   { x: 32, y: 150, w: 300, h: 156, rowHeight: 26, labelX: 30, nameX: 128 },
+        items:   { x: 348, y: 58, w: 420, h: 248, rowHeight: 26, headHeight: 30, effectX: 196 },
+        compare: { x: 32, y: 316, w: 736, h: 226, colB: 250, colStats: 520, lineHeight: 20 }
+      },
+      /**
+       * 預かり所の画面（v1.0.3。js/scenes/PartyScene.js の _renderBoxView）
+       *   party  … 左の連れていく仲間の列（rowHeight は1体ぶん、spriteSize は絵）
+       *   grid   … 中の箱。cols 列のマス（cell は1マスの大きさ、gap はマスの間）。headHeight は「◀ 箱 1/10 ▶」の高さ
+       *   footer … 下の並べ方・絞り込みと、操作の札
+       *   detail … 右の詳細（一覧の右の欄と同じ描き方）
+       *   filter … 絞り込みの一覧（箱の上に重ねる）
+       *   cellColor … マスの地の色 / markColor … まとめて逃がす印 / chipColor … 操作の札の地の色
+       */
+      box: {
+        party:  { x: 32, y: 58, w: 170, h: 306, rowHeight: 46, spriteSize: 32 },
+        grid:   { x: 214, y: 58, w: 326, h: 306, headHeight: 34, cols: 6, cell: 50, gap: 2, spriteSize: 36 },
+        footer: { x: 32, y: 374, w: 508, h: 168, lineHeight: 26 },
+        detail: { x: 552, y: 58, w: 216, h: 484 },
+        filter: { x: 250, y: 110, w: 300, h: 340, rowHeight: 24 },
+        cellColor: "#121a2e",
+        markColor: "#e86a8a",
+        chipColor: "#18213a",
+        levelFont: "10px monospace"
+      },
       // 「この仲間をどうするか」の項目。
       // h は最低の高さで、項目が増えたぶんは CommandMenu が自動で伸ばす
       actionMenu: { x: 300, y: 180, w: 220, h: 140, lineHeight: 28 },
