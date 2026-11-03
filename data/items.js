@@ -1318,6 +1318,21 @@
       usableIn: []
     },
 
+    // 千年樹の根底の主のドロップ（v1.0.3）。ほかの主の素材と同じく、必ず1つ落ちる。
+    // 名前・説明・値段は仮（値段は若木の芯の一段上）。使い道（作れる物）はまだ無い
+    amberCore: {
+      id: "amberCore",
+      name: "琥珀の芯",
+      icon: "iconItemAmberCore",
+      from: "ancientRoots",
+      category: "material",
+      description: "千年樹の根底の主の胸にあった琥珀。中で、まだ光がゆっくり揺れている。",
+      maxStack: 99,
+      price: 450,
+      effect: null,
+      usableIn: []
+    },
+
     /**
      * --- 萌芽の穴・蔦這う回廊の素材（v1.0.1） ---
      * 値段は 2026-10-28 に作者から任されて決めた（若葉の洞の同じ役の品より 3〜4割高い。回廊は1戦のゴールドも多い）。

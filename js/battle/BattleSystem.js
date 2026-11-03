@@ -214,6 +214,18 @@
       // 「ためる」の倍率は、その行動のあいだだけ
       step.actor._chargeMul = null;
       if (this._checkFinish(events)) return events;
+
+      // 1ターンに何度も動く主（data/bosses.js の actionsPerTurn）は、続けてもう一度動く。
+      // 2回目の行動はそのときに決め直す（1回目で倒れた仲間を狙い続けないように）
+      for (var extra = 1; extra < (step.actions || 1); extra++) {
+        if (step.actor.isFainted() || step.actor._removed) break;
+        if (this._alwaysBlockingStatus(step.actor)) break;   // 眠ったら、残りの手番も無い
+        var again = { actor: step.actor, side: step.side, speed: step.speed,
+          action: this._chooseEnemyAction(step.actor, this.getFieldAllies()) };
+        this._performAction(again, events);
+        step.actor._chargeMul = null;
+        if (this._checkFinish(events)) return events;
+      }
     }
 
     // 立ち塞がるのは、そのターンのあいだだけ
@@ -402,7 +414,8 @@
       enemySteps.push(this._withFirstStrike({
         actor: fieldEnemies[i], side: "enemy",
         action: this._chooseEnemyAction(fieldEnemies[i], fieldAllies),
-        speed: this._rollSpeed(fieldEnemies[i])
+        speed: this._rollSpeed(fieldEnemies[i]),
+        actions: this._rollActionCount(fieldEnemies[i])
       }));
     }
 
@@ -473,6 +486,19 @@
     var max = (typeof config.max === "number") ? config.max : 1;
 
     return actor.getSpeed() * this._tailwindMultiplier(actor) * (min + this.random.next() * (max - min));
+  };
+
+  /**
+   * このターンに何回動くか（v1.0.3）。ふつうは1回。
+   * 主の actionsPerTurn（data/bosses.js。{ min, max }）があれば、その幅で毎ターン引き直す。
+   * 2回目以降は1回目のすぐ後に続けて動く（takeTurn）
+   */
+  BattleSystem.prototype._rollActionCount = function (actor) {
+    var spec = actor && actor.actionsPerTurn;
+    if (!spec) return 1;
+    var min = Math.max(1, Math.floor(numberOr(spec.min, 1)));
+    var max = Math.max(min, Math.floor(numberOr(spec.max, min)));
+    return this.random.nextInt(min, max);
   };
 
   /** 特性「追い風」（tailwind）。戦闘の最初の turns ターンだけ、行動順の素早さに倍率を掛ける */
@@ -1022,7 +1048,7 @@
     function valueOn(skill, foe) {
       var est = self.calcDamage(actor, foe, skill, true);
       if (est.immune) return 0;
-      var hit = (skill.accuracy === undefined ? 1 : skill.accuracy) * self._accuracyMultiplier(actor);
+      var hit = (skill.accuracy === undefined ? 1 : skill.accuracy) * self._accuracyMultiplier(actor, skill);
       if (self.data.getSkillRule(skill, "evadable") !== false && foe.getEvasion) hit *= (1 - foe.getEvasion());
       // 何回か当てる技（二段斬り）は回数ぶん
       var total = est.damage * Math.max(1, skill.hits || 1);
@@ -1417,17 +1443,30 @@
   /**
    * 命中率に掛かる倍率（盲目）。
    * 属性耐性と同じで、引き算ではなく掛け算にそろえてある。
+   * 盲目（状態異常の accuracyMul）は、通常攻撃・体技・斬撃にだけ掛かる（2026-11-03 作者の指定。_isPhysicalAction）。
+   * skill を渡さなければ、今までどおり何にでも掛ける
    */
-  BattleSystem.prototype._accuracyMultiplier = function (actor) {
+  BattleSystem.prototype._accuracyMultiplier = function (actor, skill) {
     var defs = actor && actor.getStatusDefs ? actor.getStatusDefs() : [];
     var total = 1;
 
-    for (var i = 0; i < defs.length; i++) {
+    var blindApplies = !skill || this._isPhysicalAction(skill);
+    for (var i = 0; i < defs.length && blindApplies; i++) {
       if (typeof defs[i].accuracyMul === "number") total *= defs[i].accuracyMul;
     }
     // 弱体・装備などの命中の倍率（朧羽など。盲目とは別に掛け合わさる）
     if (this.effects && actor) total *= this.effects.getAccuracyMultiplier(actor);
     return total;
+  };
+
+  /**
+   * 体を使う行動か（通常攻撃・体技・斬撃）。ちからため の倍率と盲目は、これにだけ効く（2026-11-03 作者の指定）。
+   * 種類は画面に出る種類（skill.kind）で見る。死神の鎌（踊り。計算だけ斬撃）は踊りなので入らない
+   */
+  BattleSystem.prototype._isPhysicalAction = function (skill) {
+    if (!skill) return false;
+    if (skill.id === this.getNormalAttackId()) return true;
+    return skill.kind === "body" || skill.kind === "slash";
   };
 
   /**
@@ -1537,7 +1576,9 @@
       targetName: target.getName(),
       healAmount: healed,
       revealTarget: target,
-      revealHp: target.currentHp
+      revealHp: target.currentHp,
+      // 画面が回復の技の演出を出すのに使う（キュアなど。v1.0.3）。道具の回復には付かない
+      target: target, skillId: skill.id
     });
   };
 
@@ -1797,11 +1838,29 @@
     if (!skill) return;
 
     // 何回か当てる技（二段斬り。技の hits）。1回ずつ命中を判定し、相手が倒れたらそこで止める
+    // randomTargets（歯車投げ。v1.0.3）は1回ごとに向かい側の盤面からでたらめに1体選ぶ（立ち塞がる者がいればそちらへ）。
+    // 相手が全員倒れるまで続ける
     var hits = Math.max(1, skill.hits || 1);
     for (var h = 0; h < hits; h++) {
-      if (h > 0 && (target.isFainted() || target._removed || actor.isFainted())) break;
-      this._resolveHit(actor, target, skill, side, events);
+      if (h > 0 && actor.isFainted()) break;
+      var aim = target;
+      if (skill.randomTargets) {
+        aim = this._randomFoe(side, skill);
+        if (!aim) break;
+      } else if (h > 0 && (target.isFainted() || target._removed)) break;
+      this._resolveHit(actor, aim, skill, side, events);
     }
+  };
+
+  /** 向かい側の盤面の、倒れていない1体をでたらめに（立ち塞がる者がいればそちら）。いなければ null */
+  BattleSystem.prototype._randomFoe = function (side, skill) {
+    var group = this._candidatesFor(side, skill);
+    var alive = [];
+    for (var i = 0; i < group.length; i++) {
+      if (!group[i].isFainted() && !group[i]._removed) alive.push(group[i]);
+    }
+    if (alive.length === 0) return null;
+    return this._coverFor(alive[this.random.nextInt(0, alive.length - 1)], side);
   };
 
   /**
@@ -1973,8 +2032,9 @@
     if (ppCost && actor.payPp) actor.payPp(ppCost);
 
     // 「ためる」で力をためていれば、この行動のダメージに倍率を掛ける（全体の技なら全員・二段斬りなら2回とも）。
-    // 倍率はこの行動のあいだだけ（takeTurn が行動のあとに外す）
-    if (actor._charged && BattleSystem.dealsDamage(skill)) {
+    // 倍率はこの行動のあいだだけ（takeTurn が行動のあとに外す）。
+    // 効くのは通常攻撃・体技・斬撃だけ（2026-11-03 作者の指定）。共鳴・ブレス・踊りを出しても、ためた力は残る
+    if (actor._charged && BattleSystem.dealsDamage(skill) && this._isPhysicalAction(skill)) {
       var c = actor._charged;
       actor._chargeMul = c.min + this.random.next() * ((c.max || c.min) - c.min);
       actor._charged = null;
@@ -2001,7 +2061,7 @@
 
     // 盲目などで命中率が下がる。
     // このあとに回避判定がもう一度あることに注意（当たりにくさは2段構え）
-    accuracy *= this._accuracyMultiplier(actor);
+    accuracy *= this._accuracyMultiplier(actor, skill);
 
     if (this.random.next() >= accuracy) {
       events.push({ type: "miss", side: side, targetName: target.getName(), target: target });
@@ -2717,7 +2777,7 @@
                             : randomMin + this.random.next() * (randomMax - randomMin);
     // 「ためる」の倍率（この行動のあいだだけ。見積もりでは、ためていれば真ん中の値）
     if (estimate) {
-      if (attacker._charged) abilityMultiplier *= (attacker._charged.min + (attacker._charged.max || attacker._charged.min)) / 2;
+      if (attacker._charged && this._isPhysicalAction(skill)) abilityMultiplier *=(attacker._charged.min + (attacker._charged.max || attacker._charged.min)) / 2;
     } else if (attacker._chargeMul) {
       abilityMultiplier *= attacker._chargeMul;
     }

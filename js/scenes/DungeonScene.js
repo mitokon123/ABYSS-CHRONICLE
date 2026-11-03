@@ -150,7 +150,7 @@
       var f = saved[i];
       if (!definitions[f.type]) continue;
       result.push({ col: f.col, row: f.row, type: f.type, definition: definitions[f.type],
-                    used: !!f.used, revealed: !!f.revealed });
+                    used: !!f.used, revealed: !!f.revealed, contents: f.contents || null });
     }
     return result;
   };
@@ -179,7 +179,7 @@
     this.player.setPosition(start.col, start.row);
 
     // 仕掛けは開始位置と階段を避けて置く（いきなり罠を踏まないように）
-    this.placedFeatures = this.features.place(this.dungeon, [start]);
+    this.placedFeatures = this.features.place(this.dungeon, [start], this.floor);
 
     // 飾りは仕掛けの上に重ならないように置く（宝箱を隠してしまわないため）
     this._placeDecorations([start].concat(this.placedFeatures));
@@ -781,6 +781,9 @@
     if (enemy.setEncounterMultipliers) enemy.setEncounterMultipliers(boss.statMultiplier);
     // 決まった順番で動く主は、ここで手順を渡す
     if (enemy.setActionPattern) enemy.setActionPattern(boss.actionPattern);
+    // PPが減らない主・1ターンに何度も動く主（v1.0.3）。スカウトすると個体は作り直されるので、仲間には付いてこない
+    if (boss.infinitePp) enemy.infinitePp = true;
+    if (boss.actionsPerTurn) enemy.actionsPerTurn = boss.actionsPerTurn;
     // 主として立ちはだかるあいだだけ効かない状態異常。
     // 全ボス共通のぶん（data/battle.js の bossImmuneToStatus）に、その主だけのぶんを足す
     if (enemy.setBossStatusImmunity) {

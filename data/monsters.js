@@ -1811,7 +1811,9 @@
       maxLevel: 80,
       // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
       growthRate: {
-        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.35 }, { from: 55, rate: 0.46 }, { from: 65, rate: 0.30 }],
+        // HP は 2026-11-03 に下げた（作者「HP役のまま、2位との差を約5%に」）。Lv30 200・Lv50 380・Lv70 610・Lv80 690 にちょうどなる値。
+        // 区切りはそのまま。Lv24 までは変えていないので、主のとき（Lv21）の HP531 は変わらない
+        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.257 }, { from: 40, rate: 0.335 }, { from: 55, rate: 0.473 }, { from: 65, rate: 0.267 }],
         // Lv51 から +0.15（2026-10-20 作者の判断。上限で攻撃321。前は 45:0.55・55:0.30 で271）
         attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 35, rate: 0.40 }, { from: 45, rate: 0.55 }, { from: 51, rate: 0.70 }, { from: 55, rate: 0.45 }],
         defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.25 }, { from: 50, rate: 0.45 }, { from: 61, rate: 0.35 }],
@@ -2320,6 +2322,103 @@
         attack: "woodLordSlam", resonance: "woodLordResonate", breath: "woodLordBreath",
         technique: "woodLordSweep", buff: "woodLordBuff", hit: "woodLordHit", dodge: "woodLordDodge",
         guard: "guard", heal: "recover", faint: "crumble", levelUp: "woodLordCheer", sleeping: "woodLordSleeping"
+      }
+    },
+
+    /**
+     * 千年樹の根底の主（v1.0.3）。昔だれかが千年樹を守らせるために置いた、木と真鍮のからくり。胸の琥珀の芯で動く。
+     * ★ 作者が決めたもの（2026-11-01〜03）：大きなからくり・雷・弱点は地・特性は放電・
+     *   主として Lv32 HP1050 攻135 防65 速40・PP無限・1ターンに1〜2回・行動の順番・専用技 歯車投げ（data/bosses.js の rootsWarden）。
+     * ★ 名前は作者から任された仮のもの（からくり＋森／守り）。
+     * ★ 仲間にしたときの値は作者が決めた（2026-11-03）：
+     *   能力値の目標（個体値0・素直）Lv30 170/62/71/27/35・Lv50 354/132/140/53/76・
+     *   Lv70 544/263/246/76/121・Lv80 622/311/290/99/152（HP/攻/防/速/PP）。成長率はこの値にちょうどなるよう逆算した。
+     *   耐性 雷6・風3・地−4・火−2／状態異常 毒10・麻痺8・呪い8・即死5／特性 放電／覚える技／勧誘率 0.12／
+     *   絆の報酬 地+2・火+2・防御×1.1・攻撃×1.05。
+     *   図鑑の説明・記録・経験値・ゴールドは仮
+     */
+    gearWarden: {
+      id: "gearWarden",
+      name: "カラクリモリ",
+      family: "constructKind",
+      element: "thunder",
+      // 雷と風に強く、地と火に弱い（地の弱点はここが最初の主）
+      resistances: { thunder: 6, wind: 3, earth: -4, fire: -2 },
+      immunities: [],
+      // 機械なので毒と麻痺に強い（毒10は効かない。主のあいだは data/bosses.js の immuneToStatus で麻痺も効かない）
+      statusResist: { poison: 10, paralysis: 8, sleep: 0, seal: 0,
+                      blind: 0, curse: 8, instantDeath: 5 },
+      maxLevel: 80,
+      // 区切りは Lv30・50・70 の目標値のところ（遅くて硬い。防御は Lv50 から大きく伸びる）
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.21 },  { from: 31, rate: 0.384 }, { from: 51, rate: 0.395 }, { from: 71, rate: 0.327 }],
+        attack:  [{ from: 1, rate: 0.161 }, { from: 31, rate: 0.319 }, { from: 51, rate: 0.595 }, { from: 71, rate: 0.437 }],
+        defense: [{ from: 1, rate: 0.239 }, { from: 31, rate: 0.384 }, { from: 51, rate: 0.589 }, { from: 71, rate: 0.489 }],
+        speed:   [{ from: 1, rate: 0.124 }, { from: 31, rate: 0.216 }, { from: 51, rate: 0.192 }, { from: 71, rate: 0.383 }],
+        pp:      [{ from: 1, rate: 0.14 },  { from: 31, rate: 0.293 }, { from: 51, rate: 0.322 }, { from: 71, rate: 0.443 }]
+      },
+      description: "雷属性。千年樹の根底の主と呼ばれている。千年樹を守るために置かれた古いからくりで、胸の琥珀の光で動き続けている。地に弱い。",
+      records: {
+        used:  "胸の窓をのぞくと、琥珀の奥で光がゆっくり脈を打っていた。",
+        trust: "外れた歯車を拾ってきて、自分ではめ直してくれと差し出した。",
+        bond:  "千年守ってきた根から離れても、隣を歩く者を守るのは変わらない。"
+      },
+      bondReward: { effects: [
+        { type: "resistBonus", element: "earth", value: 2 },
+        { type: "resistBonus", element: "fire", value: 2 },
+        { type: "statMultiplier", stat: "defense", value: 1.1 },
+        { type: "statMultiplier", stat: "attack", value: 1.05 }
+      ] },
+      baseHp: 24,
+      baseAttack: 11,
+      baseDefense: 9,
+      baseSpeed: 6,
+      basePp: 7,
+      scoutRate: 0.12,
+      // 主なので、ふつうの遭遇には出ない
+      spawnRate: 0,
+      // 仲間になってから覚える技（作者が決めた。2026-11-03）。主のときの技（専用の歯車投げも）を覚えていく
+      learnset: [
+        { level: 1,  skill: "tackle" },
+        { level: 6,  skill: "thunderBolt" },
+        { level: 10, skill: "harden" },
+        { level: 15, skill: "gearThrow" },
+        { level: 20, skill: "volt" },
+        { level: 22, skill: "lightning" },
+        { level: 23, skill: "armorBreak" },
+        { level: 24, skill: "chargeUp" },
+        { level: 26, skill: "numbPowder" },
+        { level: 27, skill: "rallyDance" }
+      ],
+      // 主として出たときの行動は data/bosses.js の rootsWarden の手順。手順を持たない出方をしたとき用に、同じ技を並べておく
+      enemySkills: [
+        { level: 1, skill: "armorBreak" },
+        { level: 1, skill: "lightning" },
+        { level: 1, skill: "volt" },
+        { level: 1, skill: "numbPowder" },
+        { level: 1, skill: "gearThrow" }
+      ],
+      abilities: ["discharge"],
+      // 経験値・ゴールドは仮（ヒコバエ 170/115 の一段上）
+      expReward: 230,
+      goldReward: 160,
+      drops: [
+        { item: "amberCore", rate: 1.0, min: 1, max: 1 }
+      ],
+      // ふだんは胸の芯が脈打ち、はさみの手が開け閉めし、歯車が回る
+      sprite: ["gearWarden", "gearWardenGlow", "gearWardenClaw", "gearWardenGear"],
+      sizeScale: 1.4,
+      motion: "gearIdle",
+      // 姿（専用の動きのコマ。2026-11-03）。片腕を振り上げる・片足で踏み出す・膝を折る・火花を散らす・被弾・倒れる
+      poses: { armsOut: "gearWardenArmsOut", armsUp: "gearWardenArmsUp", glare: "gearWardenGlare", sleep: "gearWardenSleep",
+               armRUp: "gearWardenArmRUp", armLUp: "gearWardenArmLUp", stepL: "gearWardenStepL", stepR: "gearWardenStepR",
+               crouch: "gearWardenCrouch", sparkA: "gearWardenSparkA", sparkB: "gearWardenSparkB",
+               recoil: "gearWardenRecoil", slump: "gearWardenSlump" },
+      // 場面ごとの動き（data/motions.js の gear〜）。技ごとには分けず、技の種類ごと
+      motions: {
+        attack: "gearSlam", resonance: "gearResonate", breath: "gearBreath",
+        technique: "gearPummel", buff: "gearBuff", hit: "gearHit", dodge: "gearDodge",
+        guard: "gearGuard", heal: "recover", faint: "gearFall", levelUp: "gearCheer", sleeping: "gearSleeping"
       }
     },
 

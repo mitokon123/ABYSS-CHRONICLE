@@ -2045,6 +2045,842 @@
 
         ctx.fillRect(x - size / 2, y - size / 2, size, size);
       }
+    },
+
+    // ─────────────────────────────────────────
+    // v1.0.3：ほかの技の演出を借りていた技の専用の型（2026-11-03 作者の指定）
+    // ─────────────────────────────────────────
+
+    /**
+     * 癒やし（キュア・キュアラ）：体がやわらかく光り、十字の光が足元から昇る。
+     *   crosses … 十字の数  column: true … 上から光の柱が降りる（キュアラ）
+     */
+    healing: function (ctx, d, t, p) {
+      var i;
+      var R = d.radius || 34;
+      // 光の柱（キュアラ）
+      if (d.column) {
+        var cs = span(t, 0, 0.45);
+        var ca = (t < 0.45) ? cs : fadeOut((t - 0.45) / 0.55);
+        setAlpha(ctx, ca * 0.35);
+        ctx.fillStyle = p.color;
+        var top = p.y - 150;
+        ctx.fillRect(p.x - R * 0.7, top, R * 1.4, (p.y + 40 - top) * easeOut(cs));
+        setAlpha(ctx, ca * 0.6);
+        ctx.fillStyle = p.coreColor;
+        ctx.fillRect(p.x - R * 0.18, top, R * 0.36, (p.y + 40 - top) * easeOut(cs));
+      }
+      // 体のやわらかい光
+      var glow = Math.sin(Math.PI * Math.min(1, t * 1.4));
+      setAlpha(ctx, glow * 0.28);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, R * 1.2, R * 1.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 昇る十字
+      var count = d.crosses || 6;
+      for (i = 0; i < count; i++) {
+        var s = span(t, wobble(i) * 0.45, 0.55);
+        if (s <= 0 || s >= 1) continue;
+        var lane = (wobble(i + 7) - 0.5) * R * 2.2;
+        var y = p.y + 30 - (d.rise || 70) * easeOut(s) + Math.sin(s * 6 + i) * 2;
+        var size = (d.crossSize || 7) * (1 - s * 0.3);
+        setAlpha(ctx, fadeOut(s));
+        ctx.fillStyle = (s < 0.3) ? p.coreColor : p.color;
+        ctx.fillRect(p.x + lane - size, y - size * 0.3, size * 2, size * 0.6);
+        ctx.fillRect(p.x + lane - size * 0.3, y - size, size * 0.6, size * 2);
+      }
+    },
+
+    /**
+     * 清め（クレンズ）：澄んだ雫が上から降り、体に当たって輪が広がる。最後に小さなきらめき
+     */
+    cleanse: function (ctx, d, t, p) {
+      var i;
+      var count = d.count || 7;
+      for (i = 0; i < count; i++) {
+        var s = span(t, wobble(i) * 0.3, 0.4);
+        if (s <= 0 || s >= 1) continue;
+        var x = p.x + (wobble(i + 3) - 0.5) * 60;
+        var y = p.y - 90 + 90 * easeIn(s);
+        setAlpha(ctx, s < 0.85 ? 1 : (1 - s) / 0.15);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 7);
+        ctx.quadraticCurveTo(x + 4, y, x, y + 3);
+        ctx.quadraticCurveTo(x - 4, y, x, y - 7);
+        ctx.fill();
+      }
+      // 当たって広がる輪
+      for (i = 0; i < 2; i++) {
+        var rs = span(t, 0.35 + i * 0.12, 0.5);
+        if (rs <= 0 || rs >= 1) continue;
+        setAlpha(ctx, 1 - rs);
+        ctx.strokeStyle = (i === 0) ? p.coreColor : p.color;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y + 10, 14 + 40 * easeOut(rs), (14 + 40 * easeOut(rs)) * 0.4, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // きらめき
+      var ks = span(t, 0.55, 0.45);
+      if (ks > 0 && ks < 1) {
+        for (i = 0; i < 4; i++) {
+          var kx = p.x + (wobble(i + 20) - 0.5) * 70, ky = p.y + (wobble(i + 30) - 0.5) * 60;
+          var k = 6 * Math.sin(Math.PI * ks);
+          setAlpha(ctx, Math.sin(Math.PI * ks));
+          ctx.fillStyle = p.coreColor;
+          ctx.fillRect(kx - k, ky - 1, k * 2, 2);
+          ctx.fillRect(kx - 1, ky - k, 2, k * 2);
+        }
+      }
+    },
+
+    /**
+     * 薬草（主のやくそう）：葉が体のまわりを巡りながら昇り、体が緑に光る
+     */
+    herbLeaves: function (ctx, d, t, p) {
+      var i;
+      var count = d.count || 7;
+      var glow = Math.sin(Math.PI * t);
+      setAlpha(ctx, glow * 0.22);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, 44, 52, 0, 0, Math.PI * 2);
+      ctx.fill();
+      for (i = 0; i < count; i++) {
+        var s = span(t, i * 0.06, 0.7);
+        if (s <= 0 || s >= 1) continue;
+        var ang = turns(i / count + s * 0.8 + p.phase);
+        var r = 46 - 12 * s;
+        var x = p.x + Math.cos(ang) * r;
+        var y = p.y + 34 - 90 * easeOut(s) + Math.sin(ang) * r * 0.25;
+        setAlpha(ctx, fadeOut(s));
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(ang + Math.PI / 4);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 7, 3.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = p.coreColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-6, 0);
+        ctx.lineTo(6, 0);
+        ctx.stroke();
+        ctx.restore();
+      }
+    },
+
+    /**
+     * 硬化（こうか）：外から板が集まって体を覆い、閉じた瞬間に輪郭が光る
+     */
+    hardenShell: function (ctx, d, t, p) {
+      var i;
+      var plates = d.plates || 6;
+      var R = d.radius || 44;
+      var close = span(t, 0, 0.4);
+      for (i = 0; i < plates; i++) {
+        var ang = turns(i / plates + 1 / 12);
+        var dist = R * (1.9 - 0.9 * easeOut(close));
+        var x = p.x + Math.cos(ang) * dist;
+        var y = p.y + Math.sin(ang) * dist * 1.15;
+        var a = (t < 0.4) ? close : fadeOut((t - 0.4) / 0.6);
+        setAlpha(ctx, a * 0.85);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(ang + Math.PI / 2);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-R * 0.48, -4, R * 0.96, 8);
+        ctx.fillStyle = p.coreColor;
+        ctx.fillRect(-R * 0.48, -4, R * 0.96, 2);
+        ctx.restore();
+      }
+      // 閉じた瞬間の輪郭
+      var flash = span(t, 0.38, 0.4);
+      if (flash > 0 && flash < 1) {
+        setAlpha(ctx, 1 - flash);
+        ctx.strokeStyle = p.coreColor;
+        ctx.lineWidth = 3;
+        polygonPath(ctx, p.x, p.y, R * (1 + flash * 0.15), plates, turns(1 / 12), 1.15);
+        ctx.stroke();
+      }
+    },
+
+    /**
+     * 力が抜ける（ちからぬき）：体から赤い粒が抜け出て散り、下向きの矢じりが沈んでいく
+     */
+    drainAway: function (ctx, d, t, p) {
+      var i;
+      var count = d.count || 12;
+      for (i = 0; i < count; i++) {
+        var s = span(t, wobble(i) * 0.35, 0.6);
+        if (s <= 0 || s >= 1) continue;
+        var ang = turns(i / count + p.phase);
+        var r = 8 + 50 * easeOut(s);
+        var x = p.x + Math.cos(ang) * r;
+        var y = p.y + Math.sin(ang) * r * 0.7 - 20 * s;
+        var size = sizeOf(d, i) * (1 - s * 0.6);
+        setAlpha(ctx, fadeOut(s));
+        ctx.fillStyle = p.color;
+        ctx.fillRect(x - size / 2, y - size / 2, size, size);
+      }
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      for (i = 0; i < 3; i++) {
+        var cs = span(t, 0.25 + i * 0.12, 0.5);
+        if (cs <= 0 || cs >= 1) continue;
+        var cy = p.y - 30 + 60 * easeOut(cs);
+        setAlpha(ctx, fadeOut(cs));
+        ctx.strokeStyle = (cs < 0.3) ? p.coreColor : p.color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(p.x - 10, cy - 8);
+        ctx.lineTo(p.x, cy);
+        ctx.lineTo(p.x + 10, cy - 8);
+        ctx.stroke();
+      }
+      ctx.lineCap = "butt";
+      ctx.lineJoin = "miter";
+    },
+
+    /**
+     * 立ち塞がる：足元から石積みの壁がせり上がり、土ぼこりが舞う
+     */
+    standWall: function (ctx, d, t, p) {
+      var i, j;
+      var W = d.width || 96, H = d.height || 104;
+      var rise = easeOut(span(t, 0, 0.3));
+      var a = (t < 0.3) ? 1 : fadeOut((t - 0.3) / 0.7);
+      var base = p.y + H * 0.5;
+      var top = base - H * rise;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(p.x - W / 2, top, W, base - top);
+      ctx.clip();
+      var rows = 6, cols = 4;
+      for (j = 0; j < rows; j++) {
+        for (i = 0; i < cols + 1; i++) {
+          var off = (j % 2) ? -W / cols / 2 : 0;
+          var bx = p.x - W / 2 + off + i * W / cols;
+          var by = base - (j + 1) * H / rows;
+          // 壁の向こうの自分が見えるよう、石は薄く
+          setAlpha(ctx, a * 0.28);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(bx + 1, by + 1, W / cols - 2, H / rows - 2);
+          setAlpha(ctx, a * 0.75);
+          ctx.fillStyle = p.coreColor;
+          ctx.fillRect(bx + 1, by + 1, W / cols - 2, 1.5);
+        }
+      }
+      ctx.restore();
+      // 土ぼこり
+      for (i = 0; i < 10; i++) {
+        var s = span(t, 0.05 + wobble(i) * 0.15, 0.5);
+        if (s <= 0 || s >= 1) continue;
+        var side = (i % 2) ? 1 : -1;
+        var x = p.x + side * (W / 2 + 30 * easeOut(s) * (0.5 + wobble(i + 4)));
+        var y = base - 10 * Math.sin(Math.PI * s) - 4;
+        setAlpha(ctx, (1 - s) * 0.8);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(x - 3, y - 3, 6, 6);
+      }
+    },
+
+    /**
+     * 朧な羽（朧羽）：ぼんやりした羽が揺れながら舞い落ち、もやが相手を包む
+     */
+    hazyFeathers: function (ctx, d, t, p) {
+      var i;
+      // もや
+      var ms = Math.sin(Math.PI * t);
+      for (i = 0; i < 4; i++) {
+        setAlpha(ctx, ms * 0.12);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.ellipse(p.x + (wobble(i) - 0.5) * 40, p.y + (wobble(i + 5) - 0.5) * 30, 40, 26, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      var count = d.count || 6;
+      for (i = 0; i < count; i++) {
+        var s = span(t, wobble(i + 2) * 0.35, 0.65);
+        if (s <= 0 || s >= 1) continue;
+        var x = p.x + (wobble(i + 9) - 0.5) * 90 + Math.sin(s * 7 + i) * 12;
+        var y = p.y - 70 + 120 * s;
+        var tilt = Math.sin(s * 7 + i) * 0.7;
+        setAlpha(ctx, fadeOut(s) * 0.85);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(tilt);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 4, 11, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = p.coreColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, -11);
+        ctx.lineTo(0, 13);
+        ctx.stroke();
+        ctx.restore();
+      }
+    },
+
+    /**
+     * 導きの光：上から光の筋が降りて体を照らし、足元から前へ光の跡が流れる
+     */
+    guidingLight: function (ctx, d, t, p) {
+      var i;
+      var bs = span(t, 0, 0.35);
+      var ba = (t < 0.35) ? bs : fadeOut((t - 0.35) / 0.65);
+      var top = p.y - 140;
+      var grad = ctx.createLinearGradient(0, top, 0, p.y + 40);
+      grad.addColorStop(0, "rgba(255,255,255,0)");
+      grad.addColorStop(1, p.color);
+      setAlpha(ctx, ba * 0.5);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(p.x - 10, top);
+      ctx.lineTo(p.x + 10, top);
+      ctx.lineTo(p.x + 40, p.y + 40);
+      ctx.lineTo(p.x - 40, p.y + 40);
+      ctx.closePath();
+      ctx.fill();
+      // 光の粒が降りる
+      for (i = 0; i < 8; i++) {
+        var s = span(t, wobble(i) * 0.4, 0.45);
+        if (s <= 0 || s >= 1) continue;
+        var x = p.x + (wobble(i + 6) - 0.5) * 50;
+        var y = top + (p.y + 30 - top) * easeOut(s);
+        setAlpha(ctx, fadeOut(s));
+        ctx.fillStyle = p.coreColor;
+        ctx.fillRect(x - 2, y - 2, 4, 4);
+      }
+      // 足元から前へ流れる光の跡
+      ctx.lineCap = "round";
+      for (i = 0; i < 4; i++) {
+        var ss = span(t, 0.35 + i * 0.08, 0.4);
+        if (ss <= 0 || ss >= 1) continue;
+        var y2 = p.y + 20 + (i - 1.5) * 9;
+        var head = p.x - 30 + 90 * easeOut(ss);
+        setAlpha(ctx, fadeOut(ss));
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(head - 30, y2);
+        ctx.lineTo(head, y2);
+        ctx.stroke();
+      }
+      ctx.lineCap = "butt";
+    },
+
+    /**
+     * 王の号令：頭の上に冠の光が立ち、衝撃の輪が二重に広がる
+     */
+    royalCommand: function (ctx, d, t, p) {
+      var i;
+      // 衝撃の輪
+      for (i = 0; i < 2; i++) {
+        var rs = span(t, 0.1 + i * 0.15, 0.6);
+        if (rs <= 0 || rs >= 1) continue;
+        setAlpha(ctx, 1 - rs);
+        ctx.strokeStyle = (i === 0) ? p.coreColor : p.color;
+        ctx.lineWidth = 4 * (1 - rs) + 1;
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y + 10, 20 + 80 * easeOut(rs), (20 + 80 * easeOut(rs)) * 0.45, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // 冠
+      var cs = span(t, 0, 0.35);
+      var ca = (t < 0.35) ? cs : fadeOut((t - 0.35) / 0.65);
+      var cy = p.y - 50 - 14 * easeOut(cs);
+      var w = 34;
+      setAlpha(ctx, ca);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.moveTo(p.x - w, cy + 10);
+      for (i = 0; i <= 4; i++) {
+        var px = p.x - w + (w * 2) * (i / 4);
+        ctx.lineTo(px, cy - ((i % 2 === 0) ? 14 : 4));
+        if (i < 4) ctx.lineTo(px + w / 4, cy + 2);
+      }
+      ctx.lineTo(p.x + w, cy + 10);
+      ctx.closePath();
+      ctx.fill();
+      setAlpha(ctx, ca);
+      ctx.fillStyle = p.coreColor;
+      for (i = 0; i <= 4; i += 2) ctx.fillRect(p.x - w + (w * 2) * (i / 4) - 2, cy - 16, 4, 4);
+      ctx.fillRect(p.x - w, cy + 6, w * 2, 2);
+    },
+
+    /**
+     * 子守歌（ララバイ）：音符がゆらゆら昇り、最後に「z」が浮かぶ
+     */
+    lullaby: function (ctx, d, t, p) {
+      var i;
+      var count = d.count || 5;
+      for (i = 0; i < count; i++) {
+        var s = span(t, i * 0.1, 0.6);
+        if (s <= 0 || s >= 1) continue;
+        var x = p.x + (i - (count - 1) / 2) * 20 + Math.sin(s * 8 + i) * 8;
+        var y = p.y + 20 - 80 * easeOut(s);
+        setAlpha(ctx, fadeOut(s));
+        ctx.fillStyle = (i % 2) ? p.coreColor : p.color;
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 4.5, 3.5, -0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x + 4, y);
+        ctx.lineTo(x + 4, y - 14);
+        ctx.lineTo(x + 10, y - 10);
+        ctx.stroke();
+      }
+      // z
+      var zs = span(t, 0.5, 0.5);
+      if (zs > 0 && zs < 1) {
+        for (i = 0; i < 2; i++) {
+          var zx = p.x + 18 + i * 12, zy = p.y - 30 - i * 14 - 10 * zs;
+          var zz = 5 + i * 2;
+          setAlpha(ctx, Math.sin(Math.PI * zs));
+          ctx.strokeStyle = p.coreColor;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(zx - zz, zy - zz);
+          ctx.lineTo(zx + zz, zy - zz);
+          ctx.lineTo(zx - zz, zy + zz);
+          ctx.lineTo(zx + zz, zy + zz);
+          ctx.stroke();
+        }
+      }
+    },
+
+    /**
+     * 芽吹き（芽吹きの加護）：足元から双葉が次々に芽を出し、花びらが昇る
+     */
+    sproutBlessing: function (ctx, d, t, p) {
+      var i;
+      var count = d.count || 5;
+      var base = p.y + 34;
+      ctx.lineCap = "round";
+      for (i = 0; i < count; i++) {
+        var s = span(t, i * 0.08, 0.45);
+        if (s <= 0) continue;
+        var a = (t < 0.7) ? 1 : 1 - (t - 0.7) / 0.3;
+        var x = p.x + (i - (count - 1) / 2) * 18;
+        var h = (14 + wobble(i) * 10) * easeOut(s);
+        setAlpha(ctx, a);
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, base);
+        ctx.lineTo(x, base - h);
+        ctx.stroke();
+        var leaf = 6 * easeOut(s);
+        ctx.fillStyle = (i % 2) ? p.color : p.coreColor;
+        ctx.beginPath();
+        ctx.ellipse(x - leaf * 0.8, base - h, leaf, leaf * 0.45, -0.5, 0, Math.PI * 2);
+        ctx.ellipse(x + leaf * 0.8, base - h, leaf, leaf * 0.45, 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.lineCap = "butt";
+      for (i = 0; i < 8; i++) {
+        var ps = span(t, 0.3 + wobble(i) * 0.3, 0.5);
+        if (ps <= 0 || ps >= 1) continue;
+        var px = p.x + (wobble(i + 4) - 0.5) * 80 + Math.sin(ps * 6 + i) * 6;
+        var py = base - 20 - 80 * easeOut(ps);
+        setAlpha(ctx, fadeOut(ps));
+        ctx.fillStyle = p.coreColor;
+        ctx.beginPath();
+        ctx.ellipse(px, py, 3, 2, ps * 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    },
+
+    /**
+     * 落雷（サンダー）：上から稲妻が落ち、2度またたいて、足元に光が弾ける
+     */
+    thunderBolt: function (ctx, d, t, p) {
+      var i;
+      var top = p.y - (d.height || 150);
+      var strike = span(t, 0, 0.12);
+      var flick = (t < 0.5) ? ((Math.floor(t * 20) % 3 === 2) ? 0.35 : 1) : fadeOut((t - 0.5) / 0.5 * 0.45 + 0.55);
+      if (strike > 0) {
+        var segs = 7;
+        var reach = top + (p.y - top) * strike;
+        for (var pass = 0; pass < 2; pass++) {
+          setAlpha(ctx, flick * (pass === 0 ? 1 : 0.9));
+          ctx.strokeStyle = (pass === 0) ? p.color : p.coreColor;
+          ctx.lineWidth = (pass === 0) ? 7 : 2.5;
+          ctx.lineJoin = "miter";
+          ctx.beginPath();
+          ctx.moveTo(p.x + 6, top);
+          for (i = 1; i <= segs; i++) {
+            var y = top + (p.y - top) * (i / segs);
+            if (y > reach) break;
+            var x = p.x + ((i % 2) ? -1 : 1) * (8 + wobble(i + Math.floor(p.phase * 10)) * 10) * (i === segs ? 0 : 1);
+            ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+      }
+      // 足元に弾ける光
+      var bs = span(t, 0.1, 0.6);
+      if (bs > 0 && bs < 1) {
+        setAlpha(ctx, 1 - bs);
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 3;
+        for (i = 0; i < 8; i++) {
+          var ang = turns(i / 8 + p.phase);
+          var r0 = 10 + 30 * easeOut(bs);
+          ctx.beginPath();
+          ctx.moveTo(p.x + Math.cos(ang) * r0, p.y + Math.sin(ang) * r0 * 0.6);
+          ctx.lineTo(p.x + Math.cos(ang) * (r0 + 12), p.y + Math.sin(ang) * (r0 + 12) * 0.6);
+          ctx.stroke();
+        }
+        setAlpha(ctx, (1 - bs) * 0.5);
+        ctx.fillStyle = p.coreColor;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 24 * (1 - bs), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    },
+
+    /**
+     * 眼光（青い眼光）：相手の頭の前に、二つの鋭い光がまたたき、横へ筋が走る
+     */
+    blueGlare: function (ctx, d, t, p) {
+      var i;
+      var es = span(t, 0, 0.3);
+      var ea = (t < 0.3) ? es : fadeOut((t - 0.3) / 0.7);
+      var ey = p.y - 18;
+      for (i = -1; i <= 1; i += 2) {
+        var ex = p.x + i * 16;
+        var k = 10 * easeOut(es);
+        setAlpha(ctx, ea);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.moveTo(ex - k * 1.6, ey);
+        ctx.lineTo(ex, ey - k * 0.45);
+        ctx.lineTo(ex + k * 1.6, ey);
+        ctx.lineTo(ex, ey + k * 0.45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = p.coreColor;
+        ctx.fillRect(ex - 2, ey - 2, 4, 4);
+      }
+      // 横へ走る筋
+      ctx.lineCap = "round";
+      for (i = 0; i < 4; i++) {
+        var s = span(t, 0.2 + i * 0.06, 0.45);
+        if (s <= 0 || s >= 1) continue;
+        var y = ey + (i - 1.5) * 10;
+        setAlpha(ctx, 1 - s);
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x - 70 * easeOut(s), y);
+        ctx.lineTo(p.x + 70 * easeOut(s), y);
+        ctx.stroke();
+      }
+      ctx.lineCap = "butt";
+    },
+
+    /**
+     * まぶしい光（グレア）：細い光の十字が回りながら大きく開き、すぐ閉じる
+     */
+    glareBeam: function (ctx, d, t, p) {
+      var i;
+      var open = Math.sin(Math.PI * Math.min(1, t * 1.3));
+      var L = (d.length || 90) * open;
+      var rot = turns(0.04 * t + p.phase * 0.02);
+      setAlpha(ctx, open * 0.35);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 34 * open, 0, Math.PI * 2);
+      ctx.fill();
+      for (i = 0; i < 4; i++) {
+        var ang = rot + turns(i / 4);
+        var len = (i % 2) ? L * 0.6 : L;
+        setAlpha(ctx, open);
+        ctx.fillStyle = p.coreColor;
+        ctx.beginPath();
+        ctx.moveTo(p.x + Math.cos(ang) * len, p.y + Math.sin(ang) * len);
+        ctx.lineTo(p.x + Math.cos(ang + 1.5708) * 4, p.y + Math.sin(ang + 1.5708) * 4);
+        ctx.lineTo(p.x - Math.cos(ang + 1.5708) * 4, p.y - Math.sin(ang + 1.5708) * 4);
+        ctx.closePath();
+        ctx.fill();
+      }
+      setAlpha(ctx, open);
+      ctx.fillStyle = p.coreColor;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 8 * open, 0, Math.PI * 2);
+      ctx.fill();
+    },
+
+    /**
+     * 惑わす瞳（幻惑の瞳）：大きな瞳が開き、そこから渦の輪が何重にも広がる
+     */
+    dazzleEye: function (ctx, d, t, p) {
+      var i;
+      var os = span(t, 0, 0.3);
+      var oa = (t < 0.3) ? os : fadeOut((t - 0.3) / 0.7);
+      var w = 30, h = 14 * easeOut(os);
+      setAlpha(ctx, oa);
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(p.x - w, p.y);
+      ctx.quadraticCurveTo(p.x, p.y - h * 2, p.x + w, p.y);
+      ctx.quadraticCurveTo(p.x, p.y + h * 2, p.x - w, p.y);
+      ctx.stroke();
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(0.1, h * 0.8), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = p.coreColor;
+      ctx.fillRect(p.x - 2, p.y - 2 - h * 0.3, 4, 4);
+      // 渦の輪
+      for (i = 0; i < 3; i++) {
+        var rs = span(t, 0.25 + i * 0.12, 0.55);
+        if (rs <= 0 || rs >= 1) continue;
+        var r = 20 + 60 * easeOut(rs);
+        setAlpha(ctx, 1 - rs);
+        ctx.strokeStyle = (i % 2) ? p.coreColor : p.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, r, r * 0.6, rs * 2 + i, 0.3, Math.PI * 2 - 0.3);
+        ctx.stroke();
+      }
+    },
+
+    /**
+     * 風の刃（ウィンド）：三日月の刃が弧を描いて横切り、渦が残る
+     */
+    windCutter: function (ctx, d, t, p) {
+      var i;
+      var count = d.blades || 3;
+      for (i = 0; i < count; i++) {
+        var s = span(t, i * 0.12, 0.5);
+        if (s <= 0 || s >= 1) continue;
+        var x = p.x + 80 - 160 * easeOut(s);
+        var y = p.y - 20 + i * 18 - Math.sin(Math.PI * s) * 16;
+        setAlpha(ctx, s < 0.8 ? 1 : (1 - s) / 0.2);
+        ctx.fillStyle = (s < 0.3) ? p.coreColor : p.color;
+        ctx.beginPath();
+        ctx.arc(x, y, 18, -1.1, 1.1);
+        ctx.arc(x + 7, y, 15, 1.0, -1.0, true);
+        ctx.closePath();
+        ctx.fill();
+      }
+      // 残る渦
+      var ws = span(t, 0.3, 0.7);
+      if (ws > 0 && ws < 1) {
+        setAlpha(ctx, (1 - ws) * 0.8);
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 2;
+        for (i = 0; i < 2; i++) {
+          ctx.beginPath();
+          var r = 14 + i * 12 + 10 * ws;
+          ctx.arc(p.x, p.y, r, turns(ws * 0.6 + i * 0.3), turns(ws * 0.6 + i * 0.3) + 3.4);
+          ctx.stroke();
+        }
+      }
+    },
+
+    /**
+     * 牙（吸血・焔牙）：上下の牙が噛み合い、そこから雫（吸血）や炎（焔牙）があふれる
+     *   spill: "drops" … 赤い雫が昇っていく（吸った血）  "flames" … 炎の舌が立ち昇る
+     */
+    fang: function (ctx, d, t, p) {
+      var i;
+      var bite = easeIn(span(t, 0, 0.22));
+      var ba = (t < 0.22) ? 1 : fadeOut((t - 0.22) / 0.4 * 0.45 + 0.55);
+      var gap = 40 * (1 - bite) + 4;
+      var teeth = 3, w = 60;
+      for (var row = -1; row <= 1; row += 2) {
+        setAlpha(ctx, ba);
+        ctx.fillStyle = p.coreColor;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 2;
+        for (i = 0; i < teeth; i++) {
+          var tx = p.x - w / 2 + (i + 0.5) * (w / teeth);
+          var by = p.y + row * gap;
+          ctx.beginPath();
+          ctx.moveTo(tx - 8, by);
+          ctx.lineTo(tx + 8, by);
+          ctx.lineTo(tx, by - row * 20);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+      var spill = span(t, 0.2, 0.8);
+      if (spill <= 0) return;
+      var count = d.count || 8;
+      for (i = 0; i < count; i++) {
+        var s = span(spill, wobble(i) * 0.3, 0.7);
+        if (s <= 0 || s >= 1) continue;
+        var x = p.x + (wobble(i + 5) - 0.5) * 40;
+        if (d.spill === "flames") {
+          var fy = p.y + 10 - 60 * easeOut(s);
+          var fh = 14 * (1 - s) + 4;
+          setAlpha(ctx, fadeOut(s));
+          ctx.fillStyle = (s < 0.3) ? p.coreColor : p.color;
+          ctx.beginPath();
+          ctx.moveTo(x - 5, fy + fh * 0.4);
+          ctx.quadraticCurveTo(x - 3, fy - fh * 0.3, x + Math.sin(s * 9 + i) * 3, fy - fh);
+          ctx.quadraticCurveTo(x + 3, fy - fh * 0.3, x + 5, fy + fh * 0.4);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          var dy = p.y - 50 * easeOut(s) - 10;
+          var dx = x - 30 * s;
+          setAlpha(ctx, fadeOut(s));
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(dx, dy, 3.2 * (1 - s * 0.4), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    },
+
+    /**
+     * 歯車（歯車投げ）：回る歯車が斜め上から飛んできて当たり、火花が散る
+     */
+    gearHit: function (ctx, d, t, p) {
+      var i;
+      var fly = span(t, 0, 0.3);
+      var R = d.radius || 16, teeth = 8;
+      if (t < 0.55) {
+        var gx = p.x + 90 * (1 - easeIn(fly)), gy = p.y - 80 * (1 - easeIn(fly));
+        var rot = turns(t * 2.5);
+        setAlpha(ctx, t < 0.4 ? 1 : 1 - (t - 0.4) / 0.15);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        for (i = 0; i < teeth * 2; i++) {
+          var ang = rot + turns(i / (teeth * 2));
+          var r = (i % 2) ? R : R * 1.3;
+          var a0 = ang - 0.18, a1 = ang + 0.18;
+          ctx.lineTo(gx + Math.cos(a0) * r, gy + Math.sin(a0) * r);
+          ctx.lineTo(gx + Math.cos(a1) * r, gy + Math.sin(a1) * r);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = p.coreColor;
+        ctx.beginPath();
+        ctx.arc(gx, gy, R * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#3a2817";
+        ctx.beginPath();
+        ctx.arc(gx, gy, R * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // 火花
+      var ss = span(t, 0.28, 0.6);
+      if (ss <= 0 || ss >= 1) return;
+      ctx.lineCap = "round";
+      for (i = 0; i < 10; i++) {
+        var ang2 = turns(i / 10 + p.phase);
+        var r0 = 6 + 40 * easeOut(ss) * (0.6 + wobble(i) * 0.4);
+        setAlpha(ctx, 1 - ss);
+        ctx.strokeStyle = (i % 2) ? p.coreColor : p.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x + Math.cos(ang2) * r0, p.y + Math.sin(ang2) * r0 + 30 * ss * ss);
+        ctx.lineTo(p.x + Math.cos(ang2) * (r0 + 8), p.y + Math.sin(ang2) * (r0 + 8) + 30 * ss * ss);
+        ctx.stroke();
+      }
+      ctx.lineCap = "butt";
+    },
+
+    /**
+     * 毒の針（どくばり）：斜めから針が突き刺さり、毒の雫が飛び散る
+     */
+    poisonSting: function (ctx, d, t, p) {
+      var i;
+      var thrust = easeOut(span(t, 0, 0.2));
+      if (t < 0.5) {
+        var ang = turns(-0.08);
+        var tipX = p.x + 6 - 40 * (1 - thrust) * Math.cos(ang);
+        var tipY = p.y - 40 * (1 - thrust) * Math.sin(ang);
+        setAlpha(ctx, t < 0.35 ? 1 : 1 - (t - 0.35) / 0.15);
+        ctx.strokeStyle = p.coreColor;
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(tipX + 60 * Math.cos(ang), tipY + 60 * Math.sin(ang));
+        ctx.lineTo(tipX + 12 * Math.cos(ang), tipY + 12 * Math.sin(ang));
+        ctx.stroke();
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.lineCap = "butt";
+        // 針先
+        var nx = -Math.sin(ang), ny = Math.cos(ang);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(tipX + 14 * Math.cos(ang) + nx * 4, tipY + 14 * Math.sin(ang) + ny * 4);
+        ctx.lineTo(tipX + 14 * Math.cos(ang) - nx * 4, tipY + 14 * Math.sin(ang) - ny * 4);
+        ctx.closePath();
+        ctx.fill();
+      }
+      // 毒の雫
+      var count = d.count || 9;
+      var ss = span(t, 0.18, 0.75);
+      if (ss <= 0) return;
+      for (i = 0; i < count; i++) {
+        var a2 = turns(0.5 + (i / count - 0.5) * 0.6 + p.phase * 0.1);
+        var sp = 0.6 + wobble(i) * 0.4;
+        var x = p.x + Math.cos(a2) * 45 * sp * easeOut(ss);
+        var y = p.y + Math.sin(a2) * 30 * sp * easeOut(ss) + 50 * ss * ss;
+        setAlpha(ctx, fadeOut(ss));
+        ctx.fillStyle = (i % 3 === 0) ? p.coreColor : p.color;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5 + wobble(i + 2) * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    },
+
+    /**
+     * 影の手（シャドウ）：足元の影から黒い手が何本も伸びて相手を包み、ぎゅっと閉じて消える
+     */
+    shadowGrasp: function (ctx, d, t, p) {
+      var i;
+      var count = d.count || 6;
+      var grow = easeOut(span(t, 0, 0.4));
+      var close = span(t, 0.4, 0.3);
+      var a = (t < 0.6) ? 1 : fadeOut((t - 0.6) / 0.4 * 0.45 + 0.55);
+      var base = p.y + 36;
+      // 足元の影
+      setAlpha(ctx, a * 0.5);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.ellipse(p.x, base, 46 * grow + 6, 12 * grow + 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineCap = "round";
+      for (i = 0; i < count; i++) {
+        var side = (i % 2) ? 1 : -1;
+        var spread = 18 + Math.floor(i / 2) * 14;
+        var sx = p.x + side * spread;
+        var bend = side * (20 + 10 * wobble(i)) * (1 - close * 0.8);
+        var h = (60 + wobble(i + 3) * 30) * grow;
+        setAlpha(ctx, a);
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 6 - Math.floor(i / 2);
+        ctx.beginPath();
+        ctx.moveTo(sx, base);
+        ctx.quadraticCurveTo(sx + bend, base - h * 0.6, p.x + side * (spread * (1 - close)) * 0.6, base - h);
+        ctx.stroke();
+        setAlpha(ctx, a * 0.8);
+        ctx.strokeStyle = p.coreColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.lineCap = "butt";
     }
   };
 

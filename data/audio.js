@@ -7,6 +7,10 @@
  *   file   : ファイル名（basePath からの相対）。**書かなければ「無音」**
  *   volume : このファイル自体の音量（0〜1）。素材ごとの音量差をここで揃える
  *   loop   : 繰り返すか（BGMは既定で true、効果音は false）
+ *   loopStart : BGMだけ。繰り返すときの戻り先（秒）。書いた曲は、最後まで来たら頭ではなくここへ戻る（v1.0.3）。
+ *               頭に前奏がある曲を、前奏を鳴らし直さずに繰り返すため。書かない曲は今までどおり頭へ戻る
+ *   loopEnd   : BGMだけ。ここまで来たら loopStart へ戻る（秒）。書かなければファイルの最後
+ *               ★ 戻り先は 開発用サーバー（8124）の 効果音の一覧 の「つなぎ目」で聞いて決める
  *   solo   : 効果音だけ。重ねずに頭から鳴り直す（メニュー音の連打対策）
  *   synth  : 効果音だけ。ファイルの代わりに波形の指定から音を作る（file があればそちら優先）
  *
@@ -57,6 +61,9 @@
  * fetch は file:// では止められるので、**ダブルクリックで起動したときに
  * 音だけ鳴らない**ことになる。このゲームは file:// での起動を大事にしているので、
  * 音声要素（new Audio）で鳴らす方を選んだ。
+ *   ★ loopStart を書いた BGM だけは、http で開いているとき Web Audio で鳴らす（戻り先へサンプル単位で戻れるため）。
+ *     file:// や読み込みに失敗したときは、音声要素2つを交互に使って同じ戻り先へ戻す（2つ目を先に音量0で鳴らして位置を揃えておき、つなぎ目は数十ミリ秒の重なりになる）。
+ *     js/systems/AudioManager.js の LoopedBgm と ElementLoopBgm
  *
  * ▼ 形式
  *
@@ -105,12 +112,14 @@
        */
       dungeon: { file: "abyss_dg.ogg", volume: 0.6 },
       // 戦闘曲。穴（地方）ごとに変えられる（data/regions.js の battleBgm）。書いていない穴はこの battle
-      battle:  { file: "abyss_battle.ogg",     volume: 0.7 },
+      // 戻り先 8.2187秒（2026-11-03 作者が聞いて決めた）
+      battle:  { file: "abyss_battle.ogg",     volume: 0.7, loopStart: 8.2187 },
       // 萌芽の穴のふつうの戦闘曲（v1.0.0。作者の指定。音楽の卵）
       // 音量は揺籃の戦闘曲（battle）と聞こえの大きさをそろえた値（2026-10-14 に測定。差は0.13dB）
-      hougaBattle: { file: "houga_battle.ogg", volume: 0.69 },
-      // 主との戦い。萌芽の穴の主もこの曲（作者の指定）
-      boss:    { file: "abyss_bossbattle.ogg", volume: 0.8 },
+      // 戻り先 12.4128秒（2026-11-03 作者が聞いて決めた。1小節 約2.069秒の6小節目）
+      hougaBattle: { file: "houga_battle.ogg", volume: 0.69, loopStart: 12.4128 },
+      // 主との戦い。萌芽の穴の主もこの曲（作者の指定）。戻り先 6.18126秒（2026-11-03 作者が決めた）
+      boss:    { file: "abyss_bossbattle.ogg", volume: 0.8, loopStart: 6.18126 },
       // 勝ったときの曲。戦闘曲を止めてから流し、繰り返さない（BattleScene の battleEnd）
       victory: { file: "victory.ogg", volume: 0.7, loop: false },
       // 全滅したときの曲。同じく battleEnd で流し、結果画面まで続く。拠点に着くと拠点の曲に変わる

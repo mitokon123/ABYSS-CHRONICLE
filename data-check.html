@@ -150,6 +150,9 @@
       out.push({ level: lowCap.length ? "warn" : "good", title: "Lv上限が 70 より低い", items: lowCap,
         why: "上限は一番低くても 70 の決まり（data/monsters.js の maxLevel の説明）。上限 Lv1 のシニガミは別扱いなので数えない。" });
 
+      // 5b. 能力値の線を超えている（data/growth.js の statLimits。作者と決めた目安 2026-11-03）
+      checkStatLimits(raw).forEach(function (c) { out.push(c); });
+
       // 6. 手に入れる方法が見つからない道具
       var obtain = {};
       refs.forEach(function (r) {
@@ -199,6 +202,63 @@
       unused("shapes", "使っていない演出の型",
         "技・種族のどこからも指されていない演出（data/effects.js の shapes）。", notOwnFile("data/effects.js"));
       return out;
+    }
+
+    /**
+     * 種族の能力値が、そのレベルの線（data/growth.js の statLimits）を超えていないか。
+     *   在来種は native、仲間にできる主（data/bosses.js の species）は boss の線と比べる。
+     *   個体値0・性格「素直」・特性と絆と装備なしで、線を書いたレベル（1・5・10…99）のうち上限までを調べる。
+     *   線は5レベルおきの最大値なので、あいだのレベルは調べない（直線で見ると、今の種族でも +0〜4% の超えが出るため）。
+     *   認めた例外（exceptions）は「注意」ではなく「参考」に出す。
+     */
+    function checkStatLimits(raw) {
+      var NS = window.MyGame, lim = raw.growth && raw.growth.statLimits;
+      var warn = [], info = [];
+      if (lim && NS.GameData && NS.MonsterInstance) {
+        var gd = new NS.GameData(raw);
+        var defMax = (raw.growth && raw.growth.defaultMaxLevel) || 99;
+        var bossSpecies = {};
+        Object.keys(raw.bosses || {}).forEach(function (k) { bossSpecies[raw.bosses[k].species] = true; });
+        var allowed = {};
+        (lim.exceptions || []).forEach(function (e) { allowed[e.species + "." + e.stat] = true; });
+        var keys = ["hp", "attack", "defense", "speed", "pp"], names = ["HP", "攻撃", "防御", "素早さ", "PP"];
+
+        Object.keys(raw.monsters || {}).forEach(function (id) {
+          var sp = raw.monsters[id], cap = sp.maxLevel || defMax;
+          if (cap <= 1) return;   // シニガミ（Lv1 固定で育たない）
+          var table = bossSpecies[id] ? lim.boss : lim.native;
+          var found = {};   // 能力 → { from, to, lv, value, line }
+          var levels = Object.keys(table || {}).map(Number).sort(function (a, b) { return a - b; });
+          levels.forEach(function (lv) {
+            if (lv > cap) return;
+            var line = table[lv];
+            var m = new NS.MonsterInstance(id, lv, gd, { nature: "balanced", ivs: { hp: 0, attack: 0, defense: 0, speed: 0 } });
+            m.getEffectStatMultiplier = function () { return 1; };
+            m.getEffectStatBonus = function () { return 0; };
+            var values = [m.getMaxHp(), m.getAttack(), m.getDefense(), m.getSpeed(), m.getMaxPp()];
+            for (var s = 0; s < 5; s++) {
+              if (values[s] <= line[s]) continue;
+              var f = found[s] || (found[s] = { from: lv, value: 0, line: 1 });
+              f.to = lv;
+              if (values[s] / line[s] > f.value / f.line) { f.lv = lv; f.value = values[s]; f.line = line[s]; }
+            }
+          });
+          Object.keys(found).forEach(function (s) {
+            var f = found[s];
+            var text = "<code>" + esc(id) + "</code>（" + esc(sp.name) + (bossSpecies[id] ? "・主" : "") + "）の" + names[s] + "：" +
+              "Lv" + f.from + (f.to > f.from ? "〜" + f.to : "") + " で線を超える" +
+              "　<span class='where'>いちばん上は Lv" + f.lv + " " + f.value + "（線 " + f.line + "・+" + Math.round((f.value / f.line - 1) * 100) + "%）</span>";
+            (allowed[id + "." + keys[s]] ? info : warn).push(text);
+          });
+        });
+      }
+      return [
+        { level: warn.length ? "warn" : "good", title: "能力値の線を超えている", items: warn,
+          why: "そのレベルの目安（data/growth.js の statLimits。早見表/能力値の線.txt）より高い。在来種と主で線が違う。" +
+               "個体値0・素直・特性なしの値。直すか、作者が認めたら exceptions に足す。" },
+        { level: info.length ? "info" : "good", title: "認めた例外が線を超えている所", items: info,
+          why: "statLimits の exceptions に書いた種族・能力（作者が認めたもの）。どこまで上に出ているかの参考。" }
+      ];
     }
 
     // 音のファイルが置いてあるか（読みに行って確かめる）

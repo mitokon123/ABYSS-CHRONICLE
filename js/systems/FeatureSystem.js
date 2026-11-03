@@ -123,11 +123,23 @@
    * @param {Array<{col:number,row:number}>} [avoid] 置きたくないマス（開始位置など）
    * @returns {object[]} [{ col, row, type, definition, used }]
    */
-  FeatureSystem.prototype.place = function (map, avoid) {
+  FeatureSystem.prototype.place = function (map, avoid, floor) {
     var definitions = this.data.features || {};
     var counts = this.getCounts();
     var spots = this._collectSpots(map, avoid);
     var placed = [];
+
+    // 中身の決まった宝箱（data/dungeons.js の fixedChests。v1.0.3）。その階なら、数とは別に必ず置く
+    var fixed = this.dungeon.fixedChests || [];
+    for (var f = 0; f < fixed.length && definitions.chest; f++) {
+      if (fixed[f].floor !== undefined && fixed[f].floor !== floor) continue;
+      if (spots.length === 0) break;
+      var at = spots.splice(this.random.nextInt(0, spots.length - 1), 1)[0];
+      placed.push({
+        col: at.col, row: at.row, type: "chest", definition: definitions.chest, used: false,
+        contents: { item: fixed[f].item, count: fixed[f].count || 1 }
+      });
+    }
 
     for (var id in counts) {
       if (!Object.prototype.hasOwnProperty.call(counts, id)) continue;
@@ -247,7 +259,11 @@
     if (!feature || feature.used) return [];
 
     var definition = feature.definition || {};
-    var effect = this._effectFor(definition, feature.type, floor);
+    // 中身の決まった宝箱（fixedChests）は抽選せず、その中身だけを渡す
+    var effect = feature.contents
+      ? { type: "giveItem", table: [{ item: feature.contents.item, weight: 1,
+          min: feature.contents.count, max: feature.contents.count }] }
+      : this._effectFor(definition, feature.type, floor);
     var messages = [];
 
     // 踏んだこと自体の知らせ（「宝箱を見つけた!」など）

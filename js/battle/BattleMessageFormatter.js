@@ -13,9 +13,202 @@
    * @param {object} [statuses] data/statuses.js。状態異常ごとの言い回しを読むのに使う。
    *   渡さなければ、battle 側の既定文だけで動く
    */
-  function BattleMessageFormatter(messages, statuses) {
+  function BattleMessageFormatter(messages, statuses, elements) {
     this.templates = (messages || {}).battle || {};
     this.statuses = statuses || {};
+    this.elements = elements || {};
+  }
+
+  // 1つの行動のなかで、文をまとめる対象の出来事
+  var HIT_RESULT = { damage: true, miss: true, immune: true };
+  var FAIL_RESULT = { statusMiss: true, statusImmune: true, modifierMiss: true };
+  // 行動の区切り（ここで1つの行動の出来事が終わる）
+  var ACTION_BREAK = { useSkill: true, wait: true, defend: true, statusBlocked: true, statusDamage: true,
+                       modifierEnd: true, battleEnd: true, custom: true, noSkill: true };
+
+  /**
+   * 1ターンぶんの出来事を見て、まとめて1行にする出来事に文（logText）を書き込む（2026-11-03 作者の指定）。
+   * 出来事そのもの（数字・演出・HPバー）は1つずつ見せるので触らない。変えるのは文だけ。
+   *   クリティカル      … 「クリティカル!」の行を出さず、ダメージの行の頭に付ける
+   *   何回か当てる技    … 二連斬り・歯車投げは、当たった回数と合計を1行に
+   *   全体の技          … 2体以上が受けたら「先頭の名前たち は 平均 N のダメージを受けた!」の1行に
+   *   入らなかった      … 状態異常・弱体・攻撃が2体以上に入らなかったら「先頭の名前たち には 効かなかった」の1行に
+   *   全体の強化・弱体  … 同じ技で2体以上に掛かったら「先頭の名前たち」の1行に
+   * logText が "" の出来事は、文を出さない（BattleScene は文の無い出来事として扱う）
+   */
+  BattleMessageFormatter.prototype.annotate = function (events) {
+    var list = events || [];
+    var i = 0;
+    while (i < list.length) {
+      if (list[i].type !== "useSkill") { i++; continue; }
+      var head = list[i];
+      var j = i + 1;
+      while (j < list.length && !ACTION_BREAK[list[j].type]) j++;
+      this._annotateAction(head, list.slice(i + 1, j));
+      i = j;
+    }
+    return list;
+  };
+
+  BattleMessageFormatter.prototype._annotateAction = function (head, group) {
+    var skill = head.skill || {};
+    var side = head.side;
+    var k, e;
+    // この行動で相手（や味方）に起きた結果だけ。特性の反撃などで本人に返ってきたものは除く
+    var hits = [], fails = [], mods = [], misses = [], results = [];
+    for (k = 0; k < group.length; k++) {
+      e = group[k];
+      if (e.type === "critical") { e.logText = ""; continue; }
+      if (e.target && e.target === head.actor && e.type !== "modifier") continue;
+      if (HIT_RESULT[e.type]) results.push(e);
+      if (e.type === "damage" || e.type === "immune") hits.push(e);
+      if (e.type === "miss") misses.push(e);
+      if (FAIL_RESULT[e.type]) fails.push(e);
+      if (e.type === "modifier" && e.skillId === skill.id) mods.push(e);
+    }
+
+    // クリティカルはダメージの行の頭に付ける（何回か当てる技・全体の技でまとめた行も同じ）
+    for (k = 0; k < hits.length; k++) {
+      if (hits[k].type === "damage" && hits[k].critical) hits[k]._critical = true;
+    }
+
+    if ((skill.hits || 1) > 1 && results.length >= 2) {
+      this._mergeMultiHit(results);
+    } else {
+      if (distinctTargets(hits) >= 2) this._mergeAllDamage(hits);
+      if (distinctTargets(misses) >= 2) this._mergeGroup(misses, this.templates.groupMiss);
+    }
+    if (distinctTargets(fails) >= 2) this._mergeGroup(fails, this.templates.groupFail);
+    if (distinctTargets(mods) >= 2 && sameModifier(mods)) this._mergeModifiers(mods);
+  };
+
+  /** 二連斬り・歯車投げ：当たった回数と合計（相手が何体かなら相手ごとの合計）を、最初の結果の行に */
+  BattleMessageFormatter.prototype._mergeMultiHit = function (results) {
+    var t = this.templates;
+    var order = [], totals = {}, landed = 0, critical = false;
+    for (var k = 0; k < results.length; k++) {
+      var e = results[k];
+      if (e.type !== "damage") continue;
+      landed++;
+      if (e._critical) critical = true;
+      var name = this._targetName(e);
+      if (!(name in totals)) { totals[name] = 0; order.push(name); }
+      totals[name] += Math.max(0, e.amount);
+    }
+    var text;
+    if (landed === 0) {
+      text = fill(t.miss, { target: this._targetName(results[0]) });
+    } else if (order.length === 1) {
+      text = fill(t.multiHitOne, { target: order[0], hits: landed, amount: totals[order[0]] });
+    } else {
+      var parts = [];
+      for (var p = 0; p < order.length; p++) parts.push(fill(t.multiHitPart, { target: order[p], amount: totals[order[p]] }));
+      text = fill(t.multiHitMany, { hits: landed, list: parts.join(t.listJoin || "・") });
+    }
+    if (critical && t.critical) text = t.critical + " " + text;
+    // 無効（immune）だった回は、その回の行のまま残す
+    this._writeOnce(results.filter(function (r) { return r.type !== "immune"; }), text);
+  };
+
+  /** 全体の技で2体以上が受けた：先頭の名前たち は 平均 N のダメージを受けた */
+  BattleMessageFormatter.prototype._mergeAllDamage = function (hits) {
+    var t = this.templates;
+    var damages = hits.filter(function (e) { return e.type === "damage"; });
+    if (damages.length < 2) return;
+    var sum = 0;
+    for (var k = 0; k < damages.length; k++) sum += Math.max(0, damages[k].amount);
+    var text = fill(t.groupDamage, { target: this._targetName(damages[0]), amount: Math.round(sum / damages.length) });
+    // 無効だった相手は、その相手の行のまま残す
+    this._writeOnce(damages, text);
+  };
+
+  /** 同じ結果が2体以上：先頭の名前たち で1行 */
+  BattleMessageFormatter.prototype._mergeGroup = function (list, template) {
+    if (!template) return;
+    this._writeOnce(list, fill(template, { target: this._targetName(list[0]) }));
+  };
+
+  /** 全体に掛けた強化・弱体：先頭の名前たち で、技の言い回し＋変わった能力 */
+  BattleMessageFormatter.prototype._mergeModifiers = function (mods) {
+    var t = this.templates;
+    var name = fill(t.groupName || "{target}たち", { target: this._targetName(mods[0]) });
+    this._writeOnce(mods, this._modifierText(mods[0], name));
+  };
+
+  /** list の最初の出来事に文を書き、残りは文を出さない */
+  BattleMessageFormatter.prototype._writeOnce = function (list, text) {
+    for (var k = 0; k < list.length; k++) list[k].logText = (k === 0) ? text : "";
+  };
+
+  /**
+   * 強化・弱体の文。技ごとの言い回し（skills.js の modifier.message）は残し、
+   * 何が上がった／下がったかを画面の能力名で必ず足す（2026-11-03 作者の指定）
+   */
+  BattleMessageFormatter.prototype._modifierText = function (event, targetName) {
+    var t = this.templates;
+    var stats = this._modifierStatText(event.effects || []);
+    if (event.message) {
+      var flavor = fill(event.message, { target: targetName, skill: event.skillName });
+      return stats ? flavor + " " + stats : flavor;
+    }
+    if (event.renewed) return fill(t.modifierAgain, { target: targetName, skill: event.skillName });
+    if (stats) return fill(t.modifierStat, { target: targetName, stats: stats });
+    return fill(event.raised ? t.modifierUp : t.modifierDown, { target: targetName, skill: event.skillName });
+  };
+
+  /** 効果の並び → 「攻撃と防御が 大きく上がった!」のような文（作れなければ ""） */
+  BattleMessageFormatter.prototype._modifierStatText = function (effects) {
+    var t = this.templates;
+    var names = t.logStats || {};
+    var words = t.logChange || {};
+    var items = [];
+    for (var k = 0; k < effects.length; k++) {
+      var e = effects[k];
+      var noun = null, verb = null;
+      if (e.type === "statMultiplier" || e.type === "statBonus") {
+        noun = names[e.stat] || e.stat;
+        var up = (e.type === "statMultiplier") ? e.value > 1 : e.value > 0;
+        var big = (e.type === "statMultiplier") && (up ? e.value >= 1.5 : e.value <= 0.5);
+        verb = up ? (big ? words.upBig : words.up) : (big ? words.downBig : words.down);
+      } else if (e.type === "accuracyMultiplier") {
+        noun = names.accuracy;
+        verb = e.value > 1 ? words.up : words.down;
+      } else if (e.type === "damageTaken") {
+        noun = names.damageTaken;
+        verb = e.value < 1 ? words.less : words.more;
+      } else if (e.type === "damageDealt") {
+        noun = names.damageDealt;
+        verb = e.value > 1 ? words.more : words.less;
+      } else if (e.type === "resistBonus") {
+        var what = e.element ? ((this.elements[e.element] || {}).name || e.element)
+                             : (e.status === "all" ? names.allStatus : ((this.statuses[e.status] || {}).name || e.status));
+        noun = fill(names.resist, { what: what });
+        verb = e.value > 0 ? words.up : words.down;
+      }
+      if (noun && verb) items.push({ noun: noun, verb: verb });
+    }
+    if (items.length === 0) return "";
+    var sameVerb = items.every(function (it) { return it.verb === items[0].verb; });
+    if (sameVerb) {
+      return fill(t.modifierStatLine, { nouns: items.map(function (it) { return it.noun; }).join(t.nounJoin || "と"), verb: items[0].verb });
+    }
+    return items.map(function (it) { return fill(t.modifierStatLine, { nouns: it.noun, verb: it.verb }); }).join(" ");
+  };
+
+  function distinctTargets(list) {
+    var seen = [];
+    for (var k = 0; k < list.length; k++) {
+      if (list[k].target && seen.indexOf(list[k].target) < 0) seen.push(list[k].target);
+    }
+    return seen.length;
+  }
+
+  // 同じ技の強化・弱体で、文が同じ形になるものだけまとめる（かけ直しと初めてが混ざったらまとめない）
+  function sameModifier(mods) {
+    for (var k = 1; k < mods.length; k++) {
+      if (mods[k].renewed !== mods[0].renewed || mods[k].raised !== mods[0].raised) return false;
+    }
+    return true;
   }
 
   /**
@@ -41,6 +234,7 @@
    * @returns {string[]}
    */
   BattleMessageFormatter.prototype.format = function (events) {
+    this.annotate(events);
     var lines = [];
     for (var i = 0; i < (events || []).length; i++) {
       var line = this.formatOne(events[i]);
@@ -78,6 +272,9 @@
   BattleMessageFormatter.prototype.formatOne = function (event) {
     var t = this.templates;
 
+    // annotate がまとめた文（"" なら文を出さない）
+    if (event.logText !== undefined) return event.logText || null;
+
     switch (event.type) {
       // 呼び出し側が文章を組み立て済みのもの（道具・スカウトなど）
       case "custom":
@@ -102,8 +299,9 @@
                     { target: this._targetName(event), amount: event.amount });
       case "miss":
         return fill(t.miss, { target: this._targetName(event) });
+      // クリティカルは単独の行にしない。ダメージの行の頭に付ける（2026-11-03 作者の指定）
       case "critical":
-        return t.critical || null;
+        return null;
       case "effective":
         return t.effective || null;
       case "resisted":
@@ -115,15 +313,13 @@
         if (event.amount <= 0 && t.noDamage) {
           return fill(t.noDamage, { target: this._targetName(event) });
         }
-        return fill(t.damage, { target: this._targetName(event), amount: event.amount });
+        var damageLine = fill(t.damage, { target: this._targetName(event), amount: event.amount });
+        return (event.critical && t.critical) ? t.critical + " " + damageLine : damageLine;
       case "faint":
         return fill(t.faint, { target: this._targetName(event) });
       case "modifier":
-        // 技ごとの言い回しがあればそれを使い、無ければ上がり／下がりの既定文
-        return fill(event.message ||
-                    (event.renewed ? t.modifierAgain
-                                   : (event.raised ? t.modifierUp : t.modifierDown)),
-                    { target: this._targetName(event), skill: event.skillName });
+        // 技ごとの言い回し＋変わった能力（_modifierText）
+        return this._modifierText(event, this._targetName(event));
       case "drain":
         // 特性（吸精）で吸ったときは、特性の名前を出す
         if (event.abilityName) {

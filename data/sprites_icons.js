@@ -2059,6 +2059,30 @@
       ]
     },
 
+    // 琥珀の芯（仮）：千年樹の根底の主の胸にあった琥珀。真鍮の枠に収まり、中で光が揺れる
+    iconItemAmberCore: {
+      palette: { ".": null, "K": "#1c130a", "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a",
+                 "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a" },
+      pixels: [
+        "................",
+        ".....KKKKKK.....",
+        "...KKCTTTTCKK...",
+        "..KCTKKKKKKTCK..",
+        "..KTKJJOOJJKTK..",
+        ".KCKJOOQQOOJKCK.",
+        ".KTKJOQWWQOJKTK.",
+        ".KTKOQWWWQOOKTK.",
+        ".KTKOQWQQQOJKTK.",
+        ".KTKJOQQQOOJKTK.",
+        ".KCKJJOOOOJJKCK.",
+        "..KTKJJJJJJKTK..",
+        "..KCTKKKKKKTCK..",
+        "...KKCBBBBCKK...",
+        ".....KKKKKK.....",
+        "................"
+      ]
+    },
+
     // 若枝の剣：探索者の長剣の形。若葉色に光る刃と、葉のつば
     iconItemSproutBlade: {
       palette: { ".": null, "K": "#14200e", "H": "#f4ffe8", "B": "#b8e0a0", "D": "#5e9a48",

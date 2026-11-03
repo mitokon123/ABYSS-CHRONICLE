@@ -1069,7 +1069,8 @@
 
       /**
        * 「様子を見る」の画面。画面ぜんぶを1枚の枠にして、3列に分ける。
-       *   左   … 絵（sprite.x/y は**中心**の座標）と名前、その下に技と特性
+       *   左   … 絵（sprite.x/y は**中心**の座標）と名前、その下に特性と技の数
+       *   ページは3つ（←→）：ステータス ／ 技・特性 ／ モンスター説明
        *   中央 … ステータス（装備で上がったぶんは「(+8)」）と装備、装備の効果
        *   右   … 属性耐性と状態異常耐性（2列の表。装備で上がったぶんは「(+3)」）
        * 文字は一覧の詳細欄より一段大きい（font）。ゆっくり眺める画面なので読みやすさを優先
@@ -1080,6 +1081,11 @@
         tabs:   { x: 16, y: 24, gap: 20, font: "14px monospace" },
         // モンスター説明のページ。絵と名前の右に、図鑑の説明と愛情度の記録を出す
         notes:  { x: 268, y: 104, lineHeight: 22, font: "14px monospace" },
+        // 技・特性のページ（v1.0.3）。技が多くて入らないときは行の間を minLineHeight まで詰める。
+        //   elementX / kindX / statsX … 属性・種類・威力などの列（x からのずれ）
+        //   abilityGap … 技の一覧と特性の間。abilityLineHeight … 特性の説明の行の高さ
+        skills: { x: 268, y: 104, lineHeight: 22, minLineHeight: 16, font: "14px monospace",
+                  elementX: 150, kindX: 186, statsX: 256, abilityGap: 14, abilityLineHeight: 18 },
         sprite: { x: 150, y: 160, size: 128 },
         name:   { y: 246 },
         left:   { x: 64, y: 316, lineHeight: 20 },

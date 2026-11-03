@@ -3011,6 +3011,743 @@
       ]
     },
 
+    /**
+     * 千年樹の根底の主（v1.0.3。名前は仮）。昔だれかが千年樹を守らせるために置いた、木と真鍮のからくり。
+     * 胸の窓の奥で琥珀の芯が光り、それで動いている。右の耳から肩・腕へ根が絡み、頭と肩に苔がむす。
+     *   木（N〜P）・真鍮（B・C・T・I）・琥珀（J・O・Q・W）・根（X・R・Z・Y）・苔（M・G）
+     *   左半分を描いて左右を写し、右側は1段暗くした（光は左上から）。根・苔・左耳のボルトはそのあとで置いた
+     * 動くコマ：
+     *   Glow    … 胸の芯を1段明るくした（ふだんの脈・光る技）
+     *   Gear    … 肩とひじの歯車の光る歯をずらした（歯車が回る）
+     *   ArmsOut … 腕を肩の高さまで上げ、はさみの手を開いた
+     *   ArmsUp  … 腕を頭の上まで振り上げた
+     *   Glare   … ArmsOut の目を大きく光らせ、胸の芯も明るくした（にらむ・技を放つ）
+     *   Sleep   … 目の光を消し、胸の芯を暗くした（歯車が止まる）
+     * カラクリモリ専用の動きのコマ（2026-11-03）。形は描き直さず、上の絵の腕・脚・頭・胸を切り分けて組み直した：
+     *   Claw    … 両手のはさみを閉じた（ふだんの、はさみを開け閉めするコマ）
+     *   ArmRUp / ArmLUp … 片腕だけ頭の上へ振り上げた（ArmsUp の片側。胸は Glow）
+     *   StepL / StepR   … 片足を2段上げて踏み出す。反対の腕を肩の高さに上げて釣り合いをとる
+     *   Crouch  … 膝を折って体を2段沈め、腕を下げた（叩きつけた瞬間・守り・溜め）
+     *   SparkA / SparkB … Glare の胸と目で、腕を広げる（A）／掲げる（B）。体のまわりに火花が散る（放電・雷の技）
+     *   Recoil  … 目を閉じ、腕が跳ね上がり、片足が浮く（被弾）
+     *   Slump   … 膝が折れ、頭が肩に沈み、目と胸の光が消え、はさみが閉じる（倒れる）
+     */
+    gearWarden: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a",                     // 真鍮
+        "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",                     // 琥珀（目と胸の芯）
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44",                     // 根
+        "M": "#3f6b2a", "G": "#6f9a43"                                                       // 苔
+      },
+      pixels: [
+        "..........KKKKKKKKKKKK..........",
+        ".........KCMGGMTTTTMGCK.........",
+        ".........KBCMCCCCCCCCBK.........",
+        "........KKKHPPPPHHHHAKZK........",
+        "........KCKHPAAPHAAHAKRK........",
+        "........KTKHAWWDDWWAAKRK........",
+        "........KCKHAQQDDQQAAKRK........",
+        "........KKKHDKDKKDKDAKZK........",
+        "........KKKBCCCCCCCCBKZK........",
+        "...........KKBCTTCBKKKYK.KZK....",
+        "..KKKKK.KKKKKKKKKKKKKKZR.ZYKKK..",
+        ".KMGGTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCMIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKJJJJKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKJOOOOJKCAAKKBCTYCBK",
+        "..KCTCK.KHACKOQWWQOKCAAK.KCZCK..",
+        "..KBCBK.KHACKOQQQQOKCAAK.KBCYK..",
+        "..KCTCK.KHACKJOOOOJKCAAK.KCZCK..",
+        "..KBCBK.KHAACKJJJJKCAAAK.KYCBK..",
+        ".KCTTCK.KHAPAAKKKKAAHAAK.KCTTCK.",
+        ".KTIITK.KBCCCCCCCCCCCCBK.KTIITK.",
+        ".KCTTCK.KBCTTTTTTTTTTCBK.KCTTCK.",
+        "..KADK..KKNDAAAAAAAADNKK..KDAK..",
+        "..KADK...KNZAAAKKAAADNK...KDAK..",
+        ".KBCCBK..KNYAAK..KAADNK..KBCCBK.",
+        "KCTTTTCK.KZCCBK..KBCCBK.KCTTTTCK",
+        "KTK..KTK.KNYAAK..KAADNK.KTK..KTK",
+        "KK....KK.KZDAAK..KAADNK.KK....KK",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenGlow: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "..........KKKKKKKKKKKK..........",
+        ".........KCMGGMTTTTMGCK.........",
+        ".........KBCMCCCCCCCCBK.........",
+        "........KKKHPPPPHHHHAKZK........",
+        "........KCKHPAAPHAAHAKRK........",
+        "........KTKHAWWDDWWAAKRK........",
+        "........KCKHAQQDDQQAAKRK........",
+        "........KKKHDKDKKDKDAKZK........",
+        "........KKKBCCCCCCCCBKZK........",
+        "...........KKBCTTCBKKKYK.KZK....",
+        "..KKKKK.KKKKKKKKKKKKKKZR.ZYKKK..",
+        ".KMGGTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCMIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKOOOOKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKOQQQQOKCAAKKBCTYCBK",
+        "..KCTCK.KHACKQWWWWQKCAAK.KCZCK..",
+        "..KBCBK.KHACKQWWWWQKCAAK.KBCYK..",
+        "..KCTCK.KHACKOQQQQOKCAAK.KCZCK..",
+        "..KBCBK.KHAACKOOOOKCAAAK.KYCBK..",
+        ".KCTTCK.KHAPAAKKKKAAHAAK.KCTTCK.",
+        ".KTIITK.KBCCCCCCCCCCCCBK.KTIITK.",
+        ".KCTTCK.KBCTTTTTTTTTTCBK.KCTTCK.",
+        "..KADK..KKNDAAAAAAAADNKK..KDAK..",
+        "..KADK...KNZAAAKKAAADNK...KDAK..",
+        ".KBCCBK..KNYAAK..KAADNK..KBCCBK.",
+        "KCTTTTCK.KZCCBK..KBCCBK.KCTTTTCK",
+        "KTK..KTK.KNYAAK..KAADNK.KTK..KTK",
+        "KK....KK.KZDAAK..KAADNK.KK....KK",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenGear: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "..........KKKKKKKKKKKK..........",
+        ".........KCMGGMTTTTMGCK.........",
+        ".........KBCMCCCCCCCCBK.........",
+        "........KKKHPPPPHHHHAKZK........",
+        "........KCKHPAAPHAAHAKRK........",
+        "........KTKHAWWDDWWAAKRK........",
+        "........KCKHAQQDDQQAAKRK........",
+        "........KKKHDKDKKDKDAKZK........",
+        "........KKKBCCCCCCCCBKZK........",
+        "...........KKBCTTCBKKKYK.KZK....",
+        "..KKKKK.KKKKKKKKKKKKKKZR.ZYKKK..",
+        ".KMGGTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCMTTICKKHAPAAKKKKAAHAAKKCYZTICK",
+        "KCTTTTCKKHAACKJJJJKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKJOOOOJKCAAKKBCTYCBK",
+        "..KCTCK.KHACKOQWWQOKCAAK.KCZCK..",
+        "..KBCBK.KHACKOQQQQOKCAAK.KBCYK..",
+        "..KCTCK.KHACKJOOOOJKCAAK.KCZCK..",
+        "..KBCBK.KHAACKJJJJKCAAAK.KYCBK..",
+        ".KCTTCK.KHAPAAKKKKAAHAAK.KCTTCK.",
+        ".KITTIK.KBCCCCCCCCCCCCBK.KITTIK.",
+        ".KCTTCK.KBCTTTTTTTTTTCBK.KCTTCK.",
+        "..KADK..KKNDAAAAAAAADNKK..KDAK..",
+        "..KADK...KNZAAAKKAAADNK...KDAK..",
+        ".KBCCBK..KNYAAK..KAADNK..KBCCBK.",
+        "KCTTTTCK.KZCCBK..KBCCBK.KCTTTTCK",
+        "KTK..KTK.KNYAAK..KAADNK.KTK..KTK",
+        "KK....KK.KZDAAK..KAADNK.KK....KK",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenArmsOut: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "..........KKKKKKKKKKKK..........",
+        ".........KCMGGMTTTTMGCK.........",
+        ".........KBCMCCCCCCCCBK.........",
+        "KK....KKKKKHPPPPHHHHAKZKKK....KK",
+        "KTK..KTKKCKHPAAPHAAHAKRKKTK..KTK",
+        "KCTTTTCKKTKHAWWDDWWAAKRKKCTTTTCK",
+        ".KBCCBK.KCKHAQQDDQQAAKRK.KBCCBK.",
+        ".KCTTCK.KKKHDKDKKDKDAKZK.KCTTCK.",
+        ".KTIITK.KKKBCCCCCCCCBKZK.KTIITK.",
+        "..KCTCK....KKBCTTCBKKKYK.KCTCK..",
+        "..KCTCK.KKKKKKKKKKKKKKZR.ZYTCK..",
+        ".KCTTTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCTIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKJJJJKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKJOOOOJKCAAKKBCTYCBK",
+        "........KHACKOQWWQOKCAAK........",
+        "........KHACKOQQQQOKCAAK........",
+        "........KHACKJOOOOJKCAAK........",
+        "........KHAACKJJJJKCAAAK........",
+        "........KHAPAAKKKKAAHAAK........",
+        "........KBCCCCCCCCCCCCBK........",
+        "........KBCTTTTTTTTTTCBK........",
+        "........KKNDAAAAAAAADNKK........",
+        ".........KNZAAAKKAAADNK.........",
+        ".........KNYAAK..KAADNK.........",
+        ".........KZCCBK..KBCCBK.........",
+        ".........KNYAAK..KAADNK.........",
+        ".........KZDAAK..KAADNK.........",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenArmsUp: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "KK....KK..KKKKKKKKKKKK..KK....KK",
+        "KTK..KTK.KCMGGMTTTTMGCK.KTK..KTK",
+        "KCTTTTCK.KBCMCCCCCCCCBK.KCTTTTCK",
+        ".KBCCBK.KKKHPPPPHHHHAKZK.KBCCBK.",
+        "..KADK..KCKHPAAPHAAHAKRK..KDAK..",
+        "..KADK..KTKHAWWDDWWAAKRK..KDAK..",
+        ".KCTTCK.KCKHAQQDDQQAAKRK.KCTTCK.",
+        ".KTIITK.KKKHDKDKKDKDAKZK.KTIITK.",
+        ".KCTTCK.KKKBCCCCCCCCBKZK.KCTTCK.",
+        "..KBCBK....KKBCTTCBKKKYK.KBCBK..",
+        "..KCTCK.KKKKKKKKKKKKKKZR.ZYTCK..",
+        ".KCTTTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCTIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKJJJJKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKJOOOOJKCAAKKBCTYCBK",
+        "........KHACKOQWWQOKCAAK........",
+        "........KHACKOQQQQOKCAAK........",
+        "........KHACKJOOOOJKCAAK........",
+        "........KHAACKJJJJKCAAAK........",
+        "........KHAPAAKKKKAAHAAK........",
+        "........KBCCCCCCCCCCCCBK........",
+        "........KBCTTTTTTTTTTCBK........",
+        "........KKNDAAAAAAAADNKK........",
+        ".........KNZAAAKKAAADNK.........",
+        ".........KNYAAK..KAADNK.........",
+        ".........KZCCBK..KBCCBK.........",
+        ".........KNYAAK..KAADNK.........",
+        ".........KZDAAK..KAADNK.........",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenGlare: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "..........KKKKKKKKKKKK..........",
+        ".........KCMGGMTTTTMGCK.........",
+        ".........KBCMCCCCCCCCBK.........",
+        "KK....KKKKKHPPPPHHHHAKZKKK....KK",
+        "KTK..KTKKCKHPQQPHQQHAKRKKTK..KTK",
+        "KCTTTTCKKTKHAWWDDWWAAKRKKCTTTTCK",
+        ".KBCCBK.KCKHAWWDDWWAAKRK.KBCCBK.",
+        ".KCTTCK.KKKHDKDKKDKDAKZK.KCTTCK.",
+        ".KTIITK.KKKBCCCCCCCCBKZK.KTIITK.",
+        "..KCTCK....KKBCTTCBKKKYK.KCTCK..",
+        "..KCTCK.KKKKKKKKKKKKKKZR.ZYTCK..",
+        ".KCTTTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCTIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKOOOOKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKOQQQQOKCAAKKBCTYCBK",
+        "........KHACKQWWWWQKCAAK........",
+        "........KHACKQWWWWQKCAAK........",
+        "........KHACKOQQQQOKCAAK........",
+        "........KHAACKOOOOKCAAAK........",
+        "........KHAPAAKKKKAAHAAK........",
+        "........KBCCCCCCCCCCCCBK........",
+        "........KBCTTTTTTTTTTCBK........",
+        "........KKNDAAAAAAAADNKK........",
+        ".........KNZAAAKKAAADNK.........",
+        ".........KNYAAK..KAADNK.........",
+        ".........KZCCBK..KBCCBK.........",
+        ".........KNYAAK..KAADNK.........",
+        ".........KZDAAK..KAADNK.........",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenSleep: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "..........KKKKKKKKKKKK..........",
+        ".........KCMGGMTTTTMGCK.........",
+        ".........KBCMCCCCCCCCBK.........",
+        "........KKKHPPPPHHHHAKZK........",
+        "........KCKHPAAPHAAHAKRK........",
+        "........KTKHAKKDDKKAAKRK........",
+        "........KCKHABBDDBBAAKRK........",
+        "........KKKHDKDKKDKDAKZK........",
+        "........KKKBCCCCCCCCBKZK........",
+        "...........KKBCTTCBKKKYK.KZK....",
+        "..KKKKK.KKKKKKKKKKKKKKZR.ZYKKK..",
+        ".KMGGTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCMIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKJJJJKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKJJJJJJKCAAKKBCTYCBK",
+        "..KCTCK.KHACKJOQQOJKCAAK.KCZCK..",
+        "..KBCBK.KHACKJOOOOJKCAAK.KBCYK..",
+        "..KCTCK.KHACKJJJJJJKCAAK.KCZCK..",
+        "..KBCBK.KHAACKJJJJKCAAAK.KYCBK..",
+        ".KCTTCK.KHAPAAKKKKAAHAAK.KCTTCK.",
+        ".KTIITK.KBCCCCCCCCCCCCBK.KTIITK.",
+        ".KCTTCK.KBCTTTTTTTTTTCBK.KCTTCK.",
+        "..KADK..KKNDAAAAAAAADNKK..KDAK..",
+        "..KADK...KNZAAAKKAAADNK...KDAK..",
+        ".KBCCBK..KNYAAK..KAADNK..KBCCBK.",
+        "KCTTTTCK.KZCCBK..KBCCBK.KCTTTTCK",
+        "KTK..KTK.KNYAAK..KAADNK.KTK..KTK",
+        "KK....KK.KZDAAK..KAADNK.KK....KK",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenClaw: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "..........KKKKKKKKKKKK..........",
+        ".........KCMGGMTTTTMGCK.........",
+        ".........KBCMCCCCCCCCBK.........",
+        "........KKKHPPPPHHHHAKZK........",
+        "........KCKHPAAPHAAHAKRK........",
+        "........KTKHAWWDDWWAAKRK........",
+        "........KCKHAQQDDQQAAKRK........",
+        "........KKKHDKDKKDKDAKZK........",
+        "........KKKBCCCCCCCCBKZK........",
+        "...........KKBCTTCBKKKYK.KZK....",
+        "..KKKKK.KKKKKKKKKKKKKKZR.ZYKKK..",
+        ".KMGGTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCMIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKJJJJKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKJOOOOJKCAAKKBCTYCBK",
+        "..KCTCK.KHACKOQWWQOKCAAK.KCZCK..",
+        "..KBCBK.KHACKOQQQQOKCAAK.KBCYK..",
+        "..KCTCK.KHACKJOOOOJKCAAK.KCZCK..",
+        "..KBCBK.KHAACKJJJJKCAAAK.KYCBK..",
+        ".KCTTCK.KHAPAAKKKKAAHAAK.KCTTCK.",
+        ".KTIITK.KBCCCCCCCCCCCCBK.KTIITK.",
+        ".KCTTCK.KBCTTTTTTTTTTCBK.KCTTCK.",
+        "..KADK..KKNDAAAAAAAADNKK..KDAK..",
+        "..KADK...KNZAAAKKAAADNK...KDAK..",
+        ".KBCCBK..KNYAAK..KAADNK..KBCCBK.",
+        "KCTTTTCK.KZCCBK..KBCCBK.KCTTTTCK",
+        ".KTKKTK..KNYAAK..KAADNK..KTKKTK.",
+        "..KKKK...KZDAAK..KAADNK...KKKK..",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenArmRUp: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "..........KKKKKKKKKKKK..KK....KK",
+        ".........KCMGGMTTTTMGCK.KTK..KTK",
+        ".........KBCMCCCCCCCCBK.KCTTTTCK",
+        "........KKKHPPPPHHHHAKZK.KBCCBK.",
+        "........KCKHPAAPHAAHAKRK..KDAK..",
+        "........KTKHAWWDDWWAAKRK..KDAK..",
+        "........KCKHAQQDDQQAAKRK.KCTTCK.",
+        "........KKKHDKDKKDKDAKZK.KTIITK.",
+        "........KKKBCCCCCCCCBKZK.KCTTCK.",
+        "...........KKBCTTCBKKKYK.KBCBK..",
+        "..KKKKK.KKKKKKKKKKKKKKZR.ZYTCK..",
+        ".KMGGTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCMIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKOOOOKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKOQQQQOKCAAKKBCTYCBK",
+        "..KCTCK.KHACKQWWWWQKCAAK........",
+        "..KBCBK.KHACKQWWWWQKCAAK........",
+        "..KCTCK.KHACKOQQQQOKCAAK........",
+        "..KBCBK.KHAACKOOOOKCAAAK........",
+        ".KCTTCK.KHAPAAKKKKAAHAAK........",
+        ".KTIITK.KBCCCCCCCCCCCCBK........",
+        ".KCTTCK.KBCTTTTTTTTTTCBK........",
+        "..KADK..KKNDAAAAAAAADNKK........",
+        "..KADK...KNZAAAKKAAADNK.........",
+        ".KBCCBK..KNYAAK..KAADNK.........",
+        "KCTTTTCK.KZCCBK..KBCCBK.........",
+        "KTK..KTK.KNYAAK..KAADNK.........",
+        "KK....KK.KZDAAK..KAADNK.........",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenArmLUp: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "KK....KK..KKKKKKKKKKKK..........",
+        "KTK..KTK.KCMGGMTTTTMGCK.........",
+        "KCTTTTCK.KBCMCCCCCCCCBK.........",
+        ".KBCCBK.KKKHPPPPHHHHAKZK........",
+        "..KADK..KCKHPAAPHAAHAKRK........",
+        "..KADK..KTKHAWWDDWWAAKRK........",
+        ".KCTTCK.KCKHAQQDDQQAAKRK........",
+        ".KTIITK.KKKHDKDKKDKDAKZK........",
+        ".KCTTCK.KKKBCCCCCCCCBKZK........",
+        "..KBCBK....KKBCTTCBKKKYK.KZK....",
+        "..KCTCK.KKKKKKKKKKKKKKZR.ZYKKK..",
+        ".KCTTTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCTIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKOOOOKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKOQQQQOKCAAKKBCTYCBK",
+        "........KHACKQWWWWQKCAAK.KCZCK..",
+        "........KHACKQWWWWQKCAAK.KBCYK..",
+        "........KHACKOQQQQOKCAAK.KCZCK..",
+        "........KHAACKOOOOKCAAAK.KYCBK..",
+        "........KHAPAAKKKKAAHAAK.KCTTCK.",
+        "........KBCCCCCCCCCCCCBK.KTIITK.",
+        "........KBCTTTTTTTTTTCBK.KCTTCK.",
+        "........KKNDAAAAAAAADNKK..KDAK..",
+        ".........KNZAAAKKAAADNK...KDAK..",
+        ".........KNYAAK..KAADNK..KBCCBK.",
+        ".........KZCCBK..KBCCBK.KCTTTTCK",
+        ".........KNYAAK..KAADNK.KTK..KTK",
+        ".........KZDAAK..KAADNK.KK....KK",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenStepL: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "..........KKKKKKKKKKKK..........",
+        ".........KCMGGMTTTTMGCK.........",
+        ".........KBCMCCCCCCCCBK.........",
+        "........KKKHPPPPHHHHAKZKKK....KK",
+        "........KCKHPAAPHAAHAKRKKTK..KTK",
+        "........KTKHAWWDDWWAAKRKKCTTTTCK",
+        "........KCKHAQQDDQQAAKRK.KBCCBK.",
+        "........KKKHDKDKKDKDAKZK.KCTTCK.",
+        "........KKKBCCCCCCCCBKZK.KTIITK.",
+        "...........KKBCTTCBKKKYK.KCTCK..",
+        "..KKKKK.KKKKKKKKKKKKKKZR.ZYTCK..",
+        ".KMGGTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCMIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKJJJJKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKJOOOOJKCAAKKBCTYCBK",
+        "..KCTCK.KHACKOQWWQOKCAAK........",
+        "..KBCBK.KHACKOQQQQOKCAAK........",
+        "..KCTCK.KHACKJOOOOJKCAAK........",
+        "..KBCBK.KHAACKJJJJKCAAAK........",
+        ".KCTTCK.KHAPAAKKKKAAHAAK........",
+        ".KTIITK.KBCCCCCCCCCCCCBK........",
+        ".KCTTCK.KBCTTTTTTTTTTCBK........",
+        "..KADK..KKNDAAAAAAAADNKK........",
+        "..KADK...KZCCBK.KAAADNK.........",
+        ".KBCCBK..KNYAAK..KAADNK.........",
+        "KCTTTTCK.KZDAAK..KBCCBK.........",
+        "KTK..KTKKBCTTCK..KAADNK.........",
+        "KK....KK.........KAADNK.........",
+        "....KZZK.........KCTTCBKKZZK....",
+        "...KZGMZZRZZRRZZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenStepR: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "..........KKKKKKKKKKKK..........",
+        ".........KCMGGMTTTTMGCK.........",
+        ".........KBCMCCCCCCCCBK.........",
+        "KK....KKKKKHPPPPHHHHAKZK........",
+        "KTK..KTKKCKHPAAPHAAHAKRK........",
+        "KCTTTTCKKTKHAWWDDWWAAKRK........",
+        ".KBCCBK.KCKHAQQDDQQAAKRK........",
+        ".KCTTCK.KKKHDKDKKDKDAKZK........",
+        ".KTIITK.KKKBCCCCCCCCBKZK........",
+        "..KCTCK....KKBCTTCBKKKYK.KZK....",
+        "..KCTCK.KKKKKKKKKKKKKKZR.ZYKKK..",
+        ".KCTTTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCTIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKJJJJKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKJOOOOJKCAAKKBCTYCBK",
+        "........KHACKOQWWQOKCAAK.KCZCK..",
+        "........KHACKOQQQQOKCAAK.KBCYK..",
+        "........KHACKJOOOOJKCAAK.KCZCK..",
+        "........KHAACKJJJJKCAAAK.KYCBK..",
+        "........KHAPAAKKKKAAHAAK.KCTTCK.",
+        "........KBCCCCCCCCCCCCBK.KTIITK.",
+        "........KBCTTTTTTTTTTCBK.KCTTCK.",
+        "........KKNDAAAAAAAADNKK..KDAK..",
+        ".........KNZAAAK.KBCCBK...KDAK..",
+        ".........KNYAAK..KAADNK..KBCCBK.",
+        ".........KZCCBK..KAADNK.KCTTTTCK",
+        ".........KNYAAK..KCTTCBKKTK..KTK",
+        ".........KZDAAK.........KK....KK",
+        "....KZZKKBCTTCK.........KZZK....",
+        "...KZGMZZKKKKKKZZRZZRRZZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenCrouch: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "................................",
+        "................................",
+        "..........KKKKKKKKKKKK..........",
+        ".........KCMGGMTTTTMGCK.........",
+        ".........KBCMCCCCCCCCBK.........",
+        "........KKKHPPPPHHHHAKZK........",
+        "........KCKHPAAPHAAHAKRK........",
+        "........KTKHAWWDDWWAAKRK........",
+        "........KCKHAQQDDQQAAKRK........",
+        "........KKKHDKDKKDKDAKZK........",
+        "........KKKBCCCCCCCCBKZK........",
+        "...........KKBCTTCBKKKYK.KZK....",
+        "..KKKKK.KKKKKKKKKKKKKKZR.ZYKKK..",
+        ".KMGGTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCMIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKOOOOKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKOQQQQOKCAAKKBCTYCBK",
+        "..KCTCK.KHACKQWWWWQKCAAK.KCZCK..",
+        "..KBCBK.KHACKQWWWWQKCAAK.KBCYK..",
+        "..KCTCK.KHACKOQQQQOKCAAK.KCZCK..",
+        "..KBCBK.KHAACKOOOOKCAAAK.KYCBK..",
+        ".KCTTCK.KHAPAAKKKKAAHAAK.KCTTCK.",
+        ".KTIITK.KBCCCCCCCCCCCCBK.KTIITK.",
+        ".KCTTCK.KBCTTTTTTTTTTCBK.KCTTCK.",
+        "..KADK..KKNDAAAAAAAADNKK..KDAK..",
+        "..KADK...KZCCBK..KBCCBK...KDAK..",
+        ".KBCCBK..KNYAAK..KAADNK..KBCCBK.",
+        "KCTTTTCK.KZDAAK..KAADNK.KCTTTTCK",
+        "KTK.KKTKKBCTTCK..KCTTCBKKTKK.KTK",
+        "KK.KZGKKZKKKKKKZZKKKKKKZKKMZK.KK",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenSparkA: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "...I......KKKKKKKKKKKK......I...",
+        "..W......KCMGGMTTTTMGCK......W..",
+        "...WW....KBCMCCCCCCCCBK....WW...",
+        "KK...IKKKKKHPPPPHHHHAKZKKKI...KK",
+        "KTK..KTKKCKHPQQPHQQHAKRKKTK..KTK",
+        "KCTTTTCKKTKHAWWDDWWAAKRKKCTTTTCK",
+        ".KBCCBK.KCKHAWWDDWWAAKRK.KBCCBK.",
+        ".KCTTCK.KKKHDKDKKDKDAKZK.KCTTCK.",
+        ".KTIITK.KKKBCCCCCCCCBKZK.KTIITK.",
+        "..KCTCK....KKBCTTCBKKKYK.KCTCK..",
+        "..KCTCK.KKKKKKKKKKKKKKZR.ZYTCK..",
+        ".KCTTTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCTIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKOOOOKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKOQQQQOKCAAKKBCTYCBK",
+        "........KHACKQWWWWQKCAAK........",
+        ".W......KHACKQWWWWQKCAAK......W.",
+        "..WI....KHACKOQQQQOKCAAK....IW..",
+        "..W.....KHAACKOOOOKCAAAK.....W..",
+        "........KHAPAAKKKKAAHAAK........",
+        "...I....KBCCCCCCCCCCCCBK....I...",
+        "....W...KBCTTTTTTTTTTCBK...W....",
+        "........KKNDAAAAAAAADNKK........",
+        ".........KNZAAAKKAAADNK.........",
+        ".........KNYAAK..KAADNK.........",
+        ".........KZCCBK..KBCCBK.........",
+        ".........KNYAAK..KAADNK.........",
+        ".........KZDAAK..KAADNK.........",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenSparkB: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "KI....KK..KKKKKKKKKKKK..KK....IK",
+        "KWI..KTK.KCMGGMTTTTMGCK.KTK..IWK",
+        "KWTTTTCK.KBCMCCCCCCCCBK.KCTTTTWK",
+        ".KBCCBK.KKKHPPPPHHHHAKZK.KBCCBK.",
+        "..KADK..KCKHPQQPHQQHAKRK..KDAK..",
+        "..KADK..KTKHAWWDDWWAAKRK..KDAK..",
+        ".KCTTCK.KCKHAWWDDWWAAKRK.KCTTCK.",
+        ".KTIITK.KKKHDKDKKDKDAKZK.KTIITK.",
+        ".KCTTCK.KKKBCCCCCCCCBKZK.KCTTCK.",
+        "..KBCBK....KKBCTTCBKKKYK.KBCBK..",
+        "..KCTCK.KKKKKKKKKKKKKKZR.ZYTCK..",
+        ".KCTTTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCTIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKOOOOKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKOQQQQOKCAAKKBCTYCBK",
+        "....W...KHACKQWWWWQKCAAK...W....",
+        "....WI..KHACKQWWWWQKCAAK..IW....",
+        ".....W..KHACKOQQQQOKCAAK..W.....",
+        "........KHAACKOOOOKCAAAK........",
+        ".W......KHAPAAKKKKAAHAAK......W.",
+        "..W.....KBCCCCCCCCCCCCBK.....W..",
+        ".I......KBCTTTTTTTTTTCBK......I.",
+        "........KKNDAAAAAAAADNKK........",
+        ".........KNZAAAKKAAADNK.........",
+        "....I....KNYAAK..KAADNK....I....",
+        ".....W...KZCCBK..KBCCBK...W.....",
+        ".........KNYAAK..KAADNK.........",
+        ".........KZDAAK..KAADNK.........",
+        "....KZZKKBCTTCK..KCTTCBKKZZK....",
+        "...KZGMZZKKKKKKZZKKKKKKZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenRecoil: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "..........KKKKKKKKKKKK..KK....KK",
+        ".........KCMGGMTTTTMGCK.KTK..KTK",
+        ".........KBCMCCCCCCCCBK.KCTTTTCK",
+        "KK....KKKKKHPPPPHHHHAKZK.KBCCBK.",
+        "KTK..KTKKCKHPAAPHAAHAKRK..KDAK..",
+        "KCTTTTCKKTKHAKKDDKKAAKRK..KDAK..",
+        ".KBCCBK.KCKHABBDDBBAAKRK.KCTTCK.",
+        ".KCTTCK.KKKHDKDKKDKDAKZK.KTIITK.",
+        ".KTIITK.KKKBCCCCCCCCBKZK.KCTTCK.",
+        "..KCTCK....KKBCTTCBKKKYK.KBCBK..",
+        "..KCTCK.KKKKKKKKKKKKKKZR.ZYTCK..",
+        ".KCTTTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCTIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKJJJJKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKJOOOOJKCAAKKBCTYCBK",
+        "........KHACKOQWWQOKCAAK........",
+        "........KHACKOQQQQOKCAAK........",
+        "........KHACKJOOOOJKCAAK........",
+        "........KHAACKJJJJKCAAAK........",
+        "........KHAPAAKKKKAAHAAK........",
+        "........KBCCCCCCCCCCCCBK........",
+        "........KBCTTTTTTTTTTCBK........",
+        "........KKNDAAAAAAAADNKK........",
+        ".........KNZAAAK.KBCCBK.........",
+        ".........KNYAAK..KAADNK.........",
+        ".........KZCCBK..KAADNK.........",
+        ".........KNYAAK..KCTTCBK........",
+        ".........KZDAAK.................",
+        "....KZZKKBCTTCK.........KZZK....",
+        "...KZGMZZKKKKKKZZRZZRRZZZRMZK...",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
+    gearWardenSlump: {
+      palette: {
+        ".": null, "K": "#120c06", "N": "#2e1f12", "D": "#4a3220", "A": "#6e4c2e", "H": "#8f6a42", "P": "#b08a5a",
+        "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a", "I": "#ecd27a", "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a",
+        "X": "#1c130a", "R": "#3a2817", "Z": "#5c4229", "Y": "#8a6a44", "M": "#3f6b2a", "G": "#6f9a43"
+      },
+      pixels: [
+        "................................",
+        "................................",
+        "................................",
+        "..........KKKKKKKKKKKK..........",
+        ".........KCMGGMTTTTMGCK.........",
+        ".........KBCMCCCCCCCCBK.........",
+        "........KKKHPPPPHHHHAKZK........",
+        "........KCKHPAAPHAAHAKRK........",
+        "........KTKHAKKDDKKAAKRK........",
+        "........KCKHABBDDBBAAKRK........",
+        "........KKKHDKDKKDKDAKZK........",
+        "........KKKBCCCCCCCCBKZK.KZK....",
+        "..KKKKK.KKKKKKKKKKKKKKZR.ZYKKK..",
+        ".KMGGTCKKHPPPPPPHHHHHHAKKYZTTCK.",
+        "KCMIITCKKHAPAAKKKKAAHAAKKCYZITCK",
+        "KCTTTTCKKHAACKJJJJKCAAAKKCTYZTCK",
+        "KBCTTCBKKHACKJJJJJJKCAAKKBCTYCBK",
+        "..KCTCK.KHACKJOQQOJKCAAK.KCZCK..",
+        "..KBCBK.KHACKJOOOOJKCAAK.KBCYK..",
+        "..KCTCK.KHACKJJJJJJKCAAK.KCZCK..",
+        "..KBCBK.KHAACKJJJJKCAAAK.KYCBK..",
+        ".KCTTCK.KHAPAAKKKKAAHAAK.KCTTCK.",
+        ".KTIITK.KBCCCCCCCCCCCCBK.KTIITK.",
+        ".KCTTCK.KBCTTTTTTTTTTCBK.KCTTCK.",
+        "..KADK..KKNDAAAAAAAADNKK..KDAK..",
+        "..KADK...KZCCBK..KBCCBK...KDAK..",
+        ".KBCCBK..KNYAAK..KAADNK..KBCCBK.",
+        "KCTTTTCK.KZDAAK..KAADNK.KCTTTTCK",
+        ".KTKKTKKKBCTTCK..KCTTCBKKKTKKTK.",
+        "..KKKKMZZKKKKKKZZKKKKKKZZRKKKK..",
+        "..KRZZRRZRRZZRRZZRRZZRRZRMGZRK..",
+        "...KKKKKKKKKKKKKKKKKKKKKKKKKK..."
+      ]
+    },
+
     sproutSpiritUp: {
       palette: {
         ".": null, "K": "#13180e", "N": "#6f8a5a", "D": "#9db87a", "A": "#cfe6a8", "H": "#ecf7d2",

@@ -19,6 +19,7 @@
       useSkill:     "{actor} の {skill}!",                  // actor, skill
       wait:         "{actor} は ようすを みている...",       // actor
       miss:         "しかし {target} には当たらなかった!",  // target
+      // ダメージの行の頭に付く（単独の行にはしない。2026-11-03 作者の指定）
       critical:     "クリティカル!",
 
       // 相性の良し悪しは文章では知らせない（空にすると、その行は出なくなる）。
@@ -42,6 +43,28 @@
       modifierDown: "{target} は {skill} で 力を そがれた!", // target, skill
       modifierAgain:"{target} の {skill} を かけ直した!",    // target, skill
       modifierEnd:  "{target} の {skill} の効果が切れた。",  // target, skill
+      // 何が上がった／下がったかを、画面の能力名で必ず足す（2026-11-03 作者の指定。BattleMessageFormatter._modifierText）。
+      //   技の言い回しがあれば「言い回し＋ modifierStatLine」、無ければ modifierStat の1文
+      modifierStat:     "{target} の {stats}",                 // target, stats
+      modifierStatLine: "{nouns}が {verb}!",                  // nouns（攻撃と防御）, verb
+      logStats: { hp: "HP", attack: "攻撃", defense: "防御", speed: "素早さ", pp: "PP", accuracy: "命中",
+                  damageTaken: "受けるダメージ", damageDealt: "与えるダメージ",
+                  resist: "{what}への耐性", allStatus: "状態異常" },
+      // ×1.5 以上・×0.5 以下は「大きく」
+      logChange: { up: "上がった", upBig: "大きく上がった", down: "下がった", downBig: "大きく下がった",
+                   more: "増えた", less: "減った" },
+      nounJoin: "と",
+
+      // 1行にまとめる文（2026-11-03 作者の指定。BattleMessageFormatter.annotate）
+      //   全体の技で2体以上が受けた／何回か当てる技／2体以上に入らなかった・当たらなかった／全体に掛けた強化・弱体
+      groupName:    "{target}たち",                                       // target（先頭の名前）
+      groupDamage:  "{target}たち は 平均 {amount} のダメージを受けた!",   // target, amount
+      groupFail:    "しかし {target}たち には効かなかった",               // target
+      groupMiss:    "しかし {target}たち には当たらなかった!",            // target
+      multiHitOne:  "{target} に {hits}回 当たって 合計 {amount} のダメージ!", // target, hits, amount
+      multiHitMany: "{hits}回 当たって {list} のダメージ!",              // hits, list
+      multiHitPart: "{target} に {amount}",                              // target, amount
+      listJoin:     "・",
 
       // 状態異常。ふつうは data/statuses.js に書いた言い回し
       // （message / tickMessage / cureMessage / blockMessage）が使われる。
@@ -966,7 +989,9 @@
       hintInspect: "↑↓: 別の仲間    ←→: ページ切替    決定・愛情度を押す: 愛情度の詳細    Esc: 戻る",
       // 様子を見るのページ（左上の札）。モンスター説明は図鑑と同じ説明と、愛情度の記録
       inspectPageStats: "ステータス",
+      inspectPageSkills: "技・特性",
       inspectPageNotes: "モンスター説明",
+      skillCount: "{label}（{n}）",       // 「技（12）」。仲間の一覧の右の欄・様子を見るの左の欄・技・特性のページの見出し（label, n）
       notesNoRecords:   "（関係が深まると、記録が書き足されていく）",
       natureLabel: "性格",
       attackLabel: "攻撃",

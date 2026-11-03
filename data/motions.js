@@ -3943,6 +3943,153 @@
       scaleY: { offset: -0.03, amplitude: 0.018, period: 5000, phase: 0.25 }
     },
 
+    // ─────────────────────────────────────────
+    // 千年樹の根底の主・カラクリモリ（v1.0.3・2026-11-03）。木と真鍮のからくり。
+    // 姿は data/monsters.js の gearWarden の poses（絵は sprites_marsh.js の gearWarden〜）。
+    //   armRUp / armLUp（片腕を振り上げる）・stepL / stepR（片足を上げて踏み出す）・crouch（膝を折って沈む）・
+    //   sparkA / sparkB（胸を開いて火花が散る）・recoil（被弾）・slump（倒れる）・armsOut / armsUp・sleep
+    // 重いからくりなので跳ねない。腕を振り上げ、踏み込み、膝を折って叩きつける。雷の技は体中から火花を散らす
+    // ─────────────────────────────────────────
+
+    // ふだん：胸の芯が脈打ち、はさみの手が開け閉めし、歯車が回る（sprite の4枚 × 560ms）。
+    //   体はからくりらしく小さく上下するだけ
+    gearIdle: {
+      frames: { interval: 560 },
+      offsetY: { amplitude: -0.8, period: 2240 },
+      scaleY:  { amplitude: 0.010, period: 2240, phase: 0.25 }
+    },
+
+    // 通常攻撃。右腕を振り上げて溜め、左足で踏み込みながら、膝を折って叩きつける
+    gearSlam: {
+      duration: 760,
+      offsetY: { amount: 24, shape: "windup", backRatio: 0.45 },
+      scaleY:  { amount: -0.05, shape: "windup", backRatio: 0.45 },
+      poses: [
+        { at: 0,    pose: "armRUp" },
+        { at: 0.3,  pose: "stepL" },
+        { at: 0.45, pose: "crouch" },
+        { at: 0.82, pose: null }
+      ]
+    },
+
+    // 体技・斬撃・踊り（鎧くずし・歯車投げ・しびれ粉）。右・左と交互に腕を振り上げ、踏み込んで2回叩きつける
+    gearPummel: {
+      duration: 980,
+      offsetY: { amount: 18, shape: "hops", count: 2 },
+      offsetX: { amount: 3,  shape: "wobble", cycles: 2 },
+      poses: [
+        { at: 0,    pose: "armRUp" },
+        { at: 0.16, pose: "stepL" },
+        { at: 0.26, pose: "crouch" },
+        { at: 0.46, pose: "armLUp" },
+        { at: 0.62, pose: "stepR" },
+        { at: 0.72, pose: "crouch" },
+        { at: 0.9,  pose: null }
+      ]
+    },
+
+    // 共鳴（雷の技）。腕を広げて胸を開き、体中から火花を散らす（その場から動かない）
+    gearResonate: {
+      duration: 900,
+      offsetY: { amount: -5,   shape: "pulse" },
+      scaleY:  { amount: 0.05, shape: "pulse" },
+      offsetX: { amount: 1.5,  shape: "wobble", cycles: 4 },
+      poses: [
+        { at: 0,    pose: "armsOut" },
+        { at: 0.18, pose: "sparkA" },
+        { at: 0.34, pose: "sparkB" },
+        { at: 0.5,  pose: "sparkA" },
+        { at: 0.66, pose: "sparkB" },
+        { at: 0.86, pose: null }
+      ]
+    },
+
+    // ブレス。膝を折って溜め、伸び上がって胸から吐き出す
+    gearBreath: {
+      duration: 800,
+      offsetY: { amount: 12,   shape: "windup", backRatio: 0.5 },
+      scale:   { amount: 0.05, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "crouch" },
+        { at: 0.5,  pose: "sparkA" },
+        { at: 0.88, pose: null }
+      ]
+    },
+
+    // 自分・味方にかける技（こうか・ちからため・鼓舞の舞）。膝を折って力をため、腕を広げ、振り上げる
+    gearBuff: {
+      duration: 820,
+      offsetY: { amount: -6, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "crouch" },
+        { at: 0.3,  pose: "armsOut" },
+        { at: 0.5,  pose: "armsUp" },
+        { at: 0.7,  pose: "armsOut" },
+        { at: 0.88, pose: null }
+      ]
+    },
+
+    // 被弾。目を閉じ、腕が跳ね上がって片足が浮く。重いのでほとんど押されない
+    gearHit: {
+      duration: 440,
+      offsetY: { amount: 5,    shape: "decay", cycles: 2 },
+      offsetX: { amount: 2,    shape: "wobble", cycles: 3 },
+      alpha:   { amount: -0.3, shape: "fade" },
+      poses: [
+        { at: 0,    pose: "recoil" },
+        { at: 0.55, pose: "crouch" },
+        { at: 0.85, pose: null }
+      ]
+    },
+
+    // 回避。片足ずつ踏みかえて、横へずれる
+    gearDodge: {
+      duration: 480,
+      offsetX: { amount: 14, outRatio: 0.35 },
+      poses: [
+        { at: 0,    pose: "stepL" },
+        { at: 0.3,  pose: "stepR" },
+        { at: 0.6,  pose: null }
+      ]
+    },
+
+    // 守り。膝を折って沈んだまま構える
+    gearGuard: {
+      pose: "crouch",
+      scaleX: { offset: 0.02 }
+    },
+
+    // 倒れる。腕が跳ね、膝が折れて頭が肩に沈み、光が消えて崩れる
+    gearFall: {
+      duration: 1000,
+      offsetY: { amount: 8,     shape: "rise" },
+      scale:   { amount: -0.35, shape: "rise" },
+      alpha:   { amount: -1,    shape: "rise" },
+      poses: [
+        { at: 0,    pose: "recoil" },
+        { at: 0.2,  pose: "slump" }
+      ]
+    },
+
+    // レベルアップ・スカウトに応じたとき。左右に足踏みし、両腕を掲げて火花を散らす
+    gearCheer: {
+      duration: 900,
+      offsetY: { amount: -5, shape: "hops", count: 2 },
+      poses: [
+        { at: 0,    pose: "stepL" },
+        { at: 0.25, pose: "armsUp" },
+        { at: 0.45, pose: "stepR" },
+        { at: 0.7,  pose: "sparkB" },
+        { at: 0.92, pose: null }
+      ]
+    },
+
+    // 眠っている間。目と胸の光が消え（Sleep の絵）、歯車が止まったまま、ほとんど動かない
+    gearSleeping: {
+      pose: "sleep",
+      scaleY: { offset: -0.02, amplitude: 0.008, period: 5200 }
+    },
+
     /**
      * --- シニガミ（蔦這う回廊の初見殺し。2026-10-21） ---
      * 姿は sprites_marsh.js の shinigami（ふつう）・shinigamiRaise（振りかぶる）・shinigamiSwing（振り下ろす）。

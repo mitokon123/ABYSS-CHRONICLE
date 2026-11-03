@@ -123,7 +123,10 @@
       swampLord:  { lv: 20, members: ["slime", "flamin", "boltBug"] },
       // 若葉の洞の主（v1.0.0）。作者の目標は「若葉の洞の装備を着けたLv26の3体で勝率15〜20%」
       hollowLord: { lv: 26, members: ["slime", "flamin", "boltBug"],
-                    gear: { weapon: "sproutBlade", armor: "mossShellArmor", accessory: "sleepWard", accessory2: "leafPlume" } }
+                    gear: { weapon: "sproutBlade", armor: "mossShellArmor", accessory: "sleepWard", accessory2: "leafPlume" } },
+      // 千年樹の根底の主（v1.0.3）。推奨Lv30（仮）で、蔦這う回廊の装備を着けた同じ3体
+      rootsWarden: { lv: 30, members: ["slime", "flamin", "boltBug"],
+                    gear: { weapon: "blueThunderBlade", armor: "windChimeVest", accessory: "paralysisWard", accessory2: "ivyBreakerCharm" } }
     };
     var SETTINGS_KEY = "__balance-sim.settings";
     var BASELINE_KEY = "__balance-sim.baseline";
@@ -305,6 +308,9 @@
         if (enemy.useEnemySkills) enemy.useEnemySkills();
         if (enemy.setEncounterMultipliers) enemy.setEncounterMultipliers(boss.statMultiplier);
         if (enemy.setActionPattern) enemy.setActionPattern(boss.actionPattern);
+        // ゲームと同じく、PPが減らない主・1ターンに何度も動く主（v1.0.3）
+        if (boss.infinitePp) enemy.infinitePp = true;
+        if (boss.actionsPerTurn) enemy.actionsPerTurn = boss.actionsPerTurn;
         if (enemy.setBossStatusImmunity) {
           var list = ((gd.battle || {}).bossImmuneToStatus || []).slice();
           (boss.immuneToStatus || []).forEach(function (id) { if (list.indexOf(id) < 0) list.push(id); });

@@ -101,7 +101,7 @@
     this.scoutSystem = new NS.ScoutSystem(game.data, random);
     this.dropSystem = new NS.DropSystem(game.data, random);
     this.itemUsage = new NS.ItemUsage(game.data);
-    this.formatter = new NS.BattleMessageFormatter(game.data.messages, game.data.statuses);
+    this.formatter = new NS.BattleMessageFormatter(game.data.messages, game.data.statuses, game.data.elements);
 
     this.phase = "message";
     this.commandIndex = 0;   // いま行動を決めている味方（盤面の番号）
@@ -665,6 +665,8 @@
     this.shownPp = this.snapshotPp || null;
 
     this.playbackEvents = events || [];
+    // まとめて1行にする文を先に決めておく（全体の技・何回か当てる技・クリティカル。BattleMessageFormatter.annotate）
+    this.formatter.annotate(this.playbackEvents);
     this.playbackIndex = 0;
     this.playbackTimer = 0;
     this.playbackWaiting = false;
@@ -1522,8 +1524,10 @@
     // ダメージの無い状態異常の技（青い眼光など）は damage が来ないので、状態異常の出来事も合図にする
     // 治した出来事は、いまの技で治したときだけ（特性「脱皮」で治ったときに、前の技の演出を出さない）
     if (event.type === "cure" && event.skillId !== this._currentSkill.id) return;
+    // 回復の技（キュア・やくそう）は、回復した仲間ごとに演出を出す。道具の回復（skillId が無い）では出さない（v1.0.3）
+    var healed = (event.type === "heal" && event.skillId === this._currentSkill.id);
     var statusOnly = isStatusResultEvent(event.type) && !NS.BattleSystem.dealsDamage(this._currentSkill);
-    if ((!isHitEvent(event.type) && !statusOnly) || !event.target) return;
+    if ((!isHitEvent(event.type) && !statusOnly && !healed) || !event.target) return;
     // 威力も持つ弱体の技（ロックスパイク）は、当たった時点でもう演出を出している。弱体で2回目は出さない
     if ((event.type === "modifier" || event.type === "modifierMiss") && NS.BattleSystem.dealsDamage(this._currentSkill)) return;
     // 反動は自分が受けるもの。技の演出は出さない

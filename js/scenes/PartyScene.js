@@ -512,6 +512,9 @@
 
   // --- 様子を見る ---
 
+  // ページの並び（左上の札もこの順）。技が多いと左の欄からはみ出したので、技は専用のページにした（v1.0.3）
+  var INSPECT_PAGES = ["stats", "skills", "notes"];
+
   /**
    * 眺めるだけの画面。何も変えない。
    *
@@ -529,9 +532,11 @@
       if (input.isPressed("down")) this.index = (this.index + 1) % size;
     }
 
-    // ←→ でページを切り替える（ステータス ⇔ モンスター説明）。上部の札を押しても切り替わる
-    if (input.isPressed("left") || input.isPressed("right")) {
-      this.inspectPage = (this.inspectPage === "notes") ? "stats" : "notes";
+    // ←→ でページを切り替える（ステータス → 技・特性 → モンスター説明）。上部の札を押しても切り替わる
+    var step = input.isPressed("right") ? 1 : (input.isPressed("left") ? -1 : 0);
+    if (step) {
+      var at = INSPECT_PAGES.indexOf(this.inspectPage || "stats");
+      this.inspectPage = INSPECT_PAGES[(Math.max(0, at) + step + INSPECT_PAGES.length) % INSPECT_PAGES.length];
     }
     var tabPointer = input.getPointer ? input.getPointer() : null;
     if (tabPointer && tabPointer.clicked && this._inspectTabRects) {
@@ -1210,16 +1215,13 @@
       x, y, { color: t.subTextColor, font: t.smallFont });
     y += lh + 4;
 
-    this.panel.drawText(this.texts.skillLabel || "skills", x, y, { font: t.smallFont });
+    // 技は数だけ（「技（11）」）。技はこの先も増えて欄からはみ出すので、中身は「様子を見る」の技・特性のページで見る（v1.0.3）
+    this.panel.drawText(fill(this.texts.skillCount || "{label} {n}", {
+      label: this.texts.skillLabel || "skills", n: monster.skills.length
+    }), x, y, { font: t.smallFont });
     y += lh;
 
     var i;
-    for (i = 0; i < monster.skills.length; i++) {
-      var skill = this.game.data.getSkill(monster.skills[i]);
-      this.panel.drawText("・" + (skill ? skill.name : monster.skills[i]),
-        x, y, { color: t.subTextColor, font: t.smallFont });
-      y += lh;
-    }
 
     // 特性（アビリティ）
     var abilities = this._getAbilities(monster);
@@ -1266,7 +1268,7 @@
     var base = t.lineHeight || 18;
 
     var lines = 8;
-    lines += 1 + monster.skills.length;
+    lines += 1;   // 技は数だけの1行（「技（11）」）
     var abilities = this._getAbilities(monster).length;
     if (abilities > 0) lines += 1 + abilities;
     var slots = this._equipSlotLines(monster);
@@ -1401,11 +1403,17 @@
       { align: "center", font: t.smallFont, color: t.subTextColor });
     this._renderAffection(monster, sp.x, ((L.name || {}).y || 268) + 42);
 
-    // 左の下：技と特性（中央をステータスと装備に空けるため、こちらへ）
-    this._renderInspectSkills(monster, L.left || { x: 64, y: 316, lineHeight: 20 });
+    // 左の下：特性（技は数が多いとはみ出すので「技・特性」のページへ）
+    this._renderInspectAbilities(monster, L.left || { x: 64, y: 316, lineHeight: 20 });
 
-    // 左上：ページの札（ステータス ／ モンスター説明）
+    // 左上：ページの札（ステータス ／ 技・特性 ／ モンスター説明）
     this._renderInspectTabs(rect, L.tabs || {});
+
+    // 技・特性のページ：右側に覚えている技の一覧と、特性の説明
+    if (this.inspectPage === "skills") {
+      this._renderInspectSkillPage(monster, rect, L.skills || {});
+      return;
+    }
 
     // モンスター説明のページ：右側に図鑑と同じ説明と、愛情度の記録を出す
     if (this.inspectPage === "notes") {
@@ -1443,10 +1451,15 @@
   PartyScene.prototype._renderInspectTabs = function (box, T) {
     var t = this.theme;
     var ctx = this.panel.ctx;
-    var pages = [
-      { page: "stats", label: this.texts.inspectPageStats || "stats" },
-      { page: "notes", label: this.texts.inspectPageNotes || "notes" }
-    ];
+    var labels = {
+      stats: this.texts.inspectPageStats || "stats",
+      skills: this.texts.inspectPageSkills || "skills",
+      notes: this.texts.inspectPageNotes || "notes"
+    };
+    var pages = [];
+    for (var p = 0; p < INSPECT_PAGES.length; p++) {
+      pages.push({ page: INSPECT_PAGES[p], label: labels[INSPECT_PAGES[p]] });
+    }
     var x = box.x + (T.x === undefined ? 16 : T.x);
     var y = box.y + (T.y === undefined ? 22 : T.y);
     var gap = T.gap === undefined ? 18 : T.gap;
@@ -1702,30 +1715,113 @@
     }
   };
 
-  /** 様子を見る：左の下の、技と特性 */
-  PartyScene.prototype._renderInspectSkills = function (monster, pos) {
+  /** 様子を見る：左の下の、特性と技の数（技の中身は「技・特性」のページ） */
+  PartyScene.prototype._renderInspectAbilities = function (monster, pos) {
     var t = this.theme;
     var lh = pos.lineHeight || 20;
     var x = pos.x, y = pos.y;
-    var i;
-
-    this.panel.drawText(this.texts.skillLabel || "", x, y, { font: t.smallFont });
-    y += lh;
-    for (i = 0; i < monster.skills.length; i++) {
-      var skill = this.game.data.getSkill(monster.skills[i]);
-      this.panel.drawText("・" + (skill ? skill.name : monster.skills[i]), x, y,
-        { font: t.smallFont, color: t.subTextColor });
-      y += lh;
-    }
 
     var abilities = this._getAbilities(monster);
-    if (abilities.length === 0) return;
-    y += 6;
-    this.panel.drawText(this.texts.abilityLabel || "", x, y, { font: t.smallFont });
-    y += lh;
-    for (i = 0; i < abilities.length; i++) {
-      this.panel.drawText("・" + abilities[i].name, x, y, { font: t.smallFont, color: t.subTextColor });
+    if (abilities.length > 0) {
+      this.panel.drawText(this.texts.abilityLabel || "", x, y, { font: t.smallFont });
       y += lh;
+      for (var i = 0; i < abilities.length; i++) {
+        this.panel.drawText("・" + abilities[i].name, x, y, { font: t.smallFont, color: t.subTextColor });
+        y += lh;
+      }
+      y += 6;
+    }
+
+    this.panel.drawText(fill(this.texts.skillCount || "{label} {n}", {
+      label: this.texts.skillLabel || "", n: monster.skills.length
+    }), x, y, { font: t.smallFont });
+  };
+
+  /**
+   * 様子を見る：技・特性のページ。
+   * 覚えている技を1行ずつ（名前・属性・種類・威力／命中／PP。戦闘の技の欄と同じ数字）、
+   * その下に特性の説明。技が多くて入りきらないときは行の間を詰め、それでも入らなければ2列にする。
+   * 配置は data/ui.js の party.inspect.skills
+   */
+  PartyScene.prototype._renderInspectSkillPage = function (monster, box, S) {
+    var t = this.theme;
+    var data = this.game.data;
+    var battleTexts = (data.messages || {}).battleUi || {};   // 戦闘の技の欄と同じ書き方を使う
+    var x = S.x || 268;
+    var y = S.y || 104;
+    var lh = S.lineHeight || 22;
+    var font = S.font || t.font;
+    var bottom = box.y + box.h - (t.padding || 10) * 2;
+    var maxWidth = (box.x + box.w - (t.padding || 10) * 2) - x;
+    var ctx = this.panel.ctx;
+    var i;
+
+    // 特性の説明が要る高さを先に測り、残りに技を並べる
+    var abilities = this._getAbilities(monster);
+    var abilityLines = [];
+    for (i = 0; i < abilities.length; i++) {
+      abilityLines.push({ text: "・" + abilities[i].name, color: t.textColor, font: font });
+      var desc = wrapByWidth(ctx, abilities[i].description || "", maxWidth - 14, t.smallFont);
+      for (var d = 0; d < desc.length; d++) {
+        abilityLines.push({ text: desc[d], color: t.subTextColor, font: t.smallFont, indent: 14 });
+      }
+    }
+    var abilityLh = S.abilityLineHeight || 18;
+    var abilityHeight = abilities.length ? (S.abilityGap || 18) + lh + abilityLines.length * abilityLh : 0;
+
+    this.panel.drawText(fill(this.texts.skillCount || "{label} {n}", {
+      label: this.texts.skillLabel || "", n: monster.skills.length
+    }), x, y, { font: font, color: t.cursorColor });
+    y += lh;
+
+    // 1列で入りきらないほど多いときは2列にして、威力などの数字を省く（名前・属性・種類だけ）
+    var count = monster.skills.length;
+    var room = bottom - abilityHeight - y;
+    var minLh = S.minLineHeight || 16;
+    var columns = (count * minLh > room) ? 2 : 1;
+    var perColumn = Math.ceil(count / columns);
+    var rowH = perColumn > 0 ? Math.max(minLh, Math.min(lh, Math.floor(room / perColumn))) : lh;
+    var columnW = Math.floor(maxWidth / columns);
+    var defaultAccuracy = (data.battle || {}).defaultAccuracy || 1;
+    var top = y;
+
+    for (i = 0; i < count; i++) {
+      var skill = data.getSkill(monster.skills[i]);
+      if (!skill) continue;
+      var cx = x + Math.floor(i / perColumn) * columnW;
+      var cy = top + (i % perColumn) * rowH;
+      this.panel.drawText(skill.name, cx, cy, { font: font });
+
+      var element = (data.elements || {})[skill.element];
+      if (element) {
+        this.panel.drawText("[" + element.name + "]", cx + (S.elementX || 150), cy,
+          { font: t.smallFont, color: element.color });
+      }
+      var kind = data.getSkillKind ? data.getSkillKind(skill) : null;
+      if (kind) {
+        this.panel.drawText("[" + kind.name + "]", cx + (S.kindX || 186), cy,
+          { font: t.smallFont, color: kind.color });
+      }
+      if (columns > 1) continue;
+
+      var accuracy = (skill.accuracy === undefined) ? defaultAccuracy : skill.accuracy;
+      var template = NS.BattleSystem.dealsDamage(skill)
+        ? battleTexts.skillStats
+        : (battleTexts.skillStatsNoPower || battleTexts.skillStats);
+      this.panel.drawText(fill(template || "", {
+        power: skill.power || 0, accuracy: Math.round(accuracy * 100), pp: skill.pp || 0
+      }), cx + (S.statsX || 256), cy, { font: t.smallFont, color: t.subTextColor });
+    }
+    y = top + perColumn * rowH;
+
+    if (abilities.length === 0) return;
+    y += S.abilityGap || 18;
+    this.panel.drawText(this.texts.abilityLabel || "", x, y, { font: font, color: t.cursorColor });
+    y += lh;
+    for (i = 0; i < abilityLines.length; i++) {
+      var line = abilityLines[i];
+      this.panel.drawText(line.text, x + (line.indent || 0), y, { font: line.font, color: line.color });
+      y += abilityLh;
     }
   };
 

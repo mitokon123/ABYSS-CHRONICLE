@@ -61,6 +61,12 @@
  *   何もしないターンを混ぜると、こちらが立て直す隙にもなる。
  *   PPが足りない技に当たったターンは通常攻撃に落ちるが、順番は進む。
  *
+ * ▼ infinitePp : true なら、主のあいだ PP が減らない（v1.0.3。出現の表の infinitePp と同じ。仲間にすると外れる）
+ *
+ * ▼ actionsPerTurn : 1ターンに動く回数 { min, max }（v1.0.3）。毎ターンこの幅で引き直す（{ min:1, max:2 } なら半々）。
+ *   2回目は1回目のすぐ後に続けて動き、行動はそのときに決め直す（BattleSystem.takeTurn）。
+ *   眠ったら残りの手番は無い。麻痺は手番ごとに判定する。actionPattern があれば1回ごとに1手進む。
+ *
  * ▼ scoutLevel : 仲間になったときのレベル。
  *   省略すると data/scout.js の bossJoinLevel（現在は1）。
  *   ボスは高いレベルで戦うので、そのまま仲間にすると強すぎる。育て直す形にする。
@@ -249,6 +255,49 @@
       ],
       title: "ヒコバエ",
       scoutableWhen: "sproutHollow",
+      isFinal: false
+    },
+
+    /**
+     * 萌芽の穴・千年樹の根底の主「カラクリモリ」（v1.0.3。名前は仮）。萌芽の穴の最後の主。
+     * ★ 作者が決めたもの（2026-11-01〜03）：Lv32・主のとき HP1050 攻135 防65 速40・PP無限・1ターンに1〜2回・仲間にできる・
+     *   効かない状態異常は毒と麻痺（＋全部の主に共通の即死・封印・盲目。眠り・呪いは効く）・特性 放電・行動の順番。
+     *   「最序盤最後のヌシなだけあってかなり強めにしたい」（作者）
+     * ★ 行動手順（9手で一巡。1ターンに2回動くと2手進む）：
+     *   鼓舞の舞（自分の攻撃を上げる）→ 鎧くずし（1体の防御を下げる）→ いなずま（全体・雷）
+     *   → 50% 威圧の咆哮（全体の攻撃を下げる）／ 50% こうか（自分の防御を上げる）
+     *   → 70% ボルト（全体・雷・麻痺15%）／ 30% ちからため → 通常攻撃（ためていれば約2倍）
+     *   → しびれ粉（全体を麻痺45%）→ 歯車投げ（斬撃 ×0.7 を3回、1回ごとにでたらめな相手）→ ようすをみる
+     */
+    rootsWarden: {
+      id: "rootsWarden",
+      species: "gearWarden",
+      level: 32,
+      // 主として出たときの値 HP1050 攻135 防65 速40 PP150（性格「素直」・個体値0）に、ちょうどなる倍率（2026-11-03 作者が決めた）。
+      // 種族の成長率が変わったら、同じ値になるように測り直す
+      statMultiplier: { hp: 5.570, attack: 1.953, defense: 0.837, speed: 1.33, pp: 3.80 },
+      immuneToStatus: ["poison", "paralysis"],
+      infinitePp: true,
+      actionsPerTurn: { min: 1, max: 2 },
+      actionPattern: [
+        "rallyDance",
+        "armorBreak",
+        "lightning",
+        { choice: [
+          { weight: 0.5, skill: "intimidRoar" },
+          { weight: 0.5, skill: "harden" }
+        ] },
+        { choice: [
+          { weight: 0.7, skill: "volt" },
+          { weight: 0.3, skill: "chargeUp" }
+        ] },
+        "normalAttack",
+        "numbPowder",
+        "gearThrow",
+        "wait"
+      ],
+      title: "カラクリモリ",
+      scoutableWhen: "ancientRoots",
       isFinal: false
     }
   };

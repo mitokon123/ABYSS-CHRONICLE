@@ -311,7 +311,9 @@
     var featureData = [];
     for (var k = 0; k < (features || []).length; k++) {
       var f = features[k];
-      featureData.push({ col: f.col, row: f.row, type: f.type, used: !!f.used, revealed: !!f.revealed });
+      // contents … 中身の決まった宝箱（fixedChests）。中断して再開しても同じ中身のまま
+      featureData.push({ col: f.col, row: f.row, type: f.type, used: !!f.used, revealed: !!f.revealed,
+                         contents: f.contents || null });
     }
 
     var result = this.saveManager.saveSuspend({

@@ -642,6 +642,100 @@
       // クレンズレイン。澄んだ水色の雨が降り、きらめく
       cleanseRain: {
         shape: "rain", duration: 760, glow: 12, color: "#9fe3ff", count: 26, spread: 56, height: 80, minSize: 3, maxSize: 6
+      },
+
+      /**
+       * --- v1.0.3：ほかの技の演出を借りていた技の専用の型（2026-11-03 作者の指定で全部専用に） ---
+       * 色を書いていないものは、属性の色か、変わる能力の色（statColors）になる
+       */
+
+      // キュア。体がやわらかく光り、十字の光が昇る（HPの緑）
+      healing: {
+        shape: "healing", duration: 820, glow: 14, color: "#5fd18c", radius: 34, crosses: 6, crossSize: 7, rise: 70
+      },
+      // キュアラ。キュアの大きい版。上から光の柱が降りる
+      healingGreat: {
+        shape: "healing", duration: 1000, glow: 18, color: "#5fd18c", radius: 40, crosses: 10, crossSize: 8, rise: 86, column: true
+      },
+      // クレンズ。澄んだ雫が落ちて輪が広がり、きらめく
+      cleanseDrop: {
+        shape: "cleanse", duration: 860, glow: 12, color: "#9fe3ff", count: 7
+      },
+      // 主のやくそう。葉が体を巡りながら昇る
+      herbLeaves: {
+        shape: "herbLeaves", duration: 900, glow: 10, color: "#84c95a", count: 8
+      },
+      // こうか。板が集まって体を覆う。色は上がる能力（防御の青）
+      hardenShell: {
+        shape: "hardenShell", duration: 820, glow: 12, plates: 6, radius: 44
+      },
+      // ちからぬき。赤い粒が抜け出て、矢じりが沈む。色は下がる能力（攻撃の赤）
+      drainAway: {
+        shape: "drainAway", duration: 860, glow: 10, count: 14, minSize: 3, maxSize: 6
+      },
+      // 立ち塞がる。足元から石積みの壁がせり上がる
+      standWall: {
+        shape: "standWall", duration: 900, glow: 8, color: "#b9a27a", width: 96, height: 104
+      },
+      // 朧羽。ぼんやりした羽が舞い落ち、もやが包む（1体ずつに出る）
+      hazyFeathers: {
+        shape: "hazyFeathers", duration: 1000, glow: 12, color: "#a596d0", count: 7
+      },
+      // 導きの光。光が降りて体を照らし、足元から前へ光の跡が流れる（素早さの緑ではなく光の色で固定）
+      guidingLight: {
+        shape: "guidingLight", duration: 900, glow: 16, color: "#fff0a8"
+      },
+      // 王の号令。冠の光と、二重の衝撃の輪（王の金）
+      royalCommand: {
+        shape: "royalCommand", duration: 900, glow: 16, color: "#ffd75e"
+      },
+      // ララバイ。音符が揺れながら昇り、z が浮かぶ
+      lullaby: {
+        shape: "lullaby", duration: 1000, glow: 10, color: "#ff9ad0", count: 5
+      },
+      // 芽吹きの加護。足元から双葉が芽を出し、花びらが昇る
+      sproutBlessing: {
+        shape: "sproutBlessing", duration: 1000, glow: 10, color: "#84c95a", count: 5
+      },
+      // サンダー。上から稲妻が落ち、またたいて足元に光が弾ける（雷の色）
+      thunderBolt: {
+        shape: "thunderBolt", duration: 620, glow: 20, height: 150
+      },
+      // 青い眼光。二つの鋭い光がまたたき、横へ筋が走る（ヌマボネの眼窩の青）
+      blueGlare: {
+        shape: "blueGlare", duration: 760, glow: 16, color: "#5fa8ff"
+      },
+      // グレア。光の十字が大きく開いてすぐ閉じる（光の色）
+      glareBeam: {
+        shape: "glareBeam", duration: 620, glow: 22, length: 90
+      },
+      // 幻惑の瞳。大きな瞳が開き、渦の輪が広がる
+      dazzleEye: {
+        shape: "dazzleEye", duration: 860, glow: 14, color: "#c07ae0"
+      },
+      // ウィンド。三日月の刃が横切り、渦が残る（風の色）
+      windCutter: {
+        shape: "windCutter", hitSe: "slash", duration: 620, glow: 12, blades: 3
+      },
+      // 吸血。牙が噛み合い、赤い雫が昇る
+      fangDrain: {
+        shape: "fang", hitSe: "slash", duration: 760, glow: 10, color: "#d8344a", spill: "drops", count: 8
+      },
+      // 焔牙。牙が噛み合い、炎が立ち昇る（火の色）
+      blazeFang: {
+        shape: "fang", hitSe: "slash", duration: 760, glow: 16, spill: "flames", count: 10
+      },
+      // 歯車投げ。回る歯車が飛んできて当たり、火花が散る（真鍮の色）。1回当たるごとに出る
+      gearHit: {
+        shape: "gearHit", hitSe: "slash", duration: 520, glow: 10, color: "#c49a3a", radius: 16
+      },
+      // どくばり。針が突き刺さり、毒の雫が飛び散る（毒の色。data/statuses.js の poison.color）
+      poisonSting: {
+        shape: "poisonSting", hitSe: "slash", duration: 640, glow: 10, color: "#7fd06a", count: 9
+      },
+      // シャドウ。足元の影から黒い手が伸びて包む（闇の色）
+      shadowGrasp: {
+        shape: "shadowGrasp", duration: 760, glow: 12, count: 6
       }
     }
   };

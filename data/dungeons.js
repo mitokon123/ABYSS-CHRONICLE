@@ -41,6 +41,8 @@
  *   ここにはその場所で手に入る素材を並べる。書き方はドロップと同じ：
  *     chest: [{ item, weight, min, max }]
  *   minFloor / maxFloor を書くと、その階だけで出る（例: 回廊の絡み主根は minFloor: 4 で B4F だけ）
+ * fixedChests : 中身の決まった宝箱（v1.0.3）。[{ floor, item, count }]。その階に、features の数とは別に必ず置く。
+ *   抽選はせず、書いた中身だけが入る（中断して再開しても同じ中身。FeatureSystem.place）
  *   ★ 主が落とす素材（苔むした核・灼熱の牙）は入れない。
  *     倒すこと自体に意味を残すため
  * boss        : 最深階に出るボスのid（data/bosses.js を参照）
@@ -612,16 +614,17 @@
           }
         }
       },
-      // 1階に置く仕掛けの数。階の広さが若葉の洞と同じなので、数も洞にそろえてある
+      // 1階に置く仕掛けの数。宝箱は 4〜5（作者の指定 2026-11-01。灯り苔・絡み主根が宝箱だけで、集まりにくかった）
       // （★ ここに書くと既定と丸ごと入れ替わるので、泉と罠も書いておく）
       features: {
-        chest:  { min: 3, max: 4 },
+        chest:  { min: 4, max: 5 },
         spring: { min: 0, max: 1 },
         trap:   { min: 1, max: 2 }
       },
       // 回廊の宝箱（作者の指定 2026-10-27「このステージの素材を出す」）。
       // 灯り苔・絡み主根は宝箱でしか手に入らない回廊の素材。
-      //   灯り苔はほかの素材と同じくらい、絡み主根は B4F だけ（minFloor: 4。FeatureSystem）で 12%。
+      //   灯り苔はほかの素材の倍の重み（作者の指定 2026-11-01。宝箱1つで約14%）。
+      //   絡み主根は B4F だけ（minFloor: 4。FeatureSystem）で 12%。そのほかに B4F には必ず1つ入った宝箱がある（下の fixedChests）
       // 金角のかけら（ザンガルドの珍しいドロップ）は渋くしてある（洞の芽吹きの種と同じ扱い）。
       // 髑髏の護符・弔いの小鐘・神鳥の羽は装備・貴重品なので入れない
       featureTables: {
@@ -631,21 +634,33 @@
           { item: "mossSpore",        weight: 0.28, min: 1, max: 2 },
           { item: "windChimeFeather", weight: 0.28, min: 1, max: 1 },
           { item: "blueThunderScale", weight: 0.26, min: 1, max: 1 },
-          { item: "glowMoss",         weight: 0.28, min: 1, max: 2 },
+          { item: "glowMoss",         weight: 0.56, min: 1, max: 2 },
           { item: "abyssFragment",    weight: 0.14, min: 1, max: 1 },
           { item: "goldHornShard",    weight: 0.08, min: 1, max: 1 },
           // 重み 0.48 で B4F の宝箱の 12%（作者の指定 2026-10-27。最初の 0.18 では 4.9% だった）
           { item: "tangledTaproot",   weight: 0.48, min: 1, max: 1, minFloor: 4 },
           { item: "elixir",           weight: 0.12, min: 1, max: 1 }
         ]
-      }
+      },
+      // 中身の決まった宝箱（作者の指定 2026-11-01）。B4F に、絡み主根が1つ入った宝箱を必ず1つ置く。
+      // 上の features の数とは別に置かれる（B4F の宝箱は 5〜6 個になる）
+      fixedChests: [
+        { floor: 4, item: "tangledTaproot", count: 1 }
+      ]
     },
 
     /**
      * 千年樹の根底（萌芽の穴の最後の区画。v1.0.3 で入れる。区画を3つにしたのは v1.0.2.1）。
      * ★ 萌芽の穴の区画は3つ（作者 2026-10-30）。3つ目だった「胞子煙る菌床」はなくし、蔦這う回廊の次がここになった。
      *   見た目の組 spore（data/dungeonThemes.js）と、きのこの飾りの絵は使わずに残してある。
-     * ★ 主がいる（作者 2026-10-30）。どのモンスターが主かは、まだ決めていない。
+     * ★ 主がいる（作者 2026-10-30）。どのモンスターが主か（名前・見た目・属性・役・技）は、まだ決めていない。
+     *   決まっていること（作者 2026-11-01）：Lv32・主のとき HP1050 攻135 防65 速40・PP無限（infinitePp）・
+     *   1ターンに1〜2回動く（actionsPerTurn）・仲間にできる・落とすものは私に任された（見た目が決まってから案を出す）・
+     *   効かない状態異常は毒と麻痺（immuneToStatus: ["poison", "paralysis"]。全主共通の即死・封印・盲目も効かない。眠り・呪いは効く）
+     * モチーフ（作者 2026-11-01）：琥珀と樹液（千年の時）＋千年樹の番人＋機械のモンスター。敵の顔ぶれはまだ仮
+     * 主（作者 2026-11-03）：大きなからくり（木と真鍮・根が絡む・胸に琥珀の芯）。雷・弱点は地・特性は放電。
+     *   「最序盤最後のヌシなだけあってかなり強めにしたい」。行動の順番・専用技 歯車投げも作者が決めた。
+     *   名前「カラクリモリ」は作者から任された仮のもの（data/bosses.js の rootsWarden・monsters.js の gearWarden）
      * 推奨Lv 30・4階は仮（作者の予定は「推奨は30くらいに抑えたい」）。まだ準備中（ready: false）
      */
     ancientRoots: {
@@ -660,6 +675,8 @@
       unlockedBy: "ivyCorridor",
       theme: "rootdeep",
       generation: { width: 40, height: 28, roomMin: 4, roomMax: 10, roomCount: 11, attempts: 320 },
+      // 主（v1.0.3。data/bosses.js）。区画はまだ準備中なので、いまは会えない
+      boss: "rootsWarden",
       ready: false
     }
   };

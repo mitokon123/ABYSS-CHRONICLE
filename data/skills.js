@@ -72,6 +72,8 @@
  * hitSe         : 当たった音を自分で決めたいときだけ書く（"hit" / "slash" で鳴らす、null で止める）。ふつうは書かない
  * windupMs      : 技を出してから当たるまでの時間（ミリ秒）。溜めの長い専用の動きと、当たる瞬間をそろえるときだけ書く（死神の鎌）
  * damageKind    : ダメージの計算だけ、別の種類の式を使う（死神の鎌：踊りだが斬撃の式）
+ * hits          : 何回当てるか（二連斬り＝2）。1回ずつ命中を判定する
+ * randomTargets : true なら hits の1回ごとに、向かい側の盤面からでたらめに1体選ぶ（歯車投げ。v1.0.3）
  * maxDamage     : 1回あたりのダメージの上限（二連斬り＝200。何回か当てる技は1回ずつに掛かる）。書かなければ上限なし
  * modifierSe    : 強化・弱体が掛かった瞬間の音を変えたいときだけ書く（null で鳴らさない。〇〇ベール）。
  *                 書かなければ buff / debuff が鳴る（BattleScene._playModifierSe）
@@ -186,7 +188,7 @@
       accuracy: 1.0,
       target: "enemy",
       element: "dark",
-      effect: "rain",
+      effect: "shadowGrasp",
       se: "dark",
       description: "闇をまとわせる。闇に弱い相手によく効く。"
     },
@@ -214,7 +216,7 @@
       accuracy: 1.0,
       target: "enemy",
       element: "wind",
-      effect: "slash",
+      effect: "windCutter",
       se: "wind",
       // 見た目は「切る」が、共鳴なのでその場から放つ（RC-1 から動きは技の種類で決まる）
       description: "鋭い風で切りつける。風に弱い相手によく効く。"
@@ -271,7 +273,7 @@
       accuracy: 1.0,
       target: "enemy",
       element: "none",
-      effect: "slash",
+      effect: "fangDrain",
       drain: 0.3,
       description: "相手に噛みついて精力を吸う。与えたダメージの3割ぶん、自分のHPが回復する。"
     },
@@ -305,7 +307,7 @@
       accuracy: 1.0,
       target: "ally",
       element: "none",
-      effect: "aura",
+      effect: "healing",
       heal: { min: 35, max: 45 },
       description: "味方1体のHPを回復する。回復する量は使う者の強さでは変わらない。"
     },
@@ -320,7 +322,7 @@
       accuracy: 1.0,
       target: "ally",
       element: "none",
-      effect: "aura",
+      effect: "healingGreat",
       heal: { min: 75, max: 105 },
       description: "味方1体のHPを大きく回復する。回復する量は使う者の強さでは変わらない。"
     },
@@ -337,7 +339,7 @@
       accuracy: 1.0,
       target: "ally",
       element: "none",
-      effect: "aura",
+      effect: "cleanseDrop",
       cureStatus: { statuses: ["poison"] },
       description: "味方1体の毒を治す。"
     },
@@ -353,7 +355,7 @@
       accuracy: 1.0,
       target: "self",
       element: "none",
-      effect: "aura",
+      effect: "hardenShell",
       modifier: {
         duration: 3,
         // この技だけの言い回し。書かなければ messages.js の modifierUp が使われる
@@ -380,7 +382,7 @@
       target: "enemy",
       // こうかと同じく無属性。耐性で効いたり効かなかったりすると分かりにくいため
       element: "none",
-      effect: "aura",
+      effect: "drainAway",
       modifier: {
         duration: 3,
         message: "{target} の 攻める力が 落ちた!",
@@ -418,7 +420,7 @@
       accuracy: 1.0,
       target: "enemy",
       element: "none",
-      effect: "impact",
+      effect: "poisonSting",
       se: "venomSting",
       status: { id: "poison", chance: 0.6 },
       description: "毒を含んだ針で刺す。高い確率で相手を毒におかす。"
@@ -505,7 +507,7 @@
       accuracy: 1.0,
       target: "enemy",
       element: "thunder",
-      effect: "flash",
+      effect: "thunderBolt",
       se: "thunder",
       description: "強い電気を落とす。威力は高いが、消費するPPも大きい。"
     },
@@ -641,7 +643,7 @@
       accuracy: 1.0,
       target: "self",
       element: "none",
-      effect: "aura",
+      effect: "standWall",
       cover: true,
       modifier: {
         duration: 1,
@@ -663,12 +665,12 @@
       accuracy: 1.0,
       target: "allEnemies",
       element: "dark",
-      effect: "aura",
+      effect: "hazyFeathers",
       evadable: false,
       canCritical: false,
       modifier: {
         duration: 2,
-        message: "{target} は 朧な羽ばたきに 目を奪われた",
+        message: "{target} は 朧な羽ばたきに 目を奪われた!",
         effects: [ { type: "accuracyMultiplier", value: 0.8 } ]
       },
       description: "朧な羽ばたきで、相手全体の命中率を2ターンのあいだ下げる。"
@@ -684,7 +686,7 @@
       accuracy: 1.0,
       target: "ally",
       element: "light",
-      effect: "aura",
+      effect: "guidingLight",
       modifier: {
         duration: 3,
         message: "{target} は 光に導かれ、足が軽くなった!",
@@ -722,7 +724,7 @@
       accuracy: 1.0,
       target: "self",
       element: "none",
-      effect: "aura",
+      effect: "royalCommand",
       modifier: {
         duration: 3,
         message: "{target} は 王の号令を上げた!",
@@ -747,7 +749,7 @@
       criticalBonus: 0.4,
       target: "enemy",
       element: "fire",
-      effect: "slash",
+      effect: "blazeFang",
       se: "fire",
       description: "燃える牙で食らいつく。威力が高く、クリティカルがとても出やすい。"
     },
@@ -763,7 +765,7 @@
       accuracy: 1.0,
       target: "enemy",
       element: "dark",
-      effect: "flash",
+      effect: "blueGlare",
       se: "dark",
       status: { id: "curse", chance: 0.8 },
       description: "眼窩の青い光で見つめ、相手を呪うことがある。"
@@ -784,7 +786,7 @@
       accuracy: 1.0,
       target: "enemy",
       element: "none",
-      effect: "aura",
+      effect: "lullaby",
       status: { id: "sleep", chance: 0.75 },
       description: "ゆらゆらと揺れて眠りを誘い、相手1体を眠らせることがある。"
     },
@@ -800,7 +802,7 @@
       accuracy: 1.0,
       target: "enemy",
       element: "light",
-      effect: "flash",
+      effect: "glareBeam",
       se: "light",
       status: { id: "blind", chance: 0.65 },
       description: "まばゆい光を放ち、相手1体を盲目にすることがある。"
@@ -818,7 +820,7 @@
       accuracy: 1.0,
       target: "allAllies",
       element: "none",
-      effect: "aura",
+      effect: "sproutBlessing",
       modifier: {
         duration: 3,
         message: "{target} は 芽吹きの加護に 包まれた!",
@@ -1026,7 +1028,9 @@
       id: "chargeUp", name: "ちからため", kind: "body", power: 0, pp: 0, accuracy: 1.0,
       target: "self", element: "none", effect: "gather",
       charge: { min: 1.85, max: 2.25 },
-      description: "力をためる。次にダメージを与える技か攻撃が、1.85〜2.25倍になる。"
+      // 効くのは通常攻撃・体技・斬撃だけ（2026-11-03 作者の指定。BattleSystem._isPhysicalAction）。
+      // 共鳴・ブレス・踊りを出しても、ためた力は次の攻撃まで残る
+      description: "力をためる。次の攻撃・体技・斬撃のダメージが、1.85〜2.25倍になる。"
     },
     doubleSlash: {
       // 2026-10-20 作者の指定で 威力12 → 10・1回のダメージ上限200（斬撃は攻撃力がよく効き、2回ぶん伸びるので終盤に強すぎた）。
@@ -1044,6 +1048,15 @@
       // 音は当たった瞬間に雷（サンダーと同じ音）。出した瞬間には鳴らさない（斬ってから落ちる）
       target: "enemy", element: "thunder", effect: "thunderSlash", hitSe: "thunder",
       description: "稲妻をまとった刃で、相手1体を斬りつける。"
+    },
+    // 歯車投げ（v1.0.3。千年樹の根底の主の専用技。作者の指定 2026-11-03：命中100%・無・3回・斬撃・1回ごとにでたらめな相手・威力0.7）。
+    // 斬撃なので倍率（通常攻撃の基礎 ×0.7 を3回）。ちからため・盲目も効く。
+    // PP は仮（主は PP無限）。演出は回る歯車が飛んできて当たる（data/effects.js の gearHit。1回当たるごとに出る）
+    gearThrow: {
+      id: "gearThrow", name: "歯車投げ", kind: "slash", power: 0.7, pp: 6, accuracy: 1.0,
+      target: "enemy", element: "none", effect: "gearHit",
+      hits: 3, randomTargets: true,
+      description: "体の歯車を外して投げつける。3回、でたらめな相手に当たる。"
     },
 
     /**
@@ -1130,7 +1143,7 @@
       accuracy: 1.0,
       target: "enemy",
       element: "none",
-      effect: "flash",
+      effect: "dazzleEye",
       status: { id: "blind", chance: 0.60 },
       description: "怪しく光る目で見つめ、相手1体を盲目にすることがある。"
     },
@@ -1216,6 +1229,7 @@
       accuracy: 1.0,
       target: "self",
       element: "none",
+      effect: "herbLeaves",
       heal: { amount: 20 },
       useMessage: "{actor} は やくそうを 使った!",
       showInDex: false,
