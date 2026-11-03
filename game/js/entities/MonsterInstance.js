@@ -152,6 +152,41 @@
   };
 
   /**
+   * 敵として出ていたあいだだけのものを、すべて外す（スカウトで仲間になるとき。BattleScene._recruitFrom）。
+   *
+   * 主は作り直すので要らないが、在来種は戦った個体をそのまま連れて行くため、
+   * 敵として足したもの（EncounterSystem.createEnemyFrom・DungeonScene._startBossBattle）を
+   * ここで1つずつ外す。敵のときだけのものを新しく足したら、ここにも足すこと。
+   *   倍率・効果（encounterEffects）… 外さないとセーブを読み直すまで HP×2.25 のままだった（ヨミリュウ）
+   *   技（enemySkills・出る場所の skills）… 外さないと敵のときの技のままセーブされる
+   */
+  MonsterInstance.prototype.leaveEncounter = function () {
+    this.encounterEffects = [];
+    this.actionPattern = null;
+    this.patternIndex = 0;
+    this.skillRateOverride = undefined;
+    this.skillWeights = undefined;
+    this.infinitePp = false;
+    this.actionsPerTurn = undefined;
+    this.rewardMultiplier = undefined;
+    this._bossImmuneToStatus = [];
+    this._debuffResistOverride = null;
+    if (this._species) this.skills = NS.MonsterData.skillsUpToLevel(this._species, this.level);
+
+    // 戦闘中のもの。パーティが満員で行き先を選ぶときは、戦闘の後片づけの対象に入らないため
+    this.clearModifiers();
+    this.clearBattleStatuses();
+    this._statusWard = null;
+    this._undying = false;
+    this._defending = false;
+    this._removed = false;
+    this.displaySuffix = null;
+
+    this.currentHp = Math.min(this.currentHp, this.getMaxHp());
+    this.currentPp = Math.min(this.currentPp, this.getMaxPp());
+  };
+
+  /**
    * 敵として出るときの技に入れ替える（data/monsters.js の enemySkills）。
    * 野生の敵と主を作ったところで呼ぶ。enemySkills の無い種族は何も変わらない。
    * 仲間になるときは useLearnedSkills で覚える技の一覧に戻す。

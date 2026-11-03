@@ -2715,15 +2715,9 @@
   BattleScene.prototype._recruitFrom = function (target) {
     var level = this.scoutLevel;
     if (level === undefined || level === null || !(level < target.level)) {
-      // 敵のときだけ使っていた技（data/monsters.js の enemySkills）を、覚える技の一覧に戻す
-      if (target.useLearnedSkills) target.useLearnedSkills();
-      // 敵として出ていたあいだの倍率と行動の順番を外す（ヨミリュウ・シニガミなど特殊な出方の在来種）。
-      // 外さないと、セーブを読み直すまで HP×2.25 などのまま仲間として戦っていた
-      target.encounterEffects = [];
-      target.actionPattern = null;
-      target.patternIndex = 0;
-      target.currentHp = Math.min(target.currentHp, target.getMaxHp());
-      target.currentPp = Math.min(target.currentPp, target.getMaxPp());
+      // 敵として出ていたあいだだけのもの（倍率・行動の順番・その場所の技・強化弱体など）を外し、
+      // 技は覚える技の一覧に戻す（MonsterInstance.leaveEncounter）
+      target.leaveEncounter();
       return target;
     }
 
