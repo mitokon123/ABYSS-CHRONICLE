@@ -72,6 +72,8 @@
  * hitSe         : 当たった音を自分で決めたいときだけ書く（"hit" / "slash" で鳴らす、null で止める）。ふつうは書かない
  * windupMs      : 技を出してから当たるまでの時間（ミリ秒）。溜めの長い専用の動きと、当たる瞬間をそろえるときだけ書く（死神の鎌）
  * damageKind    : ダメージの計算だけ、別の種類の式を使う（死神の鎌：踊りだが斬撃の式）
+ * element2      : 2つ目の属性（烈火崩地斬）。相手ひとりずつ、element と element2 のよく効くほうで当たる。
+ *                 演出の色と技の並べ替えは element を使う
  * hits          : 何回当てるか（二連斬り＝2）。1回ずつ命中を判定する
  * randomTargets : true なら hits の1回ごとに、向かい側の盤面からでたらめに1体選ぶ（歯車投げ。v1.0.3）
  * maxDamage     : 1回あたりのダメージの上限（二連斬り＝200。何回か当てる技は1回ずつに掛かる）。書かなければ上限なし
@@ -1016,6 +1018,23 @@
       description: "味方全体の毒を治す。"
     },
 
+    // リザレクト・キュアオール（2026-11-06 作者の指定。種類は共鳴にした。キュアの仲間）。
+    // revive … 倒れた味方を起こす。chance は起きる確率、hpRatio は戻るHPの割合（神鳥の羽と同じ起こし方）。
+    //          外れてもPPは払う。敵は使わない（BattleSystem._chooseEnemyAction）。
+    //          作戦で使うのは reviveSafeHp を書いた作戦だけ（data/battle.js。いまは「仲間を守る」）
+    resurrect: {
+      id: "resurrect", name: "リザレクト", kind: "resonance", power: 0, pp: 10, accuracy: 1.0,
+      target: "ally", element: "none", effect: "reviveRise",
+      revive: { hpRatio: 0.55, chance: 0.5 },
+      description: "倒れた味方1体を、半分の確率で起こす。起きるとHPが55%まで戻る。"
+    },
+    cureAll: {
+      id: "cureAll", name: "キュアオール", kind: "resonance", power: 0, pp: 12, accuracy: 1.0,
+      target: "allAllies", element: "none", effect: "healingAll",
+      heal: { min: 75, max: 105 },
+      description: "味方全体のHPを大きく回復する。回復する量は使う者の強さでは変わらない。"
+    },
+
     // E. 攻撃に何かが付く技（新しい仕組み。BattleSystem の _applyRecoil・_applyCharge・hits）
     recklessTackle: {
       // 2026-10-20 作者の指定で 威力40 → 35・反動 1/4 → 与えたダメージそのまま
@@ -1057,6 +1076,37 @@
       target: "enemy", element: "none", effect: "gearHit",
       hits: 3, randomTargets: true,
       description: "体の歯車を外して投げつける。3回、でたらめな相手に当たる。"
+    },
+    // 属性の斬撃（v1.0.3。ウェポンの技。作者の指定 2026-11-04：ウェポンは火・水・風・地の斬撃を使う。名前は私の案を作者が了承）。
+    // 岩砕斬りの名前は作者の指定（2026-11-05）。火炎斬りも作者が了承（2026-11-05。焔牙はフレイミンの絆の専用技なので使わない）。
+    // 威力と PP は稲妻斬りと同じ（×1.2・PP4）で、仮
+    flameSlash: {
+      id: "flameSlash", name: "火炎斬り", kind: "slash", power: 1.2, pp: 4, accuracy: 1.0,
+      target: "enemy", element: "fire", effect: "flameSlash",
+      description: "炎をまとった刃で、相手1体を斬りつける。"
+    },
+    flowSlash: {
+      id: "flowSlash", name: "流水斬り", kind: "slash", power: 1.2, pp: 4, accuracy: 1.0,
+      target: "enemy", element: "water", effect: "flowSlash",
+      description: "水流をまとった刃で、相手1体を斬りつける。"
+    },
+    galeSlash: {
+      id: "galeSlash", name: "疾風斬り", kind: "slash", power: 1.2, pp: 4, accuracy: 1.0,
+      target: "enemy", element: "wind", effect: "galeSlash",
+      description: "風を切る速さで、相手1体を斬りつける。"
+    },
+    rockSlash: {
+      id: "rockSlash", name: "岩砕斬り", kind: "slash", power: 1.2, pp: 4, accuracy: 1.0,
+      target: "enemy", element: "earth", effect: "rockSlash",
+      description: "岩も砕く重い刃で、相手1体を斬りつける。"
+    },
+    // ウェポン（絆の技。名前・PP・命中・威力・火と地の混合・全体は作者の指定 2026-11-05）。
+    // 種類は斬撃、混合の計算（よく効くほう）・クリティカルなし・演出は私の案。
+    blazingRift: {
+      id: "blazingRift", name: "烈火崩地斬", kind: "slash", power: 1.0, pp: 15, accuracy: 1.0,
+      target: "allEnemies", element: "fire", element2: "earth",
+      effect: "blazingRift", effectAt: "center", se: "fire", canCritical: false,
+      description: "炎の刃で大地ごと斬り裂き、相手全体を攻撃する。火と地のうち、よく効くほうの属性で当たる。"
     },
 
     /**

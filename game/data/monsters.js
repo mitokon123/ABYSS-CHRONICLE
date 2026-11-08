@@ -195,7 +195,9 @@
         { level: 24, skill: "guardSong" },
         { level: 25, skill: "wardSongWater" },
         { level: 26, skill: "greaterCure" },
-        { level: 28, skill: "purifyLight" }
+        { level: 28, skill: "purifyLight" },
+        { level: 31, skill: "resurrect" },
+        { level: 32, skill: "cureAll" }
       ],
       abilities: ["tough"],
       expReward: 8,
@@ -274,7 +276,8 @@
         { level: 24, skill: "galeSong" },
         { level: 25, skill: "wardSongDark" },
         { level: 27, skill: "armorBreak" },
-        { level: 30, skill: "purifyLight" }
+        { level: 30, skill: "purifyLight" },
+        { level: 40, skill: "resurrect" }
       ],
       abilities: ["swiftFoot"],
       expReward: 8,
@@ -762,7 +765,8 @@
         { level: 18, skill: "wave" },
         { level: 23, skill: "wardSongWater" },
         { level: 25, skill: "rallyDance" },
-        { level: 28, skill: "fortressForm" }
+        { level: 28, skill: "fortressForm" },
+        { level: 36, skill: "cureAll" }
       ],
       abilities: ["kingsDignity"],
       expReward: 80,
@@ -843,7 +847,8 @@
         { level: 22, skill: "wakeSong" },
         { level: 24, skill: "galeSong" },
         { level: 25, skill: "wardSongWind" },
-        { level: 30, skill: "wardSongFire" }
+        { level: 30, skill: "wardSongFire" },
+        { level: 36, skill: "cureAll" }
       ],
       abilities: ["windFlow"],
       expReward: 15,
@@ -1269,7 +1274,9 @@
         { level: 19, skill: "cleanse" },
         { level: 22, skill: "slowDance" },
         { level: 28, skill: "purifyRain" },
-        { level: 30, skill: "greaterCure" }
+        { level: 30, skill: "greaterCure" },
+        { level: 33, skill: "resurrect" },
+        { level: 36, skill: "cureAll" }
       ],
       abilities: ["regen"],
       expReward: 22,
@@ -1989,7 +1996,9 @@
         { level: 18, skill: "cleanse" },
         { level: 23, skill: "shine" },
         { level: 24, skill: "wakeSong" },
-        { level: 28, skill: "greaterCure" }
+        { level: 28, skill: "greaterCure" },
+        { level: 33, skill: "resurrect" },
+        { level: 35, skill: "cureAll" }
       ],
       enemySkills: [
         { level: 1, skill: "glimmer" },
@@ -2740,6 +2749,266 @@
         attack: "zanSlash", resonance: "zanResonate", breath: "zanResonate",
         technique: "zanCleave", buff: "zanGather", hit: "zanHit", dodge: "zanDodge",
         faint: "fall", levelUp: "zanCheer"
+      }
+    },
+
+    /**
+     * --- 萌芽の穴・千年樹の根底の在来種（v1.0.3。2026-11-04） ---
+     * 作者が決めたもの：4種・4階・Lv28〜31。
+     *   ウェポン … 全部作者が確定（2026-11-05）。経験値とゴールドだけ私の案のまま。
+     *               Lv30 119/77/48/60/35 ・ Lv80 479/343/240/346/177。特性 剣豪。絆の報酬 烈火崩地斬。
+     *   ジュエル … 全部作者が確定（2026-11-05）。無属性・魔族系（姿は鉱石）。経験値は固定で 3000。
+     *               Lv30 10/32/200/65/35 ・ Lv70 60/161/832/305/162。特性 カチカチ。全属性10。
+     *               状態異常耐性のうち 毒・封印・呪いが作者の値で、ほかの4つは 5 のまま。絵と動きは私の下書き。
+     *   コハクカブト … 全部作者が確定（2026-11-06）。id は amberBeetle のまま。経験値とゴールドは作者が「それでよい」と言った値。
+     *               Lv30 176/49/69/38/21 ・ Lv70 512/289/334/140/82。特性 硬い殻。絆の報酬 全属性耐性+3・防×1.1。
+     *   樹液のスライム … 私の案を作者が了承。名前はまだ無く、説明をそのまま仮の名前にしている。
+     * ★ スライムで仮のもの：基礎値・成長率・耐性・技の並び・経験値・ゴールド・素材・図鑑の説明・記録・絆の報酬。
+     *   Lv30 の値（個体値0・素直。HP/攻/防/速/PP）
+     *     スライム 160/40/44/40/44
+     * 出る場所の役と確率は data/dungeons.js の ancientRoots の出現の表に書いてある。絵は sprites_marsh.js の末尾
+     */
+    weaponBot: {
+      id: "weaponBot",
+      name: "ウェポン",
+      family: "constructKind",
+      element: "fire",
+      resistances: { fire: 6, earth: 2, thunder: 1, water: -3 },
+      immunities: [],
+      statusResist: { poison: 10, paralysis: 5, sleep: 0, seal: 0,
+                      blind: 0, curse: 0, instantDeath: 3 },
+      maxLevel: 80,
+      // 成長率は、作者の表（Lv30・40・50・60・70・80 の値）にぴったり合うように逆算したもの（2026-11-05）
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.19 }, { from: 31, rate: 0.385 }, { from: 41, rate: 0.37 }, { from: 51, rate: 0.315 }, { from: 61, rate: 0.395 }, { from: 71, rate: 0.43 }],
+        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.35 }, { from: 31, rate: 0.32 }, { from: 41, rate: 0.37 }, { from: 51, rate: 0.80 }, { from: 61, rate: 0.50 }, { from: 71, rate: 0.43 }],
+        defense: [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.19 }, { from: 31, rate: 0.25 }, { from: 41, rate: 0.43 }, { from: 51, rate: 0.67 }, { from: 61, rate: 0.65 }, { from: 71, rate: 0.40 }],
+        speed:   [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.44 }, { from: 41, rate: 0.42 }, { from: 51, rate: 0.57 }, { from: 61, rate: 0.80 }, { from: 71, rate: 1.35 }],
+        pp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.20 }, { from: 31, rate: 0.15 }, { from: 41, rate: 0.50 }, { from: 51, rate: 0.69 }, { from: 61, rate: 0.61 }, { from: 71, rate: 0.42 }]
+      },
+      description: "火属性。何かを守るために造られた機械。不完全な箇所は多いが、両刃に属性をまとわせて攻撃する。水に弱い。",
+      records: {
+        used:  "刃の手入れを始めると、おとなしく両腕を差し出してくる。",
+        trust: "胸の炉で、冷えた手を温めさせてくれた。",
+        bond:  "どんなに傷ついても、前に出るのをやめない。"
+      },
+      bondReward: { skill: "blazingRift" },
+      baseHp: 19,
+      baseAttack: 11,
+      baseDefense: 8,
+      baseSpeed: 8,
+      basePp: 6,
+      scoutRate: 0.12,
+      spawnRate: 0.4,
+      learnset: [
+        { level: 1,  skill: "tackle" },
+        { level: 22, skill: "flameSlash" },
+        { level: 23, skill: "rockSlash" },
+        { level: 24, skill: "flowSlash" },
+        { level: 25, skill: "galeSlash" },
+        { level: 26, skill: "doubleSlash" },
+        { level: 30, skill: "rallyDance" }
+      ],
+      abilities: ["swordMaster"],
+      expReward: 48,
+      goldReward: 20,
+      drops: [
+        { item: "brassGear", rate: 0.30, min: 1, max: 1 }
+      ],
+      // ふだんは炉の光が脈打ち、左右の腕が交互に上下する
+      sprite: ["weaponBot", "weaponBotArmL", "weaponBotGlow", "weaponBotArmR"],
+      motion: "weaponIdle",
+      poses: { raise: "weaponBotRaise", swingL: "weaponBotSwingL", swingR: "weaponBotSwingR",
+               stepL: "weaponBotStepL", stepR: "weaponBotStepR", charge: "weaponBotCharge",
+               hit: "weaponBotHit", sleep: "weaponBotSleep" },
+      motions: {
+        attack: "weaponSlash", technique: "weaponCleave", buff: "weaponBuff", resonance: "weaponBuff",
+        breath: "weaponBuff", hit: "weaponHit", dodge: "weaponDodge", levelUp: "weaponCheer", sleeping: "weaponSleeping"
+      }
+    },
+
+    jewelOre: {
+      id: "jewelOre",
+      name: "ジュエル",
+      family: "demonKind",
+      element: "none",
+      // 全属性10＝7つの属性はどれも効かない（仲間のときも同じ）。無属性の攻撃だけが通る
+      resistances: { fire: 10, water: 10, wind: 10, earth: 10, thunder: 10, light: 10, dark: 10 },
+      immunities: [],
+      statusResist: { poison: 10, paralysis: 5, sleep: 5, seal: 10,
+                      blind: 5, curse: 10, instantDeath: 5 },
+      // 弱体への耐性 0（ジュエルだけ。ふつうは 1）。仲間のときは弱体が必ず入る。敵のときは出現の表で 10
+      debuffResist: 0,
+      maxLevel: 70,
+      // 成長率は、作者の表（Lv30・40・50・60・70 の値）にぴったり合うように逆算したもの（2026-11-05）
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.21 }, { from: 31, rate: 0.50 }, { from: 41, rate: 0.75 }, { from: 51, rate: 0.50 }, { from: 61, rate: 0.75 }],
+        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 31, rate: 0.70 }, { from: 41, rate: 0.46 }, { from: 51, rate: 0.84 }, { from: 61, rate: 0.58 }],
+        defense: [{ from: 1, rate: 0.50 }, { from: 25, rate: 0.70 }, { from: 31, rate: 1.125 }, { from: 41, rate: 1.235 }, { from: 51, rate: 1.225 }, { from: 61, rate: 1.68 }],
+        speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.24 }, { from: 31, rate: 0.335 }, { from: 41, rate: 0.42 }, { from: 51, rate: 0.455 }, { from: 61, rate: 0.79 }],
+        pp:      [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.25 }, { from: 31, rate: 0.48 }, { from: 41, rate: 0.56 }, { from: 51, rate: 0.66 }, { from: 61, rate: 0.84 }]
+      },
+      description: "無属性。宝石の体に悪魔が棲みついたもの、と言われるモンスター。とても硬く、攻撃はほとんど通らない。人を見るとすぐに逃げる。倒せれば多くの経験を得られる。",
+      records: {
+        used:  "光に当てると、体の奥で何かが動く。中に棲んでいる本人だ。",
+        trust: "磨いてやると、小さな手で磨き返してきた。力が足りず、くすぐったい。",
+        bond:  "逃げ足の速さは変わらない。ただ、逃げたあとに必ず戻ってくる。"
+      },
+      bondReward: { effects: [
+        { type: "statMultiplier", stat: "hp", value: 1.15 },
+        { type: "statMultiplier", stat: "speed", value: 1.05 }
+      ] },
+      baseHp: 2,
+      baseAttack: 5,
+      baseDefense: 12,
+      baseSpeed: 12,
+      basePp: 5,
+      evasion: 0.05,
+      scoutRate: 0.02,
+      spawnRate: 0.04,
+      learnset: [
+        { level: 1,  skill: "tackle" },
+        { level: 5,  skill: "rockThrow" },
+        { level: 18, skill: "rockSpike" },
+        { level: 23, skill: "galeSong" },
+        { level: 25, skill: "cleanse" },
+        { level: 28, skill: "wakeSong" }
+      ],
+      abilities: ["hardBody"],
+      // 経験値はレベルに関係なく 3000（作者の指定。MonsterInstance.getExpReward）
+      expReward: 3000,
+      expFixed: true,
+      goldReward: 30,
+      drops: [
+        { item: "jewelShard", rate: 0.5, min: 1, max: 1 }
+      ],
+      // ふだんはふわふわ浮き、体のきらめきが動き、小さな手が交互に上下する
+      sprite: ["jewelOre", "jewelOreArmL", "jewelOreShine", "jewelOreArmR"],
+      motion: "jewelFloat",
+      poses: { up: "jewelOreUp", hit: "jewelOreHit", sleep: "jewelOreSleep" },
+      motions: {
+        attack: "jewelBump", technique: "jewelBump", buff: "jewelCheer", resonance: "jewelCheer", breath: "jewelCheer",
+        hit: "jewelHit", dodge: "jewelDodge", flee: "jewelFlee", faint: "jewelShatter", levelUp: "jewelCheer", sleeping: "jewelSleeping"
+      }
+    },
+
+    amberBeetle: {
+      id: "amberBeetle",
+      name: "コハクカブト",
+      family: "insectKind",
+      element: "earth",
+      resistances: { earth: 5, thunder: 2, wind: 3, fire: -2 },
+      immunities: [],
+      statusResist: { poison: 0, paralysis: 3, sleep: 3, seal: 0,
+                      blind: 0, curse: 0, instantDeath: 0 },
+      debuffResist: 5,
+      maxLevel: 70,
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.32 }, { from: 31, rate: 0.288 }, { from: 41, rate: 0.296 }, { from: 51, rate: 0.432 }, { from: 61, rate: 0.328 }],
+        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.36 }, { from: 31, rate: 0.615 }, { from: 51, rate: 0.81 }, { from: 61, rate: 1.39 }],
+        defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.27 }, { from: 31, rate: 0.33 }, { from: 41, rate: 0.65 }, { from: 51, rate: 0.70 }, { from: 61, rate: 0.73 }],
+        speed:   [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.22 }, { from: 31, rate: 0.26 }, { from: 41, rate: 0.50 }, { from: 51, rate: 0.37 }, { from: 61, rate: 0.565 }],
+        pp:      [{ from: 1, rate: 0.30 }, { from: 25, rate: 0.45 }, { from: 31, rate: 0.46 }, { from: 41, rate: 0.60 }, { from: 51, rate: 0.90 }, { from: 61, rate: 1.10 }]
+      },
+      description: "地属性。千年のあいだ琥珀の中で眠っていた甲虫。背の琥珀がそのまま硬い殻になっている。正面からは刃が通りにくい。火に弱い。",
+      records: {
+        used:  "背中の琥珀をのぞくと、小さな羽虫が閉じ込められていた。同じ時代の友だろうか。",
+        trust: "日なたに連れて行くと、殻をじっと温めて動かない。千年ぶんの日光浴のようだ。",
+        bond:  "長い眠りから覚めて、初めて見た顔を忘れることはないだろう。"
+      },
+      bondReward: { effects: [
+        { type: "resistBonus", element: "all", value: 3 },
+        { type: "statMultiplier", stat: "defense", value: 1.1 }
+      ] },
+      baseHp: 25,
+      baseAttack: 7,
+      baseDefense: 11,
+      baseSpeed: 6,
+      basePp: 2,
+      scoutRate: 0.20,
+      spawnRate: 0.5,
+      learnset: [
+        { level: 1,  skill: "tackle" },
+        { level: 12, skill: "bodyPress" },
+        { level: 22, skill: "guardSong" },
+        { level: 24, skill: "fightSong" },
+        { level: 28, skill: "fortressForm" }
+      ],
+      abilities: ["hardShell"],
+      expReward: 46,
+      goldReward: 16,
+      drops: [
+        { item: "amberShard", rate: 0.27, min: 1, max: 1 }
+      ],
+      // ふだんは背の琥珀の中で光が揺れ、脚を左右交互に踏みかえる
+      sprite: ["amberBeetle", "amberBeetleLegL", "amberBeetleGlow", "amberBeetleLegR"],
+      sizeScale: 1.1,
+      motion: "beetleIdle",
+      poses: { legL: "amberBeetleLegL", legR: "amberBeetleLegR", rear: "amberBeetleRear",
+               hit: "amberBeetleHit", sleep: "amberBeetleSleep" },
+      motions: {
+        attack: "beetleRam", technique: "beetleRam", buff: "beetleBrace", resonance: "beetleBrace", breath: "beetleBrace",
+        hit: "beetleHit", levelUp: "beetleCheer", sleeping: "beetleSleeping"
+      }
+    },
+
+    sapSlime: {
+      id: "sapSlime",
+      name: "樹液のスライム",
+      family: "slimeKind",
+      element: "water",
+      resistances: { water: 5, earth: 2, thunder: -3 },
+      immunities: [],
+      statusResist: { poison: 5, paralysis: 0, sleep: 0, seal: 0,
+                      blind: 3, curse: 0, instantDeath: 3 },
+      maxLevel: 70,
+      growthRate: {
+        hp:      [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.30 }, { from: 41, rate: 0.40 }, { from: 51, rate: 0.50 }, { from: 61, rate: 0.52 }],
+        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.30 }, { from: 31, rate: 0.60 }, { from: 41, rate: 0.80 }, { from: 51, rate: 1.10 }, { from: 61, rate: 1.16 }],
+        defense: [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 31, rate: 0.60 }, { from: 41, rate: 0.70 }, { from: 51, rate: 0.80 }, { from: 61, rate: 0.83 }],
+        speed:   [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.40 }, { from: 31, rate: 0.70 }, { from: 41, rate: 0.90 }, { from: 51, rate: 1.20 }, { from: 61, rate: 1.40 }],
+        pp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.50 }, { from: 51, rate: 0.55 }, { from: 61, rate: 0.65 }]
+      },
+      description: "水属性。千年樹の傷から流れた樹液が固まって動き出したもの。仲間の傷を塞ぎ、ねばる体で足を止める。先に倒さないと戦いが長引く。雷に弱い。",
+      records: {
+        used:  "触ると指がくっつく。はがすと、少しだけ甘い匂いが残る。",
+        trust: "転んだ膝に、自分の体を少しちぎって貼ってくれた。傷はすぐ塞がった。",
+        bond:  "千年樹の傷を塞ぐために流れ出た体は、今は隣の者の傷を塞いでいる。"
+      },
+      bondReward: { effects: [
+        { type: "resistBonus", element: "thunder", value: 3 },
+        { type: "statMultiplier", stat: "hp", value: 1.1 }
+      ] },
+      baseHp: 22,
+      baseAttack: 6,
+      baseDefense: 7,
+      baseSpeed: 5,
+      basePp: 7,
+      scoutRate: 0.24,
+      spawnRate: 0.5,
+      learnset: [
+        { level: 1,  skill: "tackle" },
+        { level: 4,  skill: "bubble" },
+        { level: 10, skill: "cure" },
+        { level: 22, skill: "slowDance" },
+        { level: 26, skill: "greaterCure" },
+        { level: 30, skill: "wave" }
+      ],
+      abilities: ["regen"],
+      // 回復技は、仲間のHPが6割を切ってから使う（元気な相手に撃たない）
+      enemyAi: { healBelow: 0.6 },
+      expReward: 44,
+      goldReward: 15,
+      drops: [
+        { item: "ancientSap", rate: 0.30, min: 1, max: 1 }
+      ],
+      // ふだんはゆっくり伸び縮みし、体の下から樹液が垂れる
+      sprite: ["sapSlime", "sapSlimeDripA", "sapSlime", "sapSlimeDripB"],
+      motion: "sapIdle",
+      poses: { up: "sapSlimeUp", wide: "sapSlimeWide", hit: "sapSlimeHit", sleep: "sapSlimeSleep" },
+      motions: {
+        attack: "sapBump", technique: "sapBump", resonance: "sapCast", breath: "sapCast", buff: "sapCast",
+        hit: "sapHit", levelUp: "sapCheer", sleeping: "sapSleeping"
       }
     }
   };

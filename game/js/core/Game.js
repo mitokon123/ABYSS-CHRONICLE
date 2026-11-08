@@ -848,7 +848,7 @@
   Game.isFieldSkill = function (skill) {
     if (!skill || skill.power) return false;
     if (skill.fieldUse === false) return false;
-    if (skill.heal || skill.cureStatus) return true;
+    if (skill.heal || skill.cureStatus || skill.revive) return true;
     return skill.fieldUse === true;
   };
 
@@ -866,19 +866,48 @@
    * 探索中に技を使う（HPの回復と、状態異常を治す技）。
    * 回復量は戦闘と同じく data/skills.js の heal（{ min, max } か { amount }）。PPも戦闘と同じだけ払う。
    *
-   * @returns {{success:boolean, reason?:string, amount?:number, cured?:string[]}}
+   * @returns {{success:boolean, reason?:string, amount?:number, cured?:string[], allHealed?:boolean, revived?:boolean, reviveFailed?:boolean}}
    *   reason … "notUsable" / "userFainted"（使う側が倒れている）/ "noPp" /
-   *            "fainted"（相手が倒れている。蘇生は無い）/ "full"（相手が満タン）/
-   *            "nothingToCure"（治す状態異常が無い）
+   *            "fainted"（相手が倒れている）/ "full"（相手が満タン）/ "allFull"（全員が満タン）/
+   *            "nothingToCure"（治す状態異常が無い）/ "notFainted"（起こす技で、相手が倒れていない）
    *   cured  … 状態異常を治す技で、治したものの名前
+   *   allHealed … 味方全体の回復の技（キュアオール）を使った
+   *   revived / reviveFailed … 起こす技（リザレクト）で起きた／起きなかった（起きなくても PP は払う）
    *   使えなかったときは PP を払わない
    */
   Game.prototype.useFieldSkill = function (user, skillId, target) {
     var skill = this.data.getSkill(skillId);
     if (!user || !target || !Game.isFieldSkill(skill)) return { success: false, reason: "notUsable" };
     if (user.isFainted && user.isFainted()) return { success: false, reason: "userFainted" };
-    if (skill.pp && user.canPayPp && !user.canPayPp(skill.pp)) return { success: false, reason: "noPp" };
-    if (target.isFainted && target.isFainted()) return { success: false, reason: "fainted" };
+    // 払うPP（特性「カチカチ」は ×1.5。MonsterInstance.getSkillPpCost）
+    var cost = user.getSkillPpCost ? user.getSkillPpCost(skill) : skill.pp;
+    if (cost && user.canPayPp && !user.canPayPp(cost)) return { success: false, reason: "noPp" };
+
+    // 倒れた仲間を起こす技（リザレクト）。確率も戻るHPも戦闘と同じ。起きなくても PP は払う
+    if (skill.revive) {
+      if (!target.isFainted || !target.isFainted()) return { success: false, reason: "notFainted" };
+      if (cost && user.payPp) user.payPp(cost);
+      var chance = (typeof skill.revive.chance === "number") ? skill.revive.chance : 1;
+      if (new NS.Random().next() >= chance) return { success: true, reviveFailed: true };
+      return { success: true, revived: true, amount: NS.ItemUsage.reviveTarget(target, skill.revive.hpRatio).amount };
+    }
+
+    // 味方全体の技は選んだ相手に関係なく全員へ向くので、選んだ相手が倒れていても使える
+    if (skill.target !== "allAllies" && target.isFainted && target.isFainted()) return { success: false, reason: "fainted" };
+
+    // 味方全体の回復の技（キュアオール）。量は1体ずつ戦闘と同じ決め方（下の1体のときと同じ）
+    if (skill.heal && skill.target === "allAllies") {
+      var party = (this.party && this.party.getMembers) ? this.party.getMembers() : [];
+      var hurt = party.filter(function (m) { return !m.isFainted() && m.currentHp < m.getMaxHp(); });
+      if (hurt.length === 0) return { success: false, reason: "allFull" };
+      var groupRandom = new NS.Random();
+      var groupMul = NS.EffectSystem ? new NS.EffectSystem(this.data).getHealDealtMultiplier(user) : 1;
+      for (var h = 0; h < hurt.length; h++) {
+        hurt[h].heal(Math.floor(groupRandom.nextInt(skill.heal.min, skill.heal.max) * groupMul));
+      }
+      if (cost && user.payPp) user.payPp(cost);
+      return { success: true, allHealed: true };
+    }
 
     // 状態異常を治す技（クレンズ）。決まりは戦闘と同じ（BattleSystem.cureStatuses）
     // 味方全体の技（清めの雨）は、選んだ相手に関係なく連れている全員を治す
@@ -892,13 +921,13 @@
         });
       }
       if (names.length === 0) return { success: false, reason: "nothingToCure" };
-      if (skill.pp && user.payPp) user.payPp(skill.pp);
+      if (cost && user.payPp) user.payPp(cost);
       return { success: true, cured: names };
     }
     if (skill.cureStatus && !skill.heal) {
       var cured = NS.BattleSystem.cureStatuses(target, skill.cureStatus);
       if (cured.length === 0) return { success: false, reason: "nothingToCure" };
-      if (skill.pp && user.payPp) user.payPp(skill.pp);
+      if (cost && user.payPp) user.payPp(cost);
       return { success: true, cured: cured.map(function (def) { return def.name; }) };
     }
 
@@ -918,7 +947,7 @@
 
     var before = target.currentHp;
     target.heal(amount);
-    if (skill.pp && user.payPp) user.payPp(skill.pp);
+    if (cost && user.payPp) user.payPp(cost);
     return { success: true, amount: target.currentHp - before };
   };
 

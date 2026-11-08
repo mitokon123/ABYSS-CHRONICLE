@@ -304,9 +304,10 @@
     var ids = this.game.fieldSkillsOf(user);
     for (var i = 0; i < ids.length; i++) {
       var skill = this.game.data.getSkill(ids[i]);
-      var affordable = !skill.pp || !user.canPayPp || user.canPayPp(skill.pp);
+      var fieldCost = user.getSkillPpCost ? user.getSkillPpCost(skill) : (skill.pp || 0);
+      var affordable = !fieldCost || !user.canPayPp || user.canPayPp(fieldCost);
       items.push({
-        label: skill.name + "  " + fill(this.texts.fieldSkillCost, { pp: skill.pp || 0 }),
+        label: skill.name + "  " + fill(this.texts.fieldSkillCost, { pp: fieldCost }),
         value: ids[i],
         color: affordable ? null : this.theme.hintColor
       });
@@ -324,7 +325,8 @@
 
     var user = this._selected();
     var skill = this.game.data.getSkill(result.value);
-    if (skill && skill.pp && user.canPayPp && !user.canPayPp(skill.pp)) {
+    var skillCost = (skill && user.getSkillPpCost) ? user.getSkillPpCost(skill) : ((skill && skill.pp) || 0);
+    if (skillCost && user.canPayPp && !user.canPayPp(skillCost)) {
       this._notice = this.texts.fieldSkillNoPp || null;
       this.game.playError();
       return;
@@ -367,18 +369,25 @@
     var done = this.game.useFieldSkill(user, this.fieldSkillId, target);
 
     if (done.success) {
-      // 状態異常を治す技（クレンズ）は「○○が治った」、HPの回復は「HPが n 回復した」
-      this._notice = fill(done.cured ? this.texts.fieldSkillCured : this.texts.fieldSkillUsed, {
+      // 状態異常を治す技（クレンズ）は「○○が治った」、HPの回復は「HPが n 回復した」。
+      // 全体の回復（キュアオール）は「みんなの」、起こす技（リザレクト）は起きたかどうかを出す
+      var usedText = done.cured ? this.texts.fieldSkillCured
+        : done.allHealed ? this.texts.fieldSkillAllHealed
+        : done.revived ? this.texts.fieldSkillRevived
+        : done.reviveFailed ? this.texts.fieldSkillReviveFail
+        : this.texts.fieldSkillUsed;
+      this._notice = fill(usedText, {
         user: user.getName(), skill: skill ? skill.name : "",
         target: target.getName(), amount: done.amount,
         status: (done.cured || []).join("・")
       });
-      this.game.audio.playSe("heal");
+      this.game.audio.playSe(done.reviveFailed ? "miss" : "heal");
       this._buildFieldTargets();
       return;
     }
 
     var key = { noPp: "fieldSkillNoPp", fainted: "fieldSkillFainted", full: "fieldSkillFull",
+                allFull: "fieldSkillAllFull", notFainted: "fieldSkillNotFainted",
                 nothingToCure: "fieldSkillNothingToCure" }[done.reason];
     this._notice = key ? fill(this.texts[key], { target: target ? target.getName() : "" }) : null;
     this.game.playError();
@@ -510,7 +519,7 @@
 
   // --- 作戦（v1.0.0。data/battle.js の tactics） ---
 
-  /** 作戦の一覧を出す。カーソルはいまの作戦に置き、説明を下の知らせ欄に出す */
+  /** 作戦の一覧を出す。カーソルはいまの作戦に置く。説明は一覧のすぐ下に出す（_renderTacticInfo） */
   PartyScene.prototype._beginTactic = function () {
     var monster = this._selected();
     if (!monster || !monster.getTactic) return;
@@ -527,20 +536,34 @@
     this.tacticMenu.setItems(items);
     this.tacticMenu.index = at;
     this.mode = "tactic";
-    this._showTacticNotice();
+    this._notice = null;
   };
 
-  /** カーソルの作戦の説明を知らせ欄に出す */
-  PartyScene.prototype._showTacticNotice = function () {
+  /** カーソルの作戦の説明を、一覧のすぐ下の枠に出す */
+  PartyScene.prototype._renderTacticInfo = function () {
     var selected = this.tacticMenu.items ? this.tacticMenu.items[this.tacticMenu.index] : null;
     var tactics = (this.game.data.battle || {}).tactics || { list: {} };
     var tactic = selected ? tactics.list[selected.value] : null;
-    this._notice = tactic ? tactic.description : null;
+    if (!tactic) return;
+
+    var t = this.theme;
+    var info = this.layout.tacticInfo || {};
+    var menu = this.tacticMenu._boxRect();
+    var lh = t.lineHeight || 18;
+    var pad = t.padding || 8;
+    var padX = info.padX || 12;
+    var box = { x: menu.x, y: menu.y + menu.h + (info.gap || 6), w: menu.w, h: pad * 2 + lh * (info.lines || 2) };
+    this.panel.drawBox(box);
+
+    var lines = wrapByWidth(this.panel.ctx, tactic.description || "", box.w - padX * 2, t.smallFont);
+    for (var i = 0; i < lines.length; i++) {
+      this.panel.drawText(lines[i], box.x + padX, box.y + pad + lh * (i + 1) - 4,
+        { font: t.smallFont, color: t.subTextColor });
+    }
   };
 
   PartyScene.prototype._updateTacticMode = function (input) {
     var result = this.tacticMenu.handleInput(input);
-    this._showTacticNotice();
     if (!result) return;
     if (result.type === "cancel") { this.mode = "list"; this._notice = null; return; }
     if (result.type !== "confirm") return;
@@ -1560,7 +1583,10 @@
     if (this.mode === "release" || this.mode === "releaseMany") this._renderReleaseConfirm(ctx);
     // 探索中に使う技と、その相手
     if (this.mode === "fieldSkill") this.fieldSkillMenu.render(this.game.clock);
-    if (this.mode === "tactic") this.tacticMenu.render(this.game.clock);
+    if (this.mode === "tactic") {
+      this.tacticMenu.render(this.game.clock);
+      this._renderTacticInfo();
+    }
     if (this.mode === "fieldTarget") this.fieldTargetMenu.render(this.game.clock);
 
     // 名前をつけている間は、入力欄を画面の手前に重ねる。
@@ -2883,12 +2909,13 @@
 
       var element = (data.elements || {})[skill.element];
       if (element) {
-        this.panel.drawText("[" + element.name + "]", cx + (S.elementX || 150), cy,
+        this.panel.drawText("[" + data.getSkillElementName(skill) + "]", cx + (S.elementX || 150), cy,
           { font: t.smallFont, color: element.color });
       }
       var kind = data.getSkillKind ? data.getSkillKind(skill) : null;
       if (kind) {
-        this.panel.drawText("[" + kind.name + "]", cx + (S.kindX || 186), cy,
+        // 属性が2つの技は、そのぶん右へ
+        this.panel.drawText("[" + kind.name + "]", cx + (S.kindX || 186) + (skill.element2 ? 24 : 0), cy,
           { font: t.smallFont, color: kind.color });
       }
       if (columns > 1) continue;
@@ -2898,7 +2925,8 @@
         ? battleTexts.skillStats
         : (battleTexts.skillStatsNoPower || battleTexts.skillStats);
       this.panel.drawText(fill(template || "", {
-        power: skill.power || 0, accuracy: Math.round(accuracy * 100), pp: skill.pp || 0
+        power: this.game.data.formatSkillPower(skill), accuracy: Math.round(accuracy * 100),
+        pp: monster.getSkillPpCost ? monster.getSkillPpCost(skill) : (skill.pp || 0)
       }), cx + (S.statsX || 256), cy, { font: t.smallFont, color: t.subTextColor });
     }
     y = top + perColumn * rowH;

@@ -600,6 +600,31 @@
       ]
     },
 
+    // ================= 仲間にしたことのある種族（v1.0.3） =================
+    // 戦闘で、敵の状態表示の右上に出す（BattleScene._renderMember）。図鑑の「仲間」と同じ意味。
+    // 愛情度のハートと見分けがつくよう、空色の丸に白い印
+    iconCaught: {
+      palette: { ".": null, "K": "#0e2a3a", "B": "#4ab8e8", "H": "#a8e4ff", "D": "#2a7aa8", "W": "#ffffff" },
+      pixels: [
+        "................",
+        ".....KKKKKK.....",
+        "...KKHHBBBBKK...",
+        "..KHHBBBBBBBDK..",
+        "..KHBBBBBBBWDK..",
+        ".KHBBBBBBBWWBDK.",
+        ".KHBBBBBBWWBBDK.",
+        ".KBBWBBBWWBBBDK.",
+        ".KBBWWBWWBBBBDK.",
+        ".KBBBWWWBBBBBDK.",
+        "..KBBBWBBBBBDK..",
+        "..KDBBBBBBBDDK..",
+        "...KKDDDDDDKK...",
+        ".....KKKKKK.....",
+        "................",
+        "................"
+      ]
+    },
+
     // ================= アイテム =================
     // 一覧で名前の左に出す（data/items.js の icon から指す）。
     // 同じ回復でも、HP は赤、PP は青、毒消しは青緑の葉、と色で分ける
@@ -2079,6 +2104,97 @@
         "..KCTKKKKKKTCK..",
         "...KKCBBBBCKK...",
         ".....KKKKKK.....",
+        "................"
+      ]
+    },
+
+    // 千年樹の根底の素材（v1.0.3。どれも名前は仮）
+    // 琥珀のかけら：コハクカブトの背から欠けたもの
+    iconItemAmberShard: {
+      palette: { ".": null, "K": "#241206", "A": "#e8a030", "a": "#c47818", "D": "#7a4410",
+                 "H": "#ffd884", "W": "#fff4cc", "i": "#6a3a0c" },
+      pixels: [
+        "................",
+        ".......KK.......",
+        "......KWHK......",
+        ".....KWHAAK.....",
+        "....KHAAAAaK....",
+        "....KAAiAAaK....",
+        "...KHAiiAAaaK...",
+        "...KHAAiAAaaK...",
+        "...KAAAAAaaDK...",
+        "....KAAAaaDK....",
+        "....KAaaaDK.....",
+        ".....KaaDK......",
+        "......KDK.......",
+        ".......K........",
+        "................",
+        "................"
+      ]
+    },
+    // 千年樹の樹液：とろりと落ちる琥珀色のしずく
+    iconItemAncientSap: {
+      palette: { ".": null, "K": "#4a2408", "S": "#e8a838", "s": "#c87e1a", "H": "#ffdc88", "W": "#fff6d0" },
+      pixels: [
+        "................",
+        ".......KK.......",
+        "......KHSK......",
+        "......KHSK......",
+        ".....KHSSSK.....",
+        "....KHWSSSsK....",
+        "...KHWSSSSSsK...",
+        "...KHSSSSSSsK...",
+        "...KSSSSSSSsK...",
+        "...KSSSSSSssK...",
+        "....KsSSSssK....",
+        ".....KKsssKK....",
+        ".......KKK......",
+        "................",
+        "................",
+        "................"
+      ]
+    },
+    // 真鍮の歯車：ウェポンの体から外れた歯車
+    iconItemBrassGear: {
+      palette: { ".": null, "K": "#1c130a", "B": "#c49a3a", "I": "#7c8698" },
+      pixels: [
+        "................",
+        "......KKKK......",
+        "...KK.KBBK.KK...",
+        "..KBBKKBBKKBBK..",
+        "..KBBBBBBBBBBK..",
+        "...KBBKKKKBBK...",
+        ".KKKBKIIIIKBKKK.",
+        ".KBBBKIKKIKBBBK.",
+        ".KBBBKIKKIKBBBK.",
+        ".KKKBKIIIIKBKKK.",
+        "...KBBKKKKBBK...",
+        "..KBBBBBBBBBBK..",
+        "..KBBKKBBKKBBK..",
+        "...KK.KBBK.KK...",
+        "......KKKK......",
+        "................"
+      ]
+    },
+    // 宝珠のかけら：ジュエルの体のかけら
+    iconItemJewelShard: {
+      palette: { ".": null, "K": "#141030", "G": "#7fe8e0", "g": "#2fb0c8", "D": "#1c6a8a", "W": "#f2ffff" },
+      pixels: [
+        "................",
+        "................",
+        "....KKKKKKKK....",
+        "...KWWGGGGggK...",
+        "..KWGGGGGGGggK..",
+        "..KKKKKKKKKKKK..",
+        "..KDgGGGGGGgDK..",
+        "...KDgGGGGgDK...",
+        "....KDgGGgDK....",
+        ".....KDggDK.....",
+        "......KDDK......",
+        ".......KK.......",
+        "................",
+        "................",
+        "................",
         "................"
       ]
     },

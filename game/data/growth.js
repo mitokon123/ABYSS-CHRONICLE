@@ -191,7 +191,8 @@
         { species: "kodama",   stat: "pp",      note: "コダマのPP" },
         { species: "glowBug",  stat: "pp",      note: "ヒカリムシのPP" },
         { species: "kokeGame", stat: "defense", note: "コケガメの防御（Lv35〜55）" },
-        { species: "flamin",   stat: "attack",  note: "フレイミンの攻撃（Lv99 で456）" }
+        { species: "flamin",   stat: "attack",  note: "フレイミンの攻撃（Lv99 で456）" },
+        { species: "jewelOre", stat: "defense", note: "ジュエルの防御（Lv30 で200・Lv70 で832。作者の表）" }
       ]
     }
   };

@@ -4090,6 +4090,251 @@
       scaleY: { offset: -0.02, amplitude: 0.008, period: 5200 }
     },
 
+    // ─────────────────────────────────────────
+    // 千年樹の根底の在来種（v1.0.3・2026-11-04）。姿は data/monsters.js の poses（絵は sprites_marsh.js の末尾）
+    // ─────────────────────────────────────────
+
+    // ウェポン：ふだんは炉が脈打ち、左右の腕が交互に上下する（sprite の4枚）
+    weaponIdle: {
+      frames: { interval: 420 },
+      offsetY: { amplitude: -0.6, period: 1680 }
+    },
+    // 通常攻撃。両腕を振り上げ、踏み込みながら剣を横へ振り抜く
+    weaponSlash: {
+      duration: 640,
+      offsetY: { amount: 22, shape: "windup", backRatio: 0.4 },
+      poses: [
+        { at: 0,    pose: "raise" },
+        { at: 0.42, pose: "swingL" },
+        { at: 0.85, pose: null }
+      ]
+    },
+    // 斬撃の技。剣と斧で2度斬る
+    weaponCleave: {
+      duration: 860,
+      offsetY: { amount: 16, shape: "hops", count: 2 },
+      offsetX: { amount: 3,  shape: "wobble", cycles: 2 },
+      poses: [
+        { at: 0,    pose: "raise" },
+        { at: 0.2,  pose: "swingL" },
+        { at: 0.46, pose: "raise" },
+        { at: 0.62, pose: "swingR" },
+        { at: 0.9,  pose: null }
+      ]
+    },
+    // 力をためる。腕を掲げ、炉が明るくなる
+    weaponBuff: {
+      duration: 760,
+      offsetY: { amount: -5, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "raise" },
+        { at: 0.25, pose: "charge" },
+        { at: 0.85, pose: null }
+      ]
+    },
+    weaponHit: {
+      duration: 400,
+      offsetY: { amount: 5,    shape: "decay", cycles: 2 },
+      offsetX: { amount: 3,    shape: "wobble", cycles: 3 },
+      alpha:   { amount: -0.3, shape: "fade" },
+      poses: [
+        { at: 0,    pose: "hit" },
+        { at: 0.8,  pose: null }
+      ]
+    },
+    weaponDodge: {
+      duration: 460,
+      offsetX: { amount: 16, outRatio: 0.35 },
+      poses: [
+        { at: 0,    pose: "stepL" },
+        { at: 0.3,  pose: "stepR" },
+        { at: 0.6,  pose: null }
+      ]
+    },
+    weaponCheer: {
+      duration: 860,
+      offsetY: { amount: -5, shape: "hops", count: 2 },
+      poses: [
+        { at: 0,    pose: "stepL" },
+        { at: 0.25, pose: "raise" },
+        { at: 0.5,  pose: "stepR" },
+        { at: 0.72, pose: "charge" },
+        { at: 0.92, pose: null }
+      ]
+    },
+    weaponSleeping: {
+      pose: "sleep",
+      scaleY: { offset: -0.02, amplitude: 0.008, period: 5000 }
+    },
+
+    // コハクカブト：ふだんは脚を左右交互に踏みかえ、背の琥珀の中で光が揺れる
+    beetleIdle: {
+      frames: { interval: 520 },
+      scaleY: { amplitude: 0.012, period: 2080 }
+    },
+    // 体当たり。脚を上げて構え、重く突っ込む
+    beetleRam: {
+      duration: 680,
+      offsetY: { amount: 26, shape: "windup", backRatio: 0.45 },
+      scaleY:  { amount: -0.05, shape: "windup", backRatio: 0.45 },
+      poses: [
+        { at: 0,    pose: "rear" },
+        { at: 0.45, pose: "legL" },
+        { at: 0.6,  pose: "legR" },
+        { at: 0.85, pose: null }
+      ]
+    },
+    // 守りを固める。脚を縮めて沈み、琥珀が明るくなる
+    beetleBrace: {
+      duration: 720,
+      scaleY: { amount: -0.08, shape: "pulse" },
+      scaleX: { amount: 0.04,  shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "rear" },
+        { at: 0.85, pose: null }
+      ]
+    },
+    beetleHit: {
+      duration: 400,
+      offsetY: { amount: 3,    shape: "decay", cycles: 2 },
+      offsetX: { amount: 2,    shape: "wobble", cycles: 3 },
+      alpha:   { amount: -0.3, shape: "fade" },
+      poses: [
+        { at: 0,    pose: "hit" },
+        { at: 0.8,  pose: null }
+      ]
+    },
+    beetleCheer: {
+      duration: 820,
+      offsetY: { amount: -5, shape: "hops", count: 2 },
+      poses: [
+        { at: 0,    pose: "legL" },
+        { at: 0.25, pose: "rear" },
+        { at: 0.5,  pose: "legR" },
+        { at: 0.75, pose: "rear" },
+        { at: 0.92, pose: null }
+      ]
+    },
+    beetleSleeping: {
+      pose: "sleep",
+      scaleY: { offset: -0.03, amplitude: 0.01, period: 5000 }
+    },
+
+    // 樹液のスライム：ふだんはゆっくり伸び縮みし、体の下から樹液が垂れる（sprite の4枚）
+    sapIdle: {
+      frames: { interval: 620 },
+      scaleX: { amplitude: 0.03,  period: 2480 },
+      scaleY: { amplitude: -0.03, period: 2480 }
+    },
+    // 体当たり。体を左右へ広げて、ねばりつく
+    sapBump: {
+      duration: 600,
+      offsetY: { amount: 20, shape: "windup", backRatio: 0.4 },
+      scaleX:  { amount: 0.1,  shape: "pulse" },
+      scaleY:  { amount: -0.1, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.4,  pose: "wide" },
+        { at: 0.85, pose: null }
+      ]
+    },
+    // 回復・足止め。腕のように樹液を伸ばす
+    sapCast: {
+      duration: 780,
+      offsetY: { amount: -5, shape: "pulse" },
+      scaleY:  { amount: 0.06, shape: "pulse" },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.45, pose: "wide" },
+        { at: 0.65, pose: "up" },
+        { at: 0.88, pose: null }
+      ]
+    },
+    sapHit: {
+      duration: 420,
+      scaleX: { amount: 0.1,  shape: "decay", cycles: 2 },
+      scaleY: { amount: -0.1, shape: "decay", cycles: 2 },
+      alpha:  { amount: -0.3, shape: "fade" },
+      poses: [
+        { at: 0,    pose: "hit" },
+        { at: 0.8,  pose: null }
+      ]
+    },
+    sapCheer: {
+      duration: 800,
+      offsetY: { amount: -7, shape: "hops", count: 2 },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.5,  pose: "wide" },
+        { at: 0.75, pose: "up" },
+        { at: 0.92, pose: null }
+      ]
+    },
+    sapSleeping: {
+      pose: "sleep",
+      scaleY: { offset: -0.05, amplitude: 0.02, period: 4600 },
+      scaleX: { offset: 0.03,  amplitude: 0.01, period: 4600, phase: 0.25 }
+    },
+
+    // ジュエル：ふだんはふわふわ浮き、きらめきが動き、小さな手が交互に動く
+    jewelFloat: {
+      frames: { interval: 360 },
+      offsetY: { amplitude: -3, period: 1440 }
+    },
+    // 体当たり。小さな手を上げて、すばやくぶつかる
+    jewelBump: {
+      duration: 420,
+      offsetY: { amount: 18, shape: "windup", backRatio: 0.45 },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.85, pose: null }
+      ]
+    },
+    jewelHit: {
+      duration: 360,
+      offsetX: { amount: 3,    shape: "wobble", cycles: 4 },
+      alpha:   { amount: -0.2, shape: "fade" },
+      poses: [
+        { at: 0,    pose: "hit" },
+        { at: 0.8,  pose: null }
+      ]
+    },
+    jewelDodge: {
+      duration: 320,
+      offsetX: { amount: 20, outRatio: 0.3 }
+    },
+    // 逃げる。手を上げて跳ね上がり、消える
+    jewelFlee: {
+      duration: 560,
+      lift:  { amount: 46, shape: "rise" },
+      alpha: { amount: -1, shape: "rise" },
+      poses: [
+        { at: 0, pose: "up" }
+      ]
+    },
+    // 倒れる。小さく震えて砕ける
+    jewelShatter: {
+      duration: 760,
+      offsetX: { amount: 3,     shape: "wobble", cycles: 6 },
+      scale:   { amount: -0.45, shape: "rise" },
+      alpha:   { amount: -1,    shape: "rise" },
+      poses: [
+        { at: 0, pose: "hit" }
+      ]
+    },
+    jewelCheer: {
+      duration: 700,
+      offsetY: { amount: -8, shape: "hops", count: 2 },
+      poses: [
+        { at: 0,    pose: "up" },
+        { at: 0.9,  pose: null }
+      ]
+    },
+    jewelSleeping: {
+      pose: "sleep",
+      offsetY: { amplitude: -1, period: 4200 }
+    },
+
     /**
      * --- シニガミ（蔦這う回廊の初見殺し。2026-10-21） ---
      * 姿は sprites_marsh.js の shinigami（ふつう）・shinigamiRaise（振りかぶる）・shinigamiSwing（振り下ろす）。

@@ -84,6 +84,8 @@
         if (monster.isFainted()) continue;
 
         var damage = Math.max(1, Math.floor(monster.getMaxHp() * (effect.hpRatio || 0)));
+        // 特性「カチカチ」は罠のダメージも減る
+        if (monster.reduceDirectDamage) damage = monster.reduceDirectDamage(damage);
         var allowed = Math.max(0, monster.currentHp - floor);
         damage = Math.min(damage, allowed);
 

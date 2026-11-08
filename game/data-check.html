@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Cache-Control" content="no-store">
   <title>データの点検 - ABYSS CHRONICLE</title>
+  <script src="tools/devguard.js"></script>
   <!--
     ▼ このファイルについて（開発用。ゲーム本体ではない）
 
@@ -153,6 +154,11 @@
       // 5b. 能力値の線を超えている（data/growth.js の statLimits。作者と決めた目安 2026-11-03）
       checkStatLimits(raw).forEach(function (c) { out.push(c); });
 
+      // 5c. 絆の専用技を、持ち主でない種族や別の場所が使っている（作者の指定 2026-11-05）
+      var bondProblems = checkBondSkills(raw, refs);
+      out.push({ level: bondProblems.length ? "warn" : "good", title: "絆の専用技を、持ち主以外が使っている", items: bondProblems,
+        why: "bondReward.skill に書いた技は、その種族だけのもの。別の種族の覚える技・敵のときの技・主の手順や、種族に結びつかない場所に書いてあると出る。" });
+
       // 6. 手に入れる方法が見つからない道具
       var obtain = {};
       refs.forEach(function (r) {
@@ -202,6 +208,53 @@
       unused("shapes", "使っていない演出の型",
         "技・種族のどこからも指されていない演出（data/effects.js の shapes）。", notOwnFile("data/effects.js"));
       return out;
+    }
+
+    /**
+     * 絆の専用技（monsters の bondReward.skill）が、持ち主のほかで使われていないか。
+     *   その技を指している所（D.references）を1つずつ見て、書いてある場所の種族を調べる。
+     *     monsters.〇〇…        … 〇〇
+     *     bosses.〇〇…          … その主の species
+     *     それ以外（ダンジョンの出現の表など） … 道のりで最後に出てきた species / enemy
+     *   種族に結びつかない場所も、ここに出す。
+     */
+    function checkBondSkills(raw, refs) {
+      var owners = {};
+      Object.keys(raw.monsters || {}).forEach(function (id) {
+        var reward = raw.monsters[id].bondReward;
+        if (reward && reward.skill) (owners[reward.skill] = owners[reward.skill] || []).push(id);
+      });
+
+      function speciesAt(path) {
+        var parts = path.replace(/\[(\d+)\]/g, ".$1").split(".");
+        if (parts[0] === "monsters") return parts[1];
+        if (parts[0] === "bosses") return (raw.bosses[parts[1]] || {}).species || null;
+        var node = raw, found = null;
+        for (var i = 0; i < parts.length && node && typeof node === "object"; i++) {
+          node = node[parts[i]];
+          if (node && typeof node.species === "string") found = node.species;
+          else if (node && typeof node.enemy === "string") found = node.enemy;
+        }
+        return found;
+      }
+      function nameOf(id) { return (raw.monsters[id] || {}).name || id; }
+      function skillLabel(id) { return "<code>" + esc(id) + "</code>（" + esc((raw.skills[id] || {}).name || "") + "）"; }
+
+      var items = [];
+      Object.keys(owners).forEach(function (skill) {
+        if (owners[skill].length > 1) {
+          items.push(skillLabel(skill) + " を2種族以上が絆の報酬にしている：" + owners[skill].map(function (id) { return esc(nameOf(id)); }).join("・"));
+        }
+      });
+      refs.forEach(function (r) {
+        if (r.space !== "skills" || !owners[r.value]) return;
+        var species = speciesAt(r.path);
+        if (species && owners[r.value].indexOf(species) >= 0) return;
+        items.push(skillLabel(r.value) + "（" + owners[r.value].map(function (id) { return esc(nameOf(id)); }).join("・") + "の専用）を、" +
+          (species ? esc(nameOf(species)) + " が使っている" : "種族に結びつかない場所で指している") +
+          "　<span class='where'>" + esc(r.path) + "</span>");
+      });
+      return items;
     }
 
     /**

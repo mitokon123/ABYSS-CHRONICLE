@@ -161,12 +161,17 @@
    *   技（enemySkills・出る場所の skills）… 外さないと敵のときの技のままセーブされる
    */
   MonsterInstance.prototype.leaveEncounter = function () {
+    // HP は「最大HPに対する割合」を保つ。そのまま持ち越すと、敵のとき HP×0.3〜0.5 のジュエルが 4/10 で仲間になる
+    var hpRatio = this.currentHp / Math.max(1, this.getMaxHp());
     this.encounterEffects = [];
+    this.fixedStatLevel = undefined;
     this.actionPattern = null;
     this.patternIndex = 0;
     this.skillRateOverride = undefined;
     this.skillWeights = undefined;
+    this.enemyTactic = undefined;
     this.infinitePp = false;
+    this.fleeRate = undefined;
     this.actionsPerTurn = undefined;
     this.rewardMultiplier = undefined;
     this._bossImmuneToStatus = [];
@@ -182,7 +187,7 @@
     this._removed = false;
     this.displaySuffix = null;
 
-    this.currentHp = Math.min(this.currentHp, this.getMaxHp());
+    this.currentHp = (this.currentHp > 0) ? Math.max(1, Math.round(hpRatio * this.getMaxHp())) : 0;
     this.currentPp = Math.min(this.currentPp, this.getMaxPp());
   };
 
@@ -424,7 +429,7 @@
       entry.steps = 0;
 
       var floor = (walk.leaveAtLeast === undefined) ? 1 : walk.leaveAtLeast;
-      var amount = Math.min(walk.amount || 1, Math.max(0, this.currentHp - floor));
+      var amount = Math.min(this.reduceDirectDamage(walk.amount || 1), Math.max(0, this.currentHp - floor));
       if (amount <= 0) continue;
 
       this.currentHp -= amount;
@@ -715,7 +720,8 @@
    * @param {number} [level] 省略するといまのレベル
    */
   MonsterInstance.prototype.getGrowthProgress = function (statKey, level) {
-    level = level || this.level;
+    // fixedStatLevel … 敵のあいだだけ、そのレベルの能力値で固定する（ジュエル。EncounterSystem.createEnemyFrom）
+    level = level || this.fixedStatLevel || this.level;
     if (level <= 1) return 0;
 
     var stages = this._growthStages(statKey);
@@ -839,19 +845,24 @@
    * 式: floor( 基礎値 × (1 + 伸びた量) × 性格補正 × 効果倍率 ) + 個体値 + 効果加算
    *   伸びた量       … getGrowthProgress（段階が無ければ (Lv-1) × 成長率）
    *   効果倍率／効果加算 … 特性と装備（EffectSystem がまとめて集計する）
+   * fixedStatLevel があるあいだは、そのレベルの表の値に固定する（性格補正と個体値も入れない）
    */
   MonsterInstance.prototype._calcStat = function (baseKey, ivKey, natureKey) {
     if (!this._species) return 1;
+    var fixed = !!this.fixedStatLevel;
     var progress = this.getGrowthProgress(ivKey);
-    var nature = this.getNature();
+    var nature = fixed ? null : this.getNature();
     var natureMul = nature ? (nature[natureKey] || 1) : 1;
     var effectMul = this.getEffectStatMultiplier(ivKey);
 
     var base = this._species[baseKey] || 0;
-    var value = base * (1 + progress) * natureMul * effectMul;
+    // 固定のときは「表の値 × 倍率」を四捨五入（防御 200×5＝1000。HP 10×0.3〜0.5＝3〜5 で 5 も同じように出す）
+    var value = fixed
+      ? Math.round(Math.floor(base * (1 + progress)) * effectMul)
+      : base * (1 + progress) * natureMul * effectMul;
 
     // 加算はマイナスの装備でも0未満にならないようにする
-    var total = Math.floor(value) + (this.ivs[ivKey] || 0) + this.getEffectStatBonus(ivKey);
+    var total = Math.floor(value) + (fixed ? 0 : (this.ivs[ivKey] || 0)) + this.getEffectStatBonus(ivKey);
     return this._capStat(Math.max(1, total));
   };
 
@@ -899,6 +910,19 @@
 
   // --- PP 操作 ---
 
+  /**
+   * この個体がその技に払うPP。特性「カチカチ」は ×1.5（端数は切り上げ。PP1 の技は 2、PP3 の技は 5）。
+   * 戦闘（BattleSystem.ppCostOf）と探索中（Game.useFieldSkill）、仲間画面の表示が同じ値を見る。
+   * 小数の誤差で 10 × 1.3 が 14 にならないよう、切り上げる前に少しだけ引く
+   */
+  MonsterInstance.prototype.getSkillPpCost = function (skill) {
+    var cost = (skill && skill.pp) || 0;
+    if (cost <= 0) return 0;
+    var effects = this._getEffects();
+    var multiplier = (effects && effects.getPpCostMultiplier) ? effects.getPpCostMultiplier(this) : 1;
+    return (multiplier === 1) ? cost : Math.ceil(cost * multiplier - 1e-9);
+  };
+
   /** その消費量を払えるか */
   MonsterInstance.prototype.canPayPp = function (cost) {
     return this.currentPp >= (cost || 0);
@@ -926,6 +950,18 @@
     return this.currentHp <= 0 && !this._undying;
   };
 
+  /**
+   * 攻撃のほかのダメージ（毒・反動・罠）を、特性「カチカチ」のぶん減らす。最低1は受ける。
+   * 攻撃のダメージは BattleSystem.calcDamage の damageTaken で減るので、ここを通さない。
+   * 即死はダメージではないので減らない
+   */
+  MonsterInstance.prototype.reduceDirectDamage = function (amount) {
+    if (amount <= 0) return amount;
+    var effects = this._getEffects();
+    var multiplier = (effects && effects.getAllDamageMultiplier) ? effects.getAllDamageMultiplier(this) : 1;
+    return (multiplier === 1) ? amount : Math.max(1, Math.floor(amount * multiplier));
+  };
+
   MonsterInstance.prototype.takeDamage = function (amount) {
     this.currentHp = Math.max(0, this.currentHp - amount);
     return this.currentHp;
@@ -950,6 +986,7 @@
    * この個体を倒したときに相手が得る経験値。
    * レベルが高い相手ほど多くもらえる。
    *   floor( expReward × (1 + (Lv - 1) × expRewardPerLevel) )
+   * 種族に expFixed: true と書くと、レベルに関係なく expReward そのまま（ジュエル 3000）
    */
   MonsterInstance.prototype.getExpReward = function () {
     if (!this._species) return 0;
@@ -957,7 +994,7 @@
     // rewardMultiplier … 出る場所の表で決めた倍率（EncounterSystem。蔦這う回廊のカゲヅタ）
     var base = (this._species.expReward || 0) * (this.rewardMultiplier || 1);
     var perLevel = (this._data.growth || {}).expRewardPerLevel;
-    if (!perLevel) return Math.floor(base);
+    if (!perLevel || this._species.expFixed) return Math.floor(base);
 
     return Math.floor(base * (1 + (this.level - 1) * perLevel));
   };

@@ -71,6 +71,24 @@
     return (this.categories.skillKind || {})[skill.kind] || null;
   };
 
+  /** 画面に出す技の属性の名前。2つあれば「火・地」（skills.js の element2）。無属性でも "無"。分からなければ null */
+  GameData.prototype.getSkillElementName = function (skill) {
+    var first = skill ? this.elements[skill.element] : null;
+    if (!first) return null;
+    var second = skill.element2 ? this.elements[skill.element2] : null;
+    return second ? first.name + "・" + second.name : first.name;
+  };
+
+  /**
+   * 画面に出す技の威力。斬撃の威力は通常攻撃の倍率なので、1 は "1.0" と出す（1.25 などはそのまま）。
+   * ほかの種類の威力は足し算の値なので、そのまま（15 は "15"）。威力なしは "0"
+   */
+  GameData.prototype.formatSkillPower = function (skill) {
+    var power = (skill && skill.power) || 0;
+    if (skill && skill.kind === "slash" && power === Math.floor(power) && power > 0) return power.toFixed(1);
+    return String(power);
+  };
+
   /**
    * 技の決まり（evadable / canCritical など）を読む。
    * 技に書いてあればそれを、無ければ種類の rules を使う（ブレスはよけられない、など）。

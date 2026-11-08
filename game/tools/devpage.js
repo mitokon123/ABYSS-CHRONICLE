@@ -66,6 +66,7 @@
     ["monsters.*.attackEffect", "shapes"],
     // 技
     ["skills.*.effect", "shapes"],
+    ["skills.*.element2", "elements"],
     ["skills.*.casterEffect", "shapes"],
     ["skills.*.kind", "skillKind"],
     ["skills.*.hitSe", "se"],

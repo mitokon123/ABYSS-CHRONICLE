@@ -5730,4 +5730,350 @@
       ]
     }
   });
+
+  /**
+   * --- 千年樹の根底の在来種（v1.0.3。2026-11-04） ---
+   * ★ 見た目は私の下書き（作者が見て決める）。
+   * 種族ごとに基本の絵を1枚描き、腕や脚の動いた姿は、その部分だけを動かして作る（描き直さないので形が崩れない）。
+   */
+  /** 絵の一部の範囲（x0〜x1, y0〜y1）を dx, dy だけ動かした新しい絵を返す */
+  function rootsMove(rows, x0, y0, x1, y1, dx, dy) {
+    var grid = rows.map(function (row) { return row.split(""); });
+    var moved = [];
+    for (var y = y0; y <= y1; y++) {
+      for (var x = x0; x <= x1; x++) {
+        if (grid[y][x] === ".") continue;
+        moved.push({ x: x + dx, y: y + dy, c: grid[y][x] });
+        grid[y][x] = ".";
+      }
+    }
+    moved.forEach(function (p) {
+      if (grid[p.y] && grid[p.y][p.x] !== undefined) grid[p.y][p.x] = p.c;
+    });
+    return grid.map(function (row) { return row.join(""); });
+  }
+  /** 絵の上に文字列を重ねた新しい絵を返す。parts は [y, x, 文字列] の並び。"." は下の絵をそのまま残す */
+  function rootsPaint(rows, parts) {
+    var grid = rows.map(function (row) { return row.split(""); });
+    parts.forEach(function (part) {
+      for (var i = 0; i < part[2].length; i++) {
+        if (part[2].charAt(i) !== ".") grid[part[0]][part[1] + i] = part[2].charAt(i);
+      }
+    });
+    return grid.map(function (row) { return row.join(""); });
+  }
+  /** 範囲を消した新しい絵を返す */
+  function rootsErase(rows, x0, y0, x1, y1) {
+    return rows.map(function (row, y) {
+      if (y < y0 || y > y1) return row;
+      return row.substring(0, x0) + new Array(x1 - x0 + 2).join(".") + row.substring(x1 + 1);
+    });
+  }
+  /** 色を一部だけ変えた色の表を返す */
+  function rootsTint(palette, changes) {
+    var result = {};
+    for (var key in palette) result[key] = palette[key];
+    for (var change in changes) result[change] = changes[change];
+    return result;
+  }
+
+  // ウェポン：鉄と真鍮の機械。胸に炉、片目の光。左手に大剣、右手に大斧（作者の指定で武器を大きくした。48マス。2026-11-05）。
+  // 刃の欠けは図鑑の「不完全な箇所は多い」から。
+  var WEAPON_PALETTE = {
+    ".": null,
+    "K": "#14161e",   // 輪郭
+    "I": "#4a5262",   // 鉄
+    "i": "#7c8698",   // 鉄（光の当たるところ）
+    "J": "#2e3442",   // 鉄の影
+    "B": "#c49a3a",   // 真鍮
+    "b": "#8a6a24",   // 真鍮の影
+    "y": "#ecca6a",   // 真鍮の光
+    "h": "#5a3c1c",   // 柄
+    "E": "#ff8a2a",   // 炉と目の光
+    "e": "#ffd060",   // 炉と目の芯
+    "R": "#d2561c",   // 炉の奥
+    "W": "#eaf2fa",   // 刃（光る刃先）
+    "v": "#c6d2e0",   // 刃
+    "w": "#9aa8ba",   // 刃の影
+    "l": "#7a8898"    // 剣の溝
+  };
+  var WEAPON_GLOW = rootsTint(WEAPON_PALETTE, { "E": "#ffb04a", "e": "#fff0a0", "R": "#ff8a2a" });
+  var WEAPON_DARK = rootsTint(WEAPON_PALETTE, { "E": "#4a2a18", "e": "#5a3418", "R": "#3a2014" });
+  // 1行は 左腕と大剣（16マス）＋ 頭・胴・脚（16マス）＋ 右腕と大斧（16マス）
+  var WEAPON_ROWS = [
+    "................................................",
+    "................................................",
+    "................................................",
+    ".....K............................KKKKK.........",
+    "....KWK..........................KWWWvvKK.......",
+    "...KWvwK.........................KWWvvvwwKKKKKK.",
+    "..KWWlvwK.......................KWWvvwwwK.KybhK.",
+    ".KWWvlvwwK......................KWWvvwwIKKKybhK.",
+    ".KWWvlvwwK......................KWWvvwwIbBKybhK.",
+    ".KWWvlvwwK.......................KWvvwwIbbKybhK.",
+    ".KWWvlvwwK......................KWWvvwwKbbKybhK.",
+    "..KWvlvwwK........KKKKKKKKKKKK..KWWvvwwKbbKybhK.",
+    ".KWWvlvwwK.......KIiiiiiiiiiiIK.KWWvvwwIbbKybhK.",
+    ".KWWvlvwwK.......KIiJJJJJJJJiIK.KWWvvwwIbBKybhK.",
+    ".KWWvlvwwK.......KIiJEEEEEEJiIK.KWWvvwwIKKKybhK.",
+    ".KWWvlvwK........KIiJEEeeEEJiIK.KWWvvwwwK.KybhK.",
+    ".KWWvlvwwK.......KIiJEEEEEEJiIK..KWWvvvwwKKybhK.",
+    ".KWWvlvwwK.......KIiJJJJJJJJiIK..KWWWvvKK.KybhK.",
+    ".KWWvlvwwK.......KIIiiiiiiiiIIK...KKKKK...KybhK.",
+    "KKKKKKKKKKK......KKKKKKKKKKKKKK...........KybhK.",
+    "KyBBBBBBBbK.....KyyBBBBBBBBBBbbK..........KBBbK.",
+    "KKKKKKKKKKK.....KBbIIIIIIIIIIbBK..........KybhK.",
+    "...KbhbK........KBIKKKKKKKKKKIBK..........KybhK.",
+    "...KbhbK........KBIKREEEEEERKIBK..........KybhK.",
+    ".KKKKKKKKKKKKKKKKBIKEEeeeeEEKIBKKKKKKKKKKKKKKKK.",
+    ".KiiiiiiIbyiiiyBKBIKEeeeeeeEKIBKByiiiybIiiiiiiK.",
+    ".KIKIKIKIbBIIIBbKBIKEeeeeeeEKIBKbBIIIBbIKIKIKIK.",
+    ".KIIIIIIJbbJJJbbKBIKEEeeeeEEKIBKbbJJJbbJIIIIIIK.",
+    ".KKKKKKKKKKKKKKKKBIKREEEEEERKIBKKKKKKKKKKKKKKKK.",
+    "...KbBbK........KBIKKKKKKKKKKIBK..........KbBbK.",
+    "....KKK.........KBbIIIIIIIIIIbBK...........KKK..",
+    "................KyBBBBBBBBBBBBbK................",
+    ".................KKKKKKKKKKKKKK.................",
+    ".................KIIIK....KIIIK.................",
+    "................KIiiiK....KiiiIK................",
+    "................KIiiiK....KiiiIK................",
+    "................KIiiiK....KiiiIK................",
+    "................KyBBbK....KyBBbK................",
+    "................KBBbbK....KBBbbK................",
+    "................KIIJJK....KJJIIK................",
+    "................KIIJJK....KJJIIK................",
+    "...............KIIIIIK....KIIIIIK...............",
+    "...............KIiiIIK....KIIiiIK...............",
+    "..............KIIiiIIK....KIIiiIIK..............",
+    "..............KiiiiIIK....KIIiiiiK..............",
+    "..............KIIIIJJK....KJJIIIIK..............",
+    "..............KKKKKKKK....KKKKKKKK..............",
+    "................................................"
+  ];
+  function weaponArms(dyL, dyR) {
+    return rootsMove(rootsMove(WEAPON_ROWS, 0, 3, 15, 30, 0, dyL), 32, 3, 47, 30, 0, dyR);
+  }
+  var WEAPON_RAISE = weaponArms(-3, -3);
+  /**
+   * 武器を上下さかさまにして、手の下へ振り下ろした絵にする。
+   * 手より上の武器（y0〜y1）を sum - y の行へ移し、柄の端は手の上へ出す
+   */
+  function weaponSwing(x0, x1, y0, y1, sum, gripX, extra) {
+    var rows = rootsErase(rootsErase(WEAPON_ROWS, x0, 3, x1, 23), x0, 29, x1, 30);
+    var parts = [[22, gripX + 1, "KKK"], [23, gripX, "KbBbK"]];
+    for (var y = y0; y <= y1; y++) parts.push([sum - y, x0, WEAPON_ROWS[y].substring(x0, x1 + 1)]);
+    return rootsPaint(rows, parts.concat(extra || []));
+  }
+
+  // コハクカブト：背に大きな琥珀を負い、中に古い影が透ける。脚は6本
+  var BEETLE_PALETTE = {
+    ".": null,
+    "K": "#241206",   // 輪郭
+    "A": "#e8a030",   // 琥珀
+    "a": "#c47818",   // 琥珀の影
+    "D": "#7a4410",   // 琥珀のいちばん暗いところ
+    "H": "#ffd884",   // 琥珀の光
+    "W": "#fff4cc",   // 照り
+    "i": "#6a3a0c",   // 琥珀の中の影
+    "B": "#3e2410",   // 甲虫の体
+    "b": "#6a4420",   // 甲虫の体（光）
+    "L": "#2e1a08",   // 脚
+    "E": "#ffe060"    // 目
+  };
+  var BEETLE_GLOW = rootsTint(BEETLE_PALETTE, { "A": "#f0aa38", "i": "#c86a14" });
+  var BEETLE_ROWS = [
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "..............KKKK..............",
+    ".............KBbbK..............",
+    "..............KbK...............",
+    "...........KKKKbKKKKK...........",
+    ".........KKHHHAAAAAAaKK.........",
+    "........KHHWHAAAAAAAAaaK........",
+    ".......KHWHAAAAAAAAAAAaaK.......",
+    ".......KHHAAAiiAAAiiAAAaaK......",
+    "......KHHAAAAiiiiiiiAAAAaaK.....",
+    "......KHAAAAAAiiiiiAAAAAAaK.....",
+    "..KK..KAAAAAAAAiiiAAAAAAAaK..KK.",
+    "...KLKKaAAAAAAAAAAAAAAAAaaKKLK..",
+    "....KLKKDaaaaaaaaaaaaaaaDKKLK...",
+    ".....KLKKKKKKKKKKKKKKKKKKLK.....",
+    "......KBbEEbbbbbbbbbbEEbBK......",
+    "....KLKKBbbbbbbbbbbbbbbbbBKKLK..",
+    "...KLK...KKBBBBBBBBBBKK...KLK...",
+    "..KLK.....KKKKKKKKKKKK.....KLK..",
+    "..KK........................KK..",
+    "................................",
+    "................................"
+  ];
+  function beetleLegs(dyL, dyR) {
+    return rootsMove(rootsMove(BEETLE_ROWS, 0, 21, 5, 29, 0, dyL), 27, 21, 31, 29, 0, dyR);
+  }
+
+  // 樹液のスライム：琥珀色の樹液が固まったもの。頭のしずくと、下へ垂れる樹液
+  var SAP_PALETTE = {
+    ".": null,
+    "K": "#4a2408",   // 輪郭
+    "S": "#e8a838",   // 樹液
+    "s": "#c87e1a",   // 樹液の影
+    "D": "#8a4c10",   // 樹液のいちばん暗いところ
+    "H": "#ffdc88",   // 光
+    "W": "#fff6d0",   // 照り
+    "E": "#2a1406",   // 目
+    "M": "#6a2c08"    // 口
+  };
+  var SAP_ROWS = [
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "...............KK...............",
+    "..............KHSK..............",
+    "..............KHSK..............",
+    ".............KHSSSK.............",
+    "...........KKKHSSSSKKK..........",
+    ".........KKHWHSSSSSSSsKK........",
+    "........KHWHSSSSSSSSSSSsK.......",
+    ".......KHHSSSSSSSSSSSSSSssK.....",
+    ".......KHSSSEESSSSSEESSSSsK.....",
+    "......KHSSSSEESSSSSEESSSSssK....",
+    "......KSSSSSSSSMMMSSSSSSSssK....",
+    ".....KSSSSSSSSSSSSSSSSSSSSssK...",
+    ".....KsSSSSSSSSSSSSSSSSSSSsDK...",
+    "....KKsSSsDSSSSsDSSSSsDSSssDKK..",
+    "....KDDsDDKKsDDKKKsDDKKDDsDDK...",
+    ".....KKKK..KKK....KKK..KKKK.....",
+    "...........K........K...........",
+    "................................",
+    "................................"
+  ];
+
+  // ジュエル：宝石の体に棲む小さな魔族。小さな角と手。人を見ると逃げる
+  var JEWEL_PALETTE = {
+    ".": null,
+    "K": "#141030",   // 輪郭
+    "Q": "#3a2a5a",   // 角
+    "q": "#5a4480",   // 手
+    "G": "#7fe8e0",   // 宝石
+    "g": "#2fb0c8",   // 宝石の影
+    "D": "#1c6a8a",   // 宝石のいちばん暗いところ
+    "W": "#f2ffff",   // きらめき
+    "E": "#ff3a6a",   // 目
+    "e": "#7a1030"    // 目の奥
+  };
+  var JEWEL_ROWS = [
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "...........KQK......KQK.........",
+    "...........KQQK....KQQK.........",
+    "............KQKKKKKKQK..........",
+    "...........KWWGGGGGGgK..........",
+    "..........KWWGGGGGGGggK.........",
+    ".........KWWGGGGGGGGGggK........",
+    "........KWGGGGGGGGGGGGggK.......",
+    ".......KWGGGEEGGGGEEGGGggK......",
+    "......KWGGGGEeGGGGEeGGGGggK.....",
+    ".....KWGGGGGGGGGGGGGGGGGGggK....",
+    ".....KDDDDDDDDDDDDDDDDDDDDDK....",
+    "...KqqKgGGGGGGGGGGGGGGGGgDKqqK..",
+    "....KqK.KgGGGGGGGGGGGGGGgDK.KqK.",
+    ".........KgGGGGGGGGGGGGgDK......",
+    "..........KgGGGGGGGGGGgDK.......",
+    "...........KgGGGGGGGGgDK........",
+    "............KgGGGGGGgDK.........",
+    ".............KgGGGGgDK..........",
+    "..............KgGGgDK...........",
+    "...............KgDK.............",
+    "................KK..............",
+    "................................",
+    "................................",
+    "................................",
+    "................................"
+  ];
+  function jewelArms(dyL, dyR) {
+    var left = rootsMove(rootsMove(JEWEL_ROWS, 0, 18, 5, 19, 0, dyL), 6, 19, 6, 19, 0, dyL);
+    return rootsMove(left, 27, 18, 31, 19, 0, dyR);
+  }
+
+  NS.extend("sprites", {
+    weaponBot:      { palette: WEAPON_PALETTE, pixels: WEAPON_ROWS },
+    weaponBotGlow:  { palette: WEAPON_GLOW,    pixels: WEAPON_ROWS },
+    weaponBotArmL:  { palette: WEAPON_PALETTE, pixels: weaponArms(2, 0) },
+    weaponBotArmR:  { palette: WEAPON_PALETTE, pixels: weaponArms(0, 2) },
+    weaponBotRaise: { palette: WEAPON_PALETTE, pixels: WEAPON_RAISE },
+    weaponBotCharge:{ palette: WEAPON_GLOW,    pixels: WEAPON_RAISE },
+    // 左の大剣を振り下ろす
+    weaponBotSwingL: { palette: WEAPON_GLOW, pixels: weaponSwing(0, 15, 3, 21, 50, 3) },
+    // 右の大斧を振り下ろす
+    weaponBotSwingR: { palette: WEAPON_GLOW, pixels: weaponSwing(32, 47, 3, 18, 49, 42, [
+      [29, 42, "KybhK"], [30, 42, "KybhK"]
+    ]) },
+    weaponBotStepL: { palette: WEAPON_PALETTE, pixels: rootsMove(WEAPON_ROWS, 14, 33, 21, 46, 0, -3) },
+    weaponBotStepR: { palette: WEAPON_PALETTE, pixels: rootsMove(WEAPON_ROWS, 26, 33, 33, 46, 0, -3) },
+    // 被弾：目が割れ、腕が下がる
+    weaponBotHit:   { palette: WEAPON_PALETTE, pixels: rootsPaint(weaponArms(3, 3), [
+      [14, 21, "EKEEKE"], [15, 21, "EEKKEE"], [16, 21, "EKEEKE"]
+    ]) },
+    // 眠り：光が消え、腕が下がったまま
+    weaponBotSleep: { palette: WEAPON_DARK,    pixels: weaponArms(3, 3) },
+
+    amberBeetle:     { palette: BEETLE_PALETTE, pixels: BEETLE_ROWS },
+    amberBeetleGlow: { palette: BEETLE_GLOW,    pixels: BEETLE_ROWS },
+    amberBeetleLegL: { palette: BEETLE_PALETTE, pixels: beetleLegs(-1, 0) },
+    amberBeetleLegR: { palette: BEETLE_PALETTE, pixels: beetleLegs(0, -1) },
+    // 脚を上げて構える
+    amberBeetleRear: { palette: BEETLE_GLOW,    pixels: beetleLegs(-2, -2) },
+    amberBeetleHit:  { palette: BEETLE_PALETTE, pixels: rootsPaint(beetleLegs(-1, -1), [[25, 9, "KK"], [25, 21, "KK"]]) },
+    amberBeetleSleep:{ palette: BEETLE_PALETTE, pixels: rootsPaint(BEETLE_ROWS, [[25, 9, "KK"], [25, 21, "KK"]]) },
+
+    sapSlime:      { palette: SAP_PALETTE, pixels: SAP_ROWS },
+    // 垂れた樹液が伸びる（左・右）
+    sapSlimeDripA: { palette: SAP_PALETTE, pixels: rootsPaint(SAP_ROWS, [[30, 11, "K"]]) },
+    sapSlimeDripB: { palette: SAP_PALETTE, pixels: rootsPaint(SAP_ROWS, [[30, 20, "K"]]) },
+    // 体から腕のように樹液を伸ばす（技）
+    sapSlimeUp: { palette: SAP_PALETTE, pixels: rootsPaint(SAP_ROWS, [
+      [17, 6, "KHK"], [18, 5, "KHSK"], [19, 6, "KSKK"],
+      [17, 24, "KSK"], [18, 24, "KSsK"], [19, 23, "KKsK"]
+    ]) },
+    // 体を左右へ広げる（攻撃）
+    sapSlimeWide: { palette: SAP_PALETTE, pixels: rootsPaint(SAP_ROWS, [
+      [21, 2, "KKKKK"], [22, 2, "KHSSK"], [23, 2, "KKKKK"],
+      [21, 27, "KKKK"], [22, 27, "KSsK"], [23, 27, "KKKK"]
+    ]) },
+    sapSlimeHit:   { palette: SAP_PALETTE, pixels: rootsPaint(SAP_ROWS, [[21, 12, "KS"], [21, 19, "SK"], [22, 12, "SK"], [22, 19, "KS"]]) },
+    sapSlimeSleep: { palette: SAP_PALETTE, pixels: rootsPaint(SAP_ROWS, [[21, 12, "SS"], [21, 19, "SS"], [22, 12, "KK"], [22, 19, "KK"]]) },
+
+    jewelOre:      { palette: JEWEL_PALETTE, pixels: JEWEL_ROWS },
+    // きらめきの位置が変わる
+    jewelOreShine: { palette: rootsTint(JEWEL_PALETTE, { "G": "#a0f4ec" }),
+                     pixels: rootsPaint(JEWEL_ROWS, [[12, 18, "W"], [16, 11, "WW"], [21, 14, "W"]]) },
+    jewelOreArmL:  { palette: JEWEL_PALETTE, pixels: jewelArms(-1, 0) },
+    jewelOreArmR:  { palette: JEWEL_PALETTE, pixels: jewelArms(0, -1) },
+    jewelOreUp:    { palette: JEWEL_PALETTE, pixels: jewelArms(-3, -3) },
+    jewelOreHit:   { palette: JEWEL_PALETTE, pixels: rootsPaint(jewelArms(1, 1), [[14, 12, "KG"], [14, 18, "GK"], [15, 12, "GK"], [15, 18, "KG"]]) },
+    jewelOreSleep: { palette: JEWEL_PALETTE, pixels: rootsPaint(jewelArms(1, 1), [[14, 12, "GG"], [14, 18, "GG"], [15, 12, "KK"], [15, 18, "KK"]]) }
+  });
 })(window.MyGame);

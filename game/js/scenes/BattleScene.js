@@ -112,6 +112,7 @@
 
     // 仲間になったが、パーティがいっぱいで行き先が決まっていない個体
     this.pendingScout = null;
+    this._fled = [];          // 逃げた敵（見せ終わったら画面から消す）
     this._scoutError = null;  // 行き先へ入れられなかった理由
 
     // 何ターン目か（_resolveTurn で数える）。誘いの香が「次のターンから」効くのに使う
@@ -925,6 +926,12 @@
       case "fleeFailed":
         this.game.audio.playSe("flee");
         break;
+      // 敵が逃げた。動きを流し終えたら、枠ごと画面から消える（_hasFled）
+      case "enemyFled":
+        this.game.audio.playSe("flee");
+        if (this._fled.indexOf(event.target) < 0) this._fled.push(event.target);
+        this._startMotion(event.target, "flee", 1);
+        break;
       default:
         // 画面側が組み立てた出来事に音がついていれば、見せた瞬間に鳴らす
         if (event.se) this.game.audio.playSe(event.se);
@@ -1249,6 +1256,12 @@
    *   HPが0になっても残す → 倒れる動きを流す → 流し終えたら消す
    * の順にする。動きを持っていない相手は、今までどおりその場で消える。
    */
+  /** 逃げた敵が、逃げる動きを流し終えたか */
+  BattleScene.prototype._hasFled = function (monster) {
+    if (this._fled.indexOf(monster) < 0) return false;
+    return !this.actionMotions.isPlaying(monster, this.game.clock);
+  };
+
   BattleScene.prototype._shouldShowSprite = function (monster, shownHp, action) {
     if (action) return true;        // 何か動いている最中
     if (shownHp > 0) return true;   // まだ立っている
@@ -1460,6 +1473,9 @@
       return;
     }
     if (event.healAmount && event.revealTarget) {
+      // 起き上がった者（神鳥の羽・リザレクト）は、また倒れたときに倒れる動きを流せるように覚え直す
+      var fallenAt = this._faintPlayed.indexOf(event.revealTarget);
+      if (fallenAt >= 0) this._faintPlayed.splice(fallenAt, 1);
       this._startMotion(event.revealTarget, "heal", 1);
     }
     // 状態異常を治す技（クレンズ）で治った仲間も、回復と同じ動きをする
@@ -1525,7 +1541,8 @@
     // 治した出来事は、いまの技で治したときだけ（特性「脱皮」で治ったときに、前の技の演出を出さない）
     if (event.type === "cure" && event.skillId !== this._currentSkill.id) return;
     // 回復の技（キュア・やくそう）は、回復した仲間ごとに演出を出す。道具の回復（skillId が無い）では出さない（v1.0.3）
-    var healed = (event.type === "heal" && event.skillId === this._currentSkill.id);
+    // 起こす技（リザレクト）は、起きたときだけ出す
+    var healed = ((event.type === "heal" || event.type === "revive") && event.skillId === this._currentSkill.id);
     var statusOnly = isStatusResultEvent(event.type) && !NS.BattleSystem.dealsDamage(this._currentSkill);
     if ((!isHitEvent(event.type) && !statusOnly && !healed) || !event.target) return;
     // 威力も持つ弱体の技（ロックスパイク）は、当たった時点でもう演出を出している。弱体で2回目は出さない
@@ -1565,7 +1582,7 @@
     var pos = this._monsterCenter(actor);
     if (!pos) return;
     // 回復の共鳴（キュア）は無属性なので、属性の色だと灰色になる。HPの色（緑）にする
-    var color = skill.heal
+    var color = (skill.heal || skill.revive)
       ? (((this.game.data.effects || {}).statColors || {}).hp || null)
       : this._skillEffectColor(skill, kind.casterEffect);
     this.skillEffects.play(kind.casterEffect, this.game.clock, pos.x, pos.y, color, 1);
@@ -2231,6 +2248,12 @@
       return;
     }
 
+    // 起こす技（リザレクト）は、場に倒れた仲間がいないと選べない
+    if (skill && skill.revive && !this.system.getFieldSlots().some(function (m) { return m.isFainted() && !m._undying; })) {
+      this._flashMessage(this.texts.noReviveTarget);
+      return;
+    }
+
     // 自分にかける技と範囲全体の技（相手全体・味方全体）は相手を選ばない。そのまま確定する
     if (skill && (skill.target === "self" || skill.target === "allEnemies" || skill.target === "allAllies")) {
       this._commitAction({ type: "skill", skillId: selected.value });
@@ -2371,7 +2394,15 @@
     if (this.pending && this.pending.type === "item" && this.itemUsage.isRevive(this.pending.itemId)) {
       return monster.isFainted() && !monster._undying;
     }
+    // 倒れた仲間を起こす技（リザレクト）も同じ
+    if (this._pendingRevivesSkill()) return monster.isFainted() && !monster._undying;
     return !monster.isFainted();
+  };
+
+  /** いま決めている行動が、倒れた仲間を起こす技か */
+  BattleScene.prototype._pendingRevivesSkill = function () {
+    if (!this.pending || this.pending.type !== "skill") return false;
+    return !!(this.game.data.getSkill(this.pending.skillId) || {}).revive;
   };
 
   /** 狙える相手まで、向き（+1 / -1）へ進めた番号。ぐるっと回っても無ければそのまま */
@@ -3115,6 +3146,9 @@
   BattleScene.prototype._renderMember = function (monster, centerX, row, side, index) {
     var t = this.theme;
 
+    // 逃げ終わった敵は、絵も枠も出さない
+    if (this._hasFled(monster)) return;
+
     // 種族ごとの大きさ（data/monsters.js の sizeScale）。竜のような相手は大きく出る
     var base = row.spriteSize;
     var size = Math.round(base * (monster.getSizeScale ? monster.getSizeScale() : 1));
@@ -3148,6 +3182,11 @@
       this.panel.drawText("Lv" + monster.level,
         rect.x + rect.w - (t.padding || 8), origin.y + 10,
         { align: "right", font: t.smallFont, color: t.subTextColor });
+    } else if (this._isCaughtSpecies(monster)) {
+      // 仲間にしたことのある種族の敵には、空いている右上に印を出す（図鑑の「仲間」と同じ。v1.0.3）
+      var markSize = ((this.game.data.ui || {}).icons || {}).size || 14;
+      NS.StatusMarks.drawIcon(this.spriteRenderer, "iconCaught",
+        rect.x + rect.w - (t.padding || 8) - markSize, origin.y + 10, markSize);
     }
 
     var barW = rect.w - (t.padding || 8) * 2;
@@ -3170,6 +3209,12 @@
     }
 
     this._renderMemberMarkers(monster, rect, side, index);
+  };
+
+  /** その敵の種族を、これまでに仲間にしたことがあるか（図鑑の「仲間」） */
+  BattleScene.prototype._isCaughtSpecies = function (monster) {
+    var discovery = this.game.discovery;
+    return !!(discovery && monster && discovery.isMonsterCaught(monster.speciesId));
   };
 
   /**
@@ -3606,15 +3651,15 @@
     var element = (this.game.data.elements || {})[skill.element];
     this.panel.drawText(skill.name, origin.x, y);
     if (element) {
-      this.panel.drawText("[" + element.name + "]",
+      this.panel.drawText("[" + this.game.data.getSkillElementName(skill) + "]",
         origin.x + (info.elementOffsetX || 110), y,
         { font: t.smallFont, color: element.color });
     }
-    // 技の種類（共鳴・ブレスなど。data/categories.js の skillKind）
+    // 技の種類（共鳴・ブレスなど。data/categories.js の skillKind）。属性が2つの技は、そのぶん右へ
     var kind = this.game.data.getSkillKind(skill);
     if (kind) {
       this.panel.drawText("[" + kind.name + "]",
-        origin.x + (info.kindOffsetX || 150), y,
+        origin.x + (info.kindOffsetX || 150) + (skill.element2 ? 24 : 0), y,
         { font: t.smallFont, color: kind.color });
     }
     y += lh;
@@ -3628,9 +3673,10 @@
       : (this.texts.skillStatsNoPower || this.texts.skillStats);
     this.panel.drawText(
       fill(statsTemplate, {
-        power: skill.power || 0,
+        power: this.game.data.formatSkillPower(skill),
         accuracy: Math.round(accuracy * 100),
-        pp: skill.pp || 0
+        // 一覧の右と同じ、その者が払うPP（特性「カチカチ」は ×1.5）
+        pp: this._currentActor() ? this.system.ppCostOf(this._currentActor(), skill) : (skill.pp || 0)
       }),
       origin.x, y, { font: t.smallFont, color: t.subTextColor });
     y += lh + 4;

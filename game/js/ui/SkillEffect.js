@@ -1120,6 +1120,380 @@
     },
 
     /**
+     * 火炎斬り：三日月の太刀筋が右上から左下へ走る。走った跡から炎の舌が立ち昇り、火の粉が舞う
+     */
+    flameSlash: function (ctx, d, t, p) {
+      var radius = d.radius || 92;
+      var width = d.width || 22;
+      // 円弧の中心は当たる位置の右下。弧の真ん中が相手に重なる
+      var cx = p.x + radius * 0.7, cy = p.y + radius * 0.7;
+      var from = turns(0.77 + (p.phase - 0.5) * 0.03), to = turns(0.48 + (p.phase - 0.5) * 0.03);
+      var i;
+
+      // 1. 炎の舌。太刀筋が通ったところから順に立つ
+      var flames = d.flames || 9;
+      for (i = 0; i < flames; i++) {
+        var fr = (flames > 1) ? i / (flames - 1) : 0.5;
+        var fs = span(t, 0.08 + fr * 0.2, 0.62);
+        if (fs <= 0 || fs >= 1) continue;
+        var fa = from + (to - from) * fr;
+        var bx = cx + Math.cos(fa) * radius, by = cy + Math.sin(fa) * radius;
+        var h = (d.flameHeight || 48) * (0.6 + wobble(i + 3) * 0.6) * easeOut(Math.min(1, fs * 1.6));
+        var w = (11 + wobble(i + 11) * 9) * (1 - fs * 0.55);
+        var sway = Math.sin(fs * 7 + i * 1.7) * 7 * fs;
+        var lift = 14 * easeIn(fs);
+        setAlpha(ctx, fadeOut(fs));
+        // 外の炎と、内の明るいところ
+        for (var l = 0; l < 2; l++) {
+          var scale = (l === 0) ? 1 : 0.5;
+          ctx.fillStyle = (l === 0) ? p.color : p.coreColor;
+          ctx.beginPath();
+          ctx.moveTo(bx - w * scale, by - lift);
+          ctx.quadraticCurveTo(bx - w * scale * 0.7, by - lift - h * scale * 0.55, bx + sway, by - lift - h * scale);
+          ctx.quadraticCurveTo(bx + w * scale * 0.7, by - lift - h * scale * 0.55, bx + w * scale, by - lift);
+          ctx.quadraticCurveTo(bx, by - lift + w * scale * 0.7, bx - w * scale, by - lift);
+          ctx.fill();
+        }
+      }
+
+      // 2. 太刀筋
+      var ss = span(t, 0, 0.48);
+      if (ss > 0 && ss < 1) {
+        var head = easeOut(Math.min(1, ss * 1.7));
+        var tail = easeIn(ss);
+        crescent(ctx, cx, cy, radius, from + (to - from) * tail, from + (to - from) * head,
+                 width * (1 - ss * 0.35), fadeOut(ss), p.color);
+        crescent(ctx, cx, cy, radius, from + (to - from) * tail, from + (to - from) * head,
+                 width * 0.42 * (1 - ss * 0.35), fadeOut(ss), p.coreColor);
+      }
+
+      // 3. 火の粉
+      var embers = d.embers || 12;
+      ctx.fillStyle = p.color;
+      for (i = 0; i < embers; i++) {
+        var es = span(t, 0.2 + wobble(i + 5) * 0.25, 0.55);
+        if (es <= 0 || es >= 1) continue;
+        var ea = from + (to - from) * wobble(i + 17);
+        var size = sizeOf(d, i) * (1 - es * 0.5);
+        setAlpha(ctx, fadeOut(es));
+        ctx.fillRect(cx + Math.cos(ea) * radius + (wobble(i + 23) - 0.5) * 40 * es - size / 2,
+                     cy + Math.sin(ea) * radius - 86 * easeOut(es) * (0.5 + wobble(i + 29) * 0.5) - size / 2,
+                     size, size);
+      }
+    },
+
+    /**
+     * 流水斬り：水の帯がS字に流れて斬る。薄い帯が2本、少し遅れて同じ道を追いかける。しぶきは飛んでから落ちる
+     */
+    flowSlash: function (ctx, d, t, p) {
+      var length = d.length || 184;
+      var amplitude = d.amplitude || 30;
+      var width = d.width || 16;
+      var angle = turns(0.12 + (p.phase - 0.5) * 0.03);
+      var dx = Math.cos(angle), dy = Math.sin(angle);
+      var nx = -dy, ny = dx;
+      var i, s;
+
+      // 帯の上の点。r は 0〜1（左上から右下へ）
+      function at(r, shift) {
+        var along = (r - 0.5) * length;
+        var side = Math.sin(r * Math.PI * 2) * amplitude + shift;
+        return { x: p.x + dx * along + nx * side, y: p.y + dy * along + ny * side };
+      }
+
+      var bands = [
+        { lag: 0.2,  shift: 18,  scale: 0.45, alpha: 0.55, color: p.color },
+        { lag: 0.12, shift: -16, scale: 0.55, alpha: 0.7,  color: p.color },
+        { lag: 0,    shift: 0,   scale: 1,    alpha: 1,    color: p.color },
+        { lag: 0,    shift: 0,   scale: 0.34, alpha: 1,    color: p.coreColor }
+      ];
+      var segs = 22;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      for (var b = 0; b < bands.length; b++) {
+        var band = bands[b];
+        var ss = span(t, band.lag, 0.56);
+        if (ss <= 0 || ss >= 1) continue;
+        var head = easeOut(Math.min(1, ss * 1.5));
+        var tail = easeIn(ss);
+        setAlpha(ctx, fadeOut(ss) * band.alpha);
+        ctx.strokeStyle = band.color;
+        // 太さが真ん中でふくらむように、短い線を太さを変えながらつなぐ
+        for (s = 0; s < segs; s++) {
+          var r0 = tail + (head - tail) * s / segs;
+          var r1 = tail + (head - tail) * (s + 1) / segs;
+          if (r1 <= r0) continue;
+          var a = at(r0, band.shift), c = at(r1, band.shift);
+          ctx.lineWidth = Math.max(1, width * band.scale * Math.sin(Math.PI * (s + 0.5) / segs) * (1 - ss * 0.3));
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(c.x, c.y);
+          ctx.stroke();
+        }
+      }
+      ctx.lineCap = "butt";
+      ctx.lineJoin = "miter";
+
+      // しぶき。帯の途中から外へ飛んで、落ちる。丸い雫
+      var drops = d.drops || 16;
+      for (i = 0; i < drops; i++) {
+        var ds = span(t, 0.12 + wobble(i + 7) * 0.26, 0.6);
+        if (ds <= 0 || ds >= 1) continue;
+        var start = at(0.15 + wobble(i + 13) * 0.7, 0);
+        var out = (wobble(i + 19) < 0.5 ? -1 : 1) * (22 + wobble(i + 25) * 52) * easeOut(ds);
+        var size = sizeOf(d, i) * (1 - ds * 0.35);
+        setAlpha(ctx, fadeOut(ds));
+        ctx.fillStyle = (i % 3 === 0) ? p.coreColor : p.color;
+        ctx.beginPath();
+        ctx.arc(start.x + nx * out, start.y + ny * out - 18 * Math.sin(ds * Math.PI) + (d.gravity || 110) * ds * ds,
+                size / 2 + 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    },
+
+    /**
+     * 疾風斬り：細く鋭い筋が速く3本走る（向きを変えて右、左、右）。切り口から風の線が横へ流れる
+     */
+    galeSlash: function (ctx, d, t, p) {
+      var length = d.length || 190;
+      var width = d.width || 7;
+      var strikes = [
+        { at: 0,    tilt: 0.09,  shift: -12 },
+        { at: 0.13, tilt: 0.41,  shift: 8 },
+        { at: 0.26, tilt: 0.03,  shift: 2 }
+      ];
+      var i;
+
+      // 風の線。少し曲がりながら左から右へ抜ける
+      var gusts = d.gusts || 9;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = p.color;
+      for (i = 0; i < gusts; i++) {
+        var gs = span(t, 0.08 + wobble(i + 2) * 0.32, 0.5);
+        if (gs <= 0 || gs >= 1) continue;
+        var y = p.y + (wobble(i + 41) - 0.5) * 118;
+        var span0 = 118 + wobble(i + 43) * 60;
+        var head = -span0 + span0 * 2 * easeOut(gs);
+        var tail = -span0 + span0 * 2 * easeIn(gs);
+        setAlpha(ctx, fadeOut(gs) * 0.75);
+        ctx.lineWidth = 1.5 + wobble(i + 47) * 2;
+        ctx.beginPath();
+        ctx.moveTo(p.x + tail, y);
+        ctx.quadraticCurveTo(p.x + (head + tail) / 2, y - 14 * (i % 2 === 0 ? 1 : -1), p.x + head, y);
+        ctx.stroke();
+      }
+
+      // 鋭い筋。両端がとがった形で、一瞬で伸びて消える
+      for (i = 0; i < strikes.length; i++) {
+        var strike = strikes[i];
+        var ss = span(t, strike.at, 0.34);
+        if (ss <= 0 || ss >= 1) continue;
+        var a = turns(strike.tilt + (p.phase - 0.5) * 0.03);
+        var dx = Math.cos(a), dy = Math.sin(a);
+        var cx = p.x - dy * strike.shift, cy = p.y + dx * strike.shift;
+        var front = (easeOut(Math.min(1, ss * 2)) - 0.5) * length;
+        var back = (easeIn(ss) - 0.5) * length;
+        var layers = [[p.color, width], [p.coreColor, width * 0.4]];
+        setAlpha(ctx, fadeOut(ss));
+        for (var l = 0; l < layers.length; l++) {
+          var half = layers[l][1] / 2 * (1 - ss * 0.4);
+          var mid = (front + back) / 2;
+          ctx.fillStyle = layers[l][0];
+          ctx.beginPath();
+          ctx.moveTo(cx + dx * back, cy + dy * back);
+          ctx.lineTo(cx + dx * mid - dy * half, cy + dy * mid + dx * half);
+          ctx.lineTo(cx + dx * front, cy + dy * front);
+          ctx.lineTo(cx + dx * mid + dy * half, cy + dy * mid - dx * half);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+      ctx.lineCap = "butt";
+    },
+
+    /**
+     * 岩砕斬り：太い一撃が真上から落ちる。当たると ひびが走り、角ばった岩のかけらが飛んで落ちる
+     */
+    rockSlash: function (ctx, d, t, p) {
+      var length = d.length || 170;
+      var width = d.width || 30;
+      var hitAt = 0.2;
+      var i;
+      var lean = (p.phase - 0.5) * 0.12;
+      var topX = p.x + 18 + lean * length, topY = p.y - length * 0.68;
+      var endX = p.x - 8 - lean * length, endY = p.y + length * 0.3;
+
+      // 1. 一撃。上から伸びて、当たったあとは細くなって消える
+      var ss = span(t, 0, 0.42);
+      if (ss > 0 && ss < 1) {
+        var grow = easeIn(Math.min(1, ss / (hitAt / 0.42)));
+        var fade = (ss < 0.5) ? 1 : (1 - ss) / 0.5;
+        var layers = [[p.color, width], [p.coreColor, width * 0.36]];
+        setAlpha(ctx, fade);
+        for (var l = 0; l < layers.length; l++) {
+          // 上がとがり、下の方がいちばん太い刃の形
+          var half = layers[l][1] / 2 * (1 - ss * 0.55);
+          var ex = topX + (endX - topX) * grow, ey = topY + (endY - topY) * grow;
+          var wideX = topX + (ex - topX) * 0.74, wideY = topY + (ey - topY) * 0.74;
+          ctx.fillStyle = layers[l][0];
+          ctx.beginPath();
+          ctx.moveTo(topX, topY);
+          ctx.lineTo(wideX + half, wideY);
+          ctx.lineTo(ex, ey);
+          ctx.lineTo(wideX - half, wideY);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      // 2. 当たった瞬間の光と、地を打つ輪
+      var hs = span(t, hitAt, 0.5);
+      if (hs > 0 && hs < 1) {
+        setAlpha(ctx, Math.max(0, 1 - hs * 2.5));
+        ctx.fillStyle = p.coreColor;
+        ctx.beginPath();
+        ctx.arc(endX, endY - 8, 26 * (1 - hs * 0.6), 0, Math.PI * 2);
+        ctx.fill();
+
+        setAlpha(ctx, fadeOut(hs) * 0.8);
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = Math.max(1, 7 * (1 - hs));
+        ctx.beginPath();
+        ctx.ellipse(endX, endY, 96 * easeOut(hs), 26 * easeOut(hs), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 3. ひび。当たったところから折れ線で伸びる
+      var cs = span(t, hitAt, 0.7);
+      if (cs > 0 && cs < 1) {
+        var cracks = d.cracks || 6;
+        ctx.strokeStyle = p.color;
+        ctx.lineJoin = "round";
+        ctx.lineWidth = 4;
+        setAlpha(ctx, (cs > 0.6) ? (1 - cs) / 0.4 : 1);
+        for (i = 0; i < cracks; i++) {
+          var ang = turns(i / cracks + 0.04 + p.phase * 0.1);
+          var len = (d.crackLength || 62) * (0.55 + wobble(i + 9) * 0.45) * easeOut(Math.min(1, cs * 3));
+          var bend = (wobble(i + 15) - 0.5) * 0.9;
+          ctx.beginPath();
+          ctx.moveTo(endX, endY - 10);
+          ctx.lineTo(endX + Math.cos(ang) * len * 0.5, endY - 10 + Math.sin(ang) * len * 0.5);
+          ctx.lineTo(endX + Math.cos(ang + bend) * len, endY - 10 + Math.sin(ang + bend) * len);
+          ctx.stroke();
+        }
+        ctx.lineJoin = "miter";
+      }
+
+      // 4. 岩のかけら。角ばった四角が回りながら飛び、落ちる
+      var rocks = d.rocks || 12;
+      for (i = 0; i < rocks; i++) {
+        var rs = span(t, hitAt + wobble(i + 31) * 0.06, 0.74);
+        if (rs <= 0 || rs >= 1) continue;
+        var ra = turns(0.5 + (i + 0.5) / rocks * 0.5);   // 上半分へ扇形に飛ぶ
+        var speed = 72 + wobble(i + 37) * 76;
+        var rx = endX + Math.cos(ra) * speed * easeOut(rs);
+        var ry = endY - 8 + Math.sin(ra) * speed * easeOut(rs) + (d.gravity || 170) * rs * rs;
+        var size = sizeOf(d, i);
+        setAlpha(ctx, (rs > 0.75) ? (1 - rs) / 0.25 : 1);
+        ctx.save();
+        ctx.translate(rx, ry);
+        ctx.rotate(rs * 5 * (i % 2 === 0 ? 1 : -1) + i);
+        ctx.fillStyle = (i % 4 === 0) ? p.coreColor : p.color;
+        ctx.fillRect(-size / 2, -size / 2, size, size * 0.8);
+        ctx.restore();
+      }
+    },
+
+    /**
+     * 烈火崩地斬（火と地の混合）：相手ひとりずつに、次の順で出す。並び全体に1回だけ出す型で、相手の位置は p.points。
+     *   1. 一閃 … 炎の太い筋が右上から左下へ斬り下ろす
+     *   2. 地割れ … 足元からジグザグのひびが左右へ走る（地の色）
+     *   3. 噴き上げ … ひびから岩のかけら（地の色）と火の粉（火の色）が昇る。岩は落ちてくる
+     */
+    blazingRift: function (ctx, d, t, p) {
+      var points = pointsOf(p);
+      var stagger = (d.stagger === undefined) ? 0.07 : d.stagger;
+      var earth = d.earthColor || p.color;
+      var length = d.length || 190;
+      var thick = d.thickness || 14;
+      var angle = turns(d.tilt || 0.17);
+      var dx = Math.cos(angle), dy = Math.sin(angle);
+      var width = d.crackWidth || 120;
+      var rise = d.rise || 96;
+      var i, k;
+
+      ctx.lineCap = "round";
+      for (k = 0; k < points.length; k++) {
+        var tx = points[k].x, ty = points[k].y;
+        var groundY = ty + (d.groundY || 48);
+        var lag = k * stagger;
+
+        // 1. 一閃（先端が先に走り、尾があとから追いつく）
+        var ss = span(t, lag, 0.34);
+        if (ss > 0 && ss < 1) {
+          var head = length * easeOut(Math.min(1, ss * 1.7)) - length / 2;
+          var tail = length * easeIn(ss) - length / 2;
+          var layers = [[p.color, thick], [p.coreColor, thick * 0.35]];
+          for (i = 0; i < layers.length; i++) {
+            setAlpha(ctx, fadeOut(ss));
+            ctx.strokeStyle = layers[i][0];
+            ctx.lineWidth = Math.max(1, layers[i][1] * (1 - ss * 0.5));
+            ctx.beginPath();
+            ctx.moveTo(tx - dx * tail, ty + dy * tail);
+            ctx.lineTo(tx - dx * head, ty + dy * head);
+            ctx.stroke();
+          }
+        }
+
+        // 2. 地割れ（左右へ折れ線が伸び、あとで薄れる）
+        var cs = span(t, lag + 0.2, 0.62);
+        if (cs > 0 && cs < 1) {
+          var reach = width * easeOut(Math.min(1, cs * 2.2));
+          setAlpha(ctx, (cs > 0.65) ? (1 - cs) / 0.35 : 1);
+          ctx.strokeStyle = earth;
+          ctx.lineWidth = 5;
+          for (var side = -1; side <= 1; side += 2) {
+            var steps = 5;
+            ctx.beginPath();
+            ctx.moveTo(tx, groundY);
+            for (i = 1; i <= steps; i++) {
+              var r = reach * i / steps;
+              ctx.lineTo(tx + side * r, groundY + (i % 2 === 0 ? -1 : 1) * (4 + wobble(i + k * 3 + (side > 0 ? 9 : 0)) * 7));
+            }
+            ctx.stroke();
+          }
+        }
+
+        // 3. 噴き上げ：岩のかけら（放物線で昇って落ちる）
+        var rocks = d.rocks || 8;
+        ctx.fillStyle = earth;
+        for (i = 0; i < rocks; i++) {
+          var rs = span(t, lag + 0.22 + wobble(i + k * 5) * 0.08, 0.6);
+          if (rs <= 0 || rs >= 1) continue;
+          var rockX = tx + (wobble(i + k * 13 + 2) - 0.5) * width * 1.3 * easeOut(rs);
+          var rockY = groundY - rise * (0.6 + wobble(i + 21) * 0.6) * 4 * rs * (1 - rs);
+          var rockSize = sizeOf(d, i) * 1.3;
+          setAlpha(ctx, (rs > 0.8) ? (1 - rs) / 0.2 : 1);
+          ctx.fillRect(rockX - rockSize / 2, rockY - rockSize / 2, rockSize, rockSize);
+        }
+
+        // 3. 噴き上げ：火の粉（まっすぐ昇って消える）
+        var embers = d.embers || 12;
+        ctx.fillStyle = p.color;
+        for (i = 0; i < embers; i++) {
+          var es = span(t, lag + 0.24 + wobble(i + k * 9 + 4) * 0.2, 0.5);
+          if (es <= 0 || es >= 1) continue;
+          var emberX = tx + (wobble(i + k * 17 + 6) - 0.5) * width * 1.5;
+          var emberY = groundY - rise * 1.5 * easeOut(es) * (0.5 + wobble(i + 31) * 0.5);
+          var emberSize = sizeOf(d, i) * (1 - es * 0.5);
+          setAlpha(ctx, fadeOut(es));
+          ctx.fillRect(emberX - emberSize / 2, emberY - emberSize / 2, emberSize, emberSize);
+        }
+      }
+      ctx.lineCap = "butt";
+    },
+
+    /**
      * 激突（捨て身の体当たり）：打つ（impact）の重い版。
      * 衝撃の輪が2重に広がり、中心からひびが走り、かけらが飛んで落ちる
      */
@@ -2951,6 +3325,29 @@
 
   /** 回転数をラジアンに直す */
   function turns(value) { return value * Math.PI * 2; }
+
+  /** 円弧の三日月（両端がとがり、真ん中が width の太さ）を塗る。外側がふくらむ */
+  function crescent(ctx, cx, cy, radius, from, to, width, alpha, color) {
+    if (from === to) return;
+    var steps = 18;
+    var i, r, a;
+    setAlpha(ctx, alpha);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (i = 0; i <= steps; i++) {
+      a = from + (to - from) * i / steps;
+      r = radius + width / 2 * Math.sin(Math.PI * i / steps);
+      if (i === 0) ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+      else ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    }
+    for (i = steps; i >= 0; i--) {
+      a = from + (to - from) * i / steps;
+      r = radius - width / 2 * Math.sin(Math.PI * i / steps);
+      ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
 
   /** だんだん遅くなる */
   function easeOut(x) { return 1 - (1 - x) * (1 - x); }

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>デバッグ - ABYSS CHRONICLE</title>
+  <script src="tools/devguard.js"></script>
+  <!--
+    ▼ このファイルについて（開発用。ゲーム本体ではない）
+
+    ゲームの横に操作パネルを出すページ（v1.0.3）。中身は tools/debug.js。
+    ・開発用サーバー（8124）でだけ動く。ふつうのサーバー（8123）では何も読み込まずに断る。
+      セーブは番号ごとに別なので、ここで何をしても 8123 のセーブには届かない
+    ・チートはすべて、このページの中でゲームの関数を包んで掛ける。ゲーム本体のファイルには何も足していない
+      （app.html で遊ぶときは、デバッグのセーブを読んでもチートは掛からない）
+    ・data/ のファイルには書き込まない
+  -->
+  <style>
+    :root { --gold: #ffd75e; --line: #2a3350; --bg2: #0a0f1c; --sub: #8d97b5; --ok: #9adfaa; --ng: #ff8d8d; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; background: #05070d; color: #c8d0e8; font: 13px/1.55 sans-serif; }
+    #wrap { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; padding: 10px; }
+    #game { display: block; background: #000; flex: none; image-rendering: pixelated; }
+    #panel { flex: 1 1 440px; min-width: 340px; max-height: calc(100vh - 20px); overflow-y: auto;
+             background: var(--bg2); border: 1px solid var(--line); border-radius: 6px; }
+    #refuse { max-width: 640px; margin: 40px auto; padding: 16px; border: 1px solid #7a3f3f; color: #ffc9c9; background: #1c0a0a; line-height: 1.8; }
+    #bar { position: sticky; top: 0; z-index: 2; background: #0e1526; border-bottom: 1px solid var(--line); padding: 6px 8px; }
+    #now { color: var(--sub); font-size: 12px; }
+    #msg { color: var(--ok); font-size: 12px; min-height: 18px; }
+    #msg.ng { color: var(--ng); }
+    #tabs { display: flex; gap: 2px; margin-top: 4px; }
+    #tabs button { flex: 1; background: #141b2e; border-bottom: 2px solid transparent; }
+    #tabs button.on { color: var(--gold); border-bottom-color: var(--gold); background: #1a2340; }
+    #body { padding: 8px; }
+    h3 { margin: 12px 0 4px; color: var(--gold); font-size: 13px; }
+    h3:first-child { margin-top: 0; }
+    button { padding: 2px 8px; background: #1a2340; color: #e8ecf8; border: 1px solid var(--line); border-radius: 4px;
+             font: inherit; font-size: 12px; cursor: pointer; }
+    button:hover { border-color: var(--gold); }
+    button.big { padding: 5px 14px; background: #2b3a66; font-size: 13px; }
+    input, select { background: #05070d; color: #e8ecf8; border: 1px solid var(--line); border-radius: 3px; font: inherit; font-size: 12px; padding: 1px 3px; }
+    input[type=number] { width: 66px; }
+    input[type=checkbox] { vertical-align: middle; }
+    label { margin-right: 10px; white-space: nowrap; }
+    .line { margin: 4px 0; }
+    .note { color: var(--sub); font-size: 12px; }
+    .card { border: 1px solid var(--line); border-radius: 4px; padding: 5px 7px; margin: 5px 0; background: #070b15; }
+    .card.ally { border-left: 3px solid #5a8dff; }
+    .card.enemy { border-left: 3px solid #ff6a6a; }
+    .card.down { opacity: .55; }
+    .name { color: #fff; font-weight: bold; }
+    .stat { color: var(--ok); }
+    .chip { display: inline-block; margin: 1px 3px 1px 0; padding: 0 4px; background: #141b2e; border: 1px solid var(--line); border-radius: 3px; font-size: 12px; }
+    .chip a { color: var(--ng); cursor: pointer; margin-left: 3px; }
+    .plan { color: #ffe9a8; }
+    #log { max-height: 420px; overflow-y: auto; background: #03050a; border: 1px solid var(--line); padding: 4px 6px; font-size: 12px; }
+    #log div { white-space: pre-wrap; word-break: break-all; border-bottom: 1px solid #0d1322; padding: 1px 0; }
+    .k-turn { color: var(--gold); font-weight: bold; }
+    .k-ai { color: #ffe9a8; }
+    .k-order { color: #a8c8ff; }
+    .k-dmg { color: #ffb3a8; }
+    .k-event { color: #8d97b5; }
+    .grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 1px 8px; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="game" width="800" height="600"></canvas>
+    <aside id="panel">読み込み中…</aside>
+  </div>
+
+  <script src="tools/devpage.js"></script>
+  <script>
+  (function () {
+    "use strict";
+    // 開発用サーバーでなければ、ゲームもパネルも読み込まない（8123 の本当のセーブに触らないため）
+    window.DevPage.ping().then(function (ok) {
+      if (!ok || location.port === "8123") {
+        document.body.innerHTML = "<div id='refuse'>デバッグは開発用サーバー（8124）でだけ動きます。<br>" +
+          "ここはふだんのセーブがある場所なので、何も読み込みませんでした。<br>" +
+          "開発用サーバー abyss-tools を動かして <b>http://localhost:8124/debug.html</b> を開いてください。</div>";
+        return;
+      }
+      window.DevPage.loadGame(function () {
+        var s = document.createElement("script");
+        s.src = "tools/debug.js?t=" + Date.now();
+        s.onload = function () { window.DebugPanel.boot(); };
+        document.head.appendChild(s);
+      });
+    });
+  })();
+  </script>
+</body>
+</html>

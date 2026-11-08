@@ -144,7 +144,10 @@
    *
    * エントリに書けるもの（どちらも主と同じ仕組みなので、仲間にすると外れる）
    *   statMultiplier … その戦いのあいだだけ強くする。
-   *                    「単体でしか出ないぶん、1体としては手強い」を作るのに使う
+   *                    「単体でしか出ないぶん、1体としては手強い」を作るのに使う。
+   *                    { min, max } と書くと1体ずつ幅の中から決まる（ジュエルのHP。rollMultipliers）
+   *   fixedStatLevel … 敵のあいだ、能力値をそのレベルの表の値に固定する（性格補正と個体値も入れない。ジュエル 30）。
+   *                    レベルそのものは変えないので、ゴールドや仲間にしたあとの能力値は本来のレベルのまま
    *   actionPattern  … 決まった順番で行動させる。主と同じ書き方（"wait" も使える）。
    *                    門番のような相手を「読めば対処できる」形にできる
    *   skills         … その場所でだけ使う技（技idの配列）。種族の learnset・enemySkills より優先する。
@@ -152,7 +155,10 @@
    *   skillRate      … その場所でだけの、技を使う確率（種族の skillRate より優先）
    *   skillWeights   … 技ごとの選ばれやすさ { 技id: 重み }（書かなければ均等。コケキノコ：しびれ粉0.6・堅守の陣0.4）。
    *                    技idのかわりに criticalAttack と書くと「必ずクリティカルの通常攻撃」を選択肢に入れられる（ザンガルド）
+   *   tactic         … 技を使う番の決め方を、仲間の作戦（data/battle.js の tactics.list の id）と同じにする（ウェポン "attack"）
    *   infinitePp     … true なら、敵のあいだ PP が減らない（シニガミ）
+   *   fleeRate       … 手番の頭で逃げる確率（0〜1。ジュエル）
+   *   debuffResist   … 敵のあいだの弱体への耐性（ジュエル）
    *   rewardMultiplier … 倒したときの経験値・ゴールドの倍率（種族の値は変えずに、その場所だけ。回廊のカゲヅタ 1.5）
    *   effects        … 敵のあいだだけ足す効果。特性・装備と同じ書き方（シニガミの耐性の上乗せ）
    *   ※ どれも仲間にすると外れる（スカウトした個体は覚える技の一覧で作り直す）
@@ -170,8 +176,14 @@
 
     // 敵のときだけ使う技（data/monsters.js の enemySkills）があれば入れ替える
     if (enemy.useEnemySkills) enemy.useEnemySkills();
+    // 敵のあいだだけ、そのレベルの表の値に固定する（ジュエル。倍率はこのあと掛かる）
+    if (typeof entry.fixedStatLevel === "number") {
+      enemy.fixedStatLevel = entry.fixedStatLevel;
+      enemy.currentHp = enemy.getMaxHp();
+      enemy.currentPp = enemy.getMaxPp();
+    }
     if (entry.statMultiplier && enemy.setEncounterMultipliers) {
-      enemy.setEncounterMultipliers(entry.statMultiplier);
+      enemy.setEncounterMultipliers(this.rollMultipliers(entry.statMultiplier));
     }
     if (entry.actionPattern && enemy.setActionPattern) {
       enemy.setActionPattern(entry.actionPattern);
@@ -180,8 +192,14 @@
     if (Array.isArray(entry.skills) && entry.skills.length > 0) enemy.skills = entry.skills.slice();
     if (typeof entry.skillRate === "number") enemy.skillRateOverride = entry.skillRate;
     if (entry.skillWeights) enemy.skillWeights = entry.skillWeights;
+    // 技を使う番は、仲間の作戦と同じ決め方（ウェポン。BattleSystem._chooseEnemyAction）
+    if (entry.tactic) enemy.enemyTactic = entry.tactic;
     // 敵のときだけ PP が減らない（シニガミ。BattleSystem.ppCostOf）
     if (entry.infinitePp) enemy.infinitePp = true;
+    // 敵のときだけ、手番の頭でこの確率で逃げる（ジュエル。BattleSystem._tryEnemyFlee）
+    if (typeof entry.fleeRate === "number") enemy.fleeRate = entry.fleeRate;
+    // 敵のときだけの弱体への耐性（ジュエル。主と同じ setDebuffResist）
+    if (typeof entry.debuffResist === "number" && enemy.setDebuffResist) enemy.setDebuffResist(entry.debuffResist);
     // その場所でだけ、倒したときの経験値・ゴールドに倍率を掛ける（蔦這う回廊のカゲヅタ。MonsterInstance.getExpReward）
     if (typeof entry.rewardMultiplier === "number") enemy.rewardMultiplier = entry.rewardMultiplier;
     // 敵のときだけ足す効果（特性・装備と同じ書き方。シニガミの「敵のときは耐性が高い」）。statMultiplier のあとに足す
@@ -189,6 +207,22 @@
       enemy.encounterEffects = (enemy.encounterEffects || []).concat(entry.effects);
     }
     return enemy;
+  };
+
+  /**
+   * statMultiplier の中の幅（{ min, max }）を、この1体ぶんの倍率に決める。数字はそのまま。
+   * 1体ずつ別に引くので、同じ戦いのジュエル2体でも HP が違う（hp: { min: 0.3, max: 0.5 }）
+   */
+  EncounterSystem.prototype.rollMultipliers = function (multipliers) {
+    var result = {};
+    for (var stat in multipliers) {
+      if (!Object.prototype.hasOwnProperty.call(multipliers, stat)) continue;
+      var value = multipliers[stat];
+      result[stat] = (value && typeof value === "object")
+        ? value.min + this.random.next() * (value.max - value.min)
+        : value;
+    }
+    return result;
   };
 
   /**

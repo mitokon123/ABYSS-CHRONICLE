@@ -55,10 +55,12 @@
     var side = head.side;
     var k, e;
     // この行動で相手（や味方）に起きた結果だけ。特性の反撃などで本人に返ってきたものは除く
-    var hits = [], fails = [], mods = [], misses = [], results = [];
+    var hits = [], fails = [], mods = [], misses = [], results = [], heals = [];
     for (k = 0; k < group.length; k++) {
       e = group[k];
       if (e.type === "critical") { e.logText = ""; continue; }
+      // 全体の回復（キュアオール）は本人も治るので、本人を除く前に集める
+      if (e.type === "heal" && e.skillId === skill.id) heals.push(e);
       if (e.target && e.target === head.actor && e.type !== "modifier") continue;
       if (HIT_RESULT[e.type]) results.push(e);
       if (e.type === "damage" || e.type === "immune") hits.push(e);
@@ -80,6 +82,15 @@
     }
     if (distinctTargets(fails) >= 2) this._mergeGroup(fails, this.templates.groupFail);
     if (distinctTargets(mods) >= 2 && sameModifier(mods)) this._mergeModifiers(mods);
+    if (heals.length >= 2) this._mergeAllHeal(heals);
+  };
+
+  /** 全体の回復で2体以上が治った：先頭の名前たち の HPが 平均 N 回復した（全体のダメージと同じ書き方） */
+  BattleMessageFormatter.prototype._mergeAllHeal = function (heals) {
+    var sum = 0;
+    for (var k = 0; k < heals.length; k++) sum += Math.max(0, heals[k].healAmount);
+    this._writeOnce(heals, fill(this.templates.groupHealed, {
+      target: this._targetName(heals[0]), amount: Math.round(sum / heals.length) }));
   };
 
   /** 二連斬り・歯車投げ：当たった回数と合計（相手が何体かなら相手ごとの合計）を、最初の結果の行に */
@@ -357,13 +368,20 @@
       case "heal":
         return fill(t.healed, { target: this._targetName(event), amount: event.healAmount });
       case "healFull":
-        return fill(t.healFull, { target: this._targetName(event) });
+        return event.everyone ? t.healFullAll : fill(t.healFull, { target: this._targetName(event) });
       // 状態異常を治す技（クレンズ）
       case "cure":
         return fill(t.cured, { target: this._targetName(event),
                                status: (event.statusNames || []).join("・") });
       case "cureNone":
         return fill(t.cureNone, { target: this._targetName(event) });
+      // 倒れた仲間を起こす技（リザレクト）
+      case "revive":
+        return fill(t.revived, { target: this._targetName(event), amount: event.healAmount });
+      case "reviveFail":
+        return fill(t.reviveFail, { target: this._targetName(event) });
+      case "reviveNone":
+        return fill(t.reviveNone, { target: this._targetName(event) });
       case "modifierEnd":
         return fill(t.modifierEnd,
                     { target: this._targetName(event), skill: event.skillName });
@@ -406,6 +424,8 @@
         return t.fleeSuccess || null;
       case "fleeFailed":
         return t.fleeFailed || null;
+      case "enemyFled":
+        return fill(t.enemyFled, { actor: event.actorName });
       case "noSkill":
         return fill(t.noSkill, { actor: event.actorName });
       case "battleEnd":

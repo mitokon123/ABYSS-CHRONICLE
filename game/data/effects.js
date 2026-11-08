@@ -657,6 +657,14 @@
       healingGreat: {
         shape: "healing", duration: 1000, glow: 18, color: "#5fd18c", radius: 40, crosses: 10, crossSize: 8, rise: 86, column: true
       },
+      // キュアオール。キュアラと同じ量を全員へ。柱は降りず、1体ずつ十字の光が昇る
+      healingAll: {
+        shape: "healing", duration: 960, glow: 16, color: "#5fd18c", radius: 38, crosses: 8, crossSize: 7, rise: 78
+      },
+      // リザレクト。金色の光の柱が降り、十字の光が高く昇る（起きたときだけ出る）
+      reviveRise: {
+        shape: "healing", duration: 1200, glow: 22, color: "#ffe08a", radius: 44, crosses: 12, crossSize: 8, rise: 100, column: true
+      },
       // クレンズ。澄んだ雫が落ちて輪が広がり、きらめく
       cleanseDrop: {
         shape: "cleanse", duration: 860, glow: 12, color: "#9fe3ff", count: 7
@@ -736,6 +744,41 @@
       // シャドウ。足元の影から黒い手が伸びて包む（闇の色）
       shadowGrasp: {
         shape: "shadowGrasp", duration: 760, glow: 12, count: 6
+      },
+      // 火炎斬り（v1.0.3）。三日月の太刀筋が右上から左下へ走り、筋に沿って炎の舌が立ち昇る。
+      //   radius / width … 太刀筋の大きさと太さ   flames / flameHeight … 炎の数と高さ   embers … 火の粉
+      flameSlash: {
+        shape: "flameSlash", hitSe: "slash", duration: 720, glow: 18,
+        radius: 92, width: 24, flames: 9, flameHeight: 66, embers: 12, minSize: 3, maxSize: 6
+      },
+      // 流水斬り。水の帯がS字に流れ、薄い帯が2本追いかける。水しぶきが飛んで落ちる。
+      //   length / amplitude / width … 帯の長さ・うねり・太さ   drops / gravity … 雫の数と落ち方
+      flowSlash: {
+        shape: "flowSlash", hitSe: "slash", duration: 760, glow: 14,
+        length: 184, amplitude: 30, width: 20, drops: 16, gravity: 110, minSize: 3, maxSize: 6
+      },
+      // 疾風斬り。細く鋭い筋が速く3本走り、切り口から風の線が横へ流れる。ほかの3つより短い。
+      //   length / width … 筋の長さと太さ   gusts … 風の線の数
+      galeSlash: {
+        shape: "galeSlash", hitSe: "slash", duration: 460, glow: 12,
+        length: 190, width: 7, gusts: 9
+      },
+      // 岩砕斬り。太い一撃が真上から落ち、当たったところから岩のかけらが飛び散る。
+      //   length / width … 一撃の長さと太さ   cracks … ひび   rocks / gravity … かけらの数と落ち方
+      rockSlash: {
+        shape: "rockSlash", hitSe: "slash", duration: 760, glow: 10,
+        length: 170, width: 52, cracks: 6, crackLength: 62, rocks: 12, gravity: 170, minSize: 6, maxSize: 13
+      },
+
+      // 烈火崩地斬（ウェポンの絆の技）。相手ひとりずつを炎の一閃で斬り下ろし、足元が割れて岩と火の粉が噴き上がる。
+      // 並び全体に1回だけ出す型（技の側に effectAt: "center"）。一閃と火の粉は属性の色（火）、ひびと岩は earthColor（地の色）
+      //   stagger … 相手ごとの遅れ   length / thickness … 一閃   crackWidth / groundY … ひびの幅と足元の位置   rise … 噴き上がる高さ
+      blazingRift: {
+        shape: "blazingRift", hitSe: "slash", duration: 1050, glow: 16,
+        earthColor: "#c8a35e", stagger: 0.07,
+        length: 190, thickness: 14, tilt: 0.17,
+        crackWidth: 120, groundY: 48, rise: 96,
+        rocks: 8, embers: 12, minSize: 4, maxSize: 9
       }
     }
   };

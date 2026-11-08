@@ -1086,6 +1086,8 @@
       fieldTargetMenu: { x: 300, y: 150, w: 260, h: 110, lineHeight: 28 },
       // 作戦を選ぶ（v1.0.0）。説明は下の知らせ欄に出る
       tacticMenu:      { x: 300, y: 130, w: 260, h: 110, lineHeight: 28 },
+      // カーソルの作戦の軽い説明。一覧のすぐ下に、一覧と同じ幅で出す（lines は高さに使う行数）
+      tacticInfo:      { gap: 6, lines: 2, padX: 12 },
       // 「逃がしますか?」の窓。拠点の「タイトルに戻りますか?」と同じ見た目
       releaseConfirm: {
         veil:       "rgba(4,6,12,0.72)",

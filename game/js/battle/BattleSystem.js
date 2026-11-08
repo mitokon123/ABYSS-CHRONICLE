@@ -333,6 +333,8 @@
     var damage = Math.floor(monster.getMaxHp() * (spec.hpRatio || 0));
     if (spec.max !== undefined) damage = Math.min(damage, spec.max);
     damage = Math.max(spec.min === undefined ? 1 : spec.min, damage);
+    // 特性「カチカチ」はこのダメージも減る
+    if (monster.reduceDirectDamage) damage = monster.reduceDirectDamage(damage);
 
     // leaveAtLeast を書くと、そのぶんは必ず残す（戦闘中の毒は 0＝倒れうる）
     var floor = spec.leaveAtLeast === undefined ? 0 : spec.leaveAtLeast;
@@ -565,10 +567,16 @@
 
     if (this.random.next() >= this._skillRateFor(enemy)) return fallback;
 
+    // 出現の表に tactic を書いた敵は、技を使う番には仲間の作戦と同じ決め方をする（ウェポン＝全力で攻める。
+    // 手番が来たときに _chooseTacticAction で決める。作者の指定 2026-11-05）
+    if (enemy.enemyTactic) return { type: "tactic", tacticId: enemy.enemyTactic, targetIndex: target };
+
     var usable = [];
     var skills = enemy.skills || [];
     for (var i = 0; i < skills.length; i++) {
       if (!this._canUseSkill(enemy, skills[i])) continue;
+      // 倒れた仲間を起こす技（リザレクト）は敵は使わない
+      if ((this.data.getSkill(skills[i]) || {}).revive) continue;
       // すでに効いている強化・弱体は掛け直しても意味がないので選ばない
       // （重ねがけはターン数が建て直されるだけ。手番を捨てることになる）
       if (this._modifierAlreadyOn(enemy, skills[i])) continue;
@@ -770,14 +778,17 @@
    *   3. 補助（support。強化 → 弱体 → 状態異常 の順に、まだ掛かっていないもの）
    *   4. 攻撃（attack。"best" か "finishOnly"）
    * 道具・スカウト・交代・逃げるは選ばない（主人公が決めること）。即死の技はどの作戦でも使わない
+   *
+   * @param {string} [tacticId] 作戦の id。敵（出現の表の tactic）が渡す。無ければ本人に決めてある作戦
    */
-  BattleSystem.prototype._chooseTacticAction = function (actor, side) {
-    var tactic = (actor.getTactic && actor.getTactic()) || {};
+  BattleSystem.prototype._chooseTacticAction = function (actor, side, tacticId) {
+    var named = tacticId ? (((this.data.battle || {}).tactics || {}).list || {})[tacticId] : null;
+    var tactic = named || (actor.getTactic && actor.getTactic()) || {};
     var own = aliveOf((side === "ally") ? this.getFieldAllies() : this.getFieldEnemies());
     var foes = aliveOf((side === "ally") ? this.getFieldEnemies() : this.getFieldAllies());
 
     var normalId = this.getNormalAttackId();
-    var skills = [];
+    var skills = [], revives = [];
     var list = actor.skills || [];
     for (var i = 0; i < list.length; i++) {
       var skill = this.data.getSkill(list[i]);
@@ -787,17 +798,37 @@
       if (skill.cover) continue;
       // 即死の技は使わない（作者の指定）
       if (this._isInstantDeathSkill(skill)) continue;
+      // 倒れた仲間を起こす技（リザレクト）は、回復や攻撃の候補とは分けて見る
+      if (skill.revive) { revives.push(skill); continue; }
       skills.push(skill);
     }
 
-    var picked = null;
-    if (typeof tactic.healBelow === "number") picked = this._tacticHeal(actor, skills, own, tactic);
+    var picked = this._tacticRevive(revives, own, side, tactic);
+    if (!picked && typeof tactic.healBelow === "number") picked = this._tacticHeal(actor, skills, own, tactic);
     if (!picked && tactic.cure) picked = this._tacticCure(skills, own);
     if (!picked && tactic.support) picked = this._tacticSupport(actor, skills, own, foes);
     if (!picked) picked = this._tacticAttack(actor, skills, foes, tactic);
     if (!picked) return { type: "skill", skillId: normalId, targetIndex: 0 };
 
     return { type: "skill", skillId: picked.skill.id, target: picked.target || null, targetIndex: 0 };
+  };
+
+  /**
+   * 倒れた仲間を起こす（作戦の reviveSafeHp。いまは「仲間を守る」の 40%。作者 2026-11-06）。
+   * 場に倒れた仲間がいて、生きている味方のHPがどれも reviveSafeHp 以上のときだけ、枠の順で最初の1体へ使う
+   */
+  BattleSystem.prototype._tacticRevive = function (revives, own, side, tactic) {
+    if (revives.length === 0 || typeof tactic.reviveSafeHp !== "number") return null;
+    for (var i = 0; i < own.length; i++) {
+      if (own[i].currentHp / Math.max(1, own[i].getMaxHp()) < tactic.reviveSafeHp) return null;
+    }
+    var slots = (side === "ally") ? this.getFieldSlots() : this.enemies;
+    for (var s = 0; s < slots.length; s++) {
+      if (slots[s].isFainted() && !slots[s]._undying && !slots[s]._removed) {
+        return { skill: revives[0], target: slots[s] };
+      }
+    }
+    return null;
   };
 
   function aliveOf(list) {
@@ -1281,6 +1312,7 @@
    * その者がその技を使うときに払うPP（v1.0.0）。ふつうは技の pp のまま。
    *   ・敵として PP が減らない者（data/dungeons.js の出現の表の infinitePp。シニガミ）… 0
    *   ・特性「死神」（効果の種類 freeDeathSkills）を持つ者が、即死を付ける技を使うとき … 0
+   *   ・特性「カチカチ」（効果の種類 ppCostMultiplier）… ×1.5（MonsterInstance.getSkillPpCost）
    * 戦闘の画面（技の一覧の PP 表示・使えるかどうか）もこれを見る
    */
   BattleSystem.prototype.ppCostOf = function (actor, skill) {
@@ -1288,7 +1320,7 @@
     if (cost <= 0 || !actor) return 0;
     if (actor.infinitePp) return 0;
     if (skill.status && skill.status.id === "instantDeath" && this._hasEffect(actor, "freeDeathSkills")) return 0;
-    return cost;
+    return actor.getSkillPpCost ? actor.getSkillPpCost(skill) : cost;
   };
 
   /** 特性・装備・強化などに、その種類の効果が1つでもあるか */
@@ -1307,9 +1339,12 @@
     // ただし交代は止めない（入れ替えるのは本人ではなく主人公。眠った仲間を下げて立て直せるように。v1.0.0・作者の指定）
     if (action.type !== "swap" && this._blockedByStatus(step, events)) return;
 
+    // 逃げることのある敵（出現の表の fleeRate。ジュエル）。動けるときだけ、手番の頭で逃げるかを決める
+    if (step.side === "enemy" && this._tryEnemyFlee(step.actor, events)) return;
+
     // 作戦で動く仲間は、ここ（自分の番が来たとき）で行動を決める（v1.0.0。_chooseTacticAction）
     if (action.type === "tactic") {
-      action = this._chooseTacticAction(step.actor, step.side);
+      action = this._chooseTacticAction(step.actor, step.side, action.tacticId);
       step.action = action;
     }
 
@@ -1331,6 +1366,13 @@
 
     var skill = this.data.getSkill(action.skillId);
 
+    // 番が来るまでに PP が足りなくなった、味方や自分へ向ける技（キュア・こうかなど）は通常攻撃に切り替わる。
+    // 相手も向かい側から選び直す（味方や自分を殴らないように）
+    if (skill && (skill.target === "ally" || skill.target === "self") && !this._canUseSkill(step.actor, action.skillId)) {
+      action = { type: "skill", skillId: this.getNormalAttackId(), targetIndex: 0 };
+      skill = this.data.getSkill(action.skillId);
+    }
+
     // 範囲全体の技は、向かい側の盤面にいる全員が対象
     if (skill && skill.target === "allEnemies") {
       var group = (step.side === "ally") ? this.getFieldEnemies() : this.getFieldAllies();
@@ -1342,6 +1384,12 @@
     if (skill && skill.target === "allAllies") {
       var own = (step.side === "ally") ? this.getFieldAllies() : this.getFieldEnemies();
       this._performSkillOnAllies(step.actor, own.slice(), action.skillId, step.side, events);
+      return;
+    }
+
+    // 倒れた仲間を起こす技（リザレクト）は、ふつうの「生きている相手」の選び方を通らない
+    if (skill && skill.revive) {
+      this._performRevive(step, action, skill, events);
       return;
     }
 
@@ -1363,6 +1411,40 @@
     } finally {
       this._forceCritical = false;
     }
+  };
+
+  /**
+   * 倒れた仲間を起こす技（data/skills.js の revive。リザレクト）。
+   * 道具の神鳥の羽と同じく、選んだ個体そのものへ向ける。外れてもPPは払う。
+   * 番が来るまでに相手が起きていた（別の技・道具で）なら「倒れていない」と伝える
+   */
+  BattleSystem.prototype._performRevive = function (step, action, skill, events) {
+    var side = step.side;
+    var actor = step.actor;
+    var slots = (side === "ally") ? this.getFieldSlots() : this.enemies;
+    var target = action.target || slots[action.targetIndex || 0];
+    if (!target) return;
+    if (!this._prepareSkill(actor, skill.id, side, events)) return;
+
+    if (!target.isFainted() || target._undying) {
+      events.push({ type: "reviveNone", side: side, targetSide: side,
+        targetName: target.getName(), target: target });
+      return;
+    }
+    if (this.random.next() >= numberOr(skill.revive.chance, 1)) {
+      events.push({ type: "reviveFail", side: side, targetSide: side,
+        targetName: target.getName(), target: target, se: "miss" });
+      return;
+    }
+    var result = NS.ItemUsage.reviveTarget(target, skill.revive.hpRatio);
+    events.push({
+      type: "revive", side: side, targetSide: side,
+      targetName: target.getName(), target: target, skillId: skill.id,
+      // 形は回復の出来事とそろえてある（緑の数字・HPバー・回復の動き）
+      healAmount: result.amount, revealTarget: target, revealHp: target.currentHp,
+      // 見せた瞬間に状態異常の印を消す（起きるときに全部外れる）
+      statusTarget: target, statusIds: []
+    });
   };
 
   /**
@@ -1971,13 +2053,22 @@
     }
 
     this._simulSeq = (this._simulSeq || 0) + 1;
-    var seq = this._simulSeq, first = true, cured = false;
+    var seq = this._simulSeq, first = true, cured = false, healedAny = false;
     for (var i = 0; i < targets.length; i++) {
       var target = targets[i];
       if (target.isFainted() || target._removed) continue;
       // 回復・状態異常を治す・強化（作戦の「全体を治す技」も同じ道を通る）
       var start = events.length;
-      if (skill.heal) this._applyHeal(actor, target, skill, side, events);
+      if (skill.heal) {
+        // 全体の回復では、満タンの仲間ごとに「元気なままだ」を並べない（誰も減っていなければ最後に1回だけ）
+        var healEvents = [];
+        this._applyHeal(actor, target, skill, side, healEvents);
+        for (var he = 0; he < healEvents.length; he++) {
+          if (healEvents[he].type === "healFull") continue;
+          events.push(healEvents[he]);
+          healedAny = true;
+        }
+      }
       if (skill.cureStatus) {
         // 全体を治す技では、治すものが無かった仲間ごとに「治すものがなかった」を並べない（最後に1回だけ）
         var cureEvents = [];
@@ -2000,6 +2091,9 @@
     }
     if (skill.cureStatus && !cured) {
       events.push({ type: "cureNone", side: side, targetSide: side, targetName: actor.getName(), target: actor });
+    }
+    if (skill.heal && !healedAny) {
+      events.push({ type: "healFull", side: side, targetSide: side, targetName: actor.getName(), target: actor, everyone: true });
     }
   };
 
@@ -2195,6 +2289,8 @@
   BattleSystem.prototype._applyRecoil = function (actor, skill, damage, side, events) {
     if (!skill.recoil || damage <= 0 || !actor || actor.isFainted()) return;
     var amount = Math.max(1, Math.floor(damage * skill.recoil));
+    // 特性「カチカチ」は反動も減る
+    if (actor.reduceDirectDamage) amount = actor.reduceDirectDamage(amount);
     actor.takeDamage(amount);
     events.push({ type: "recoil", targetSide: side, targetName: actor.getName(), target: actor,
       amount: amount, currentHp: actor.currentHp, maxHp: actor.getMaxHp() });
@@ -2703,7 +2799,7 @@
     var battle = this.data.battle || {};
     var config = battle.damage || {};
 
-    var elementId = skill.element || "none";
+    var elementId = this._damageElementOf(attacker, defender, skill);
     if (this._isImmune(defender, elementId)) {
       return { damage: 0, critical: false, elementMultiplier: 0, immune: true };
     }
@@ -2764,7 +2860,7 @@
     // 特性・装備（攻める側の上乗せ・受ける側の軽減）
     var abilityMultiplier = 1;
     if (this.effects) {
-      abilityMultiplier = this.effects.getDamageDealtMultiplier(attacker, elementId)
+      abilityMultiplier = this.effects.getDamageDealtMultiplier(attacker, elementId, skill)
                         * this.effects.getDamageTakenMultiplier(defender, elementId)
                         * this._targetHpMultiplier(attacker, defender);
       // 特性「ギャンブル」：受けるダメージが当たるたびに上下する（見積もりでは真ん中）
@@ -2801,6 +2897,27 @@
       elementMultiplier: elementMultiplier,
       immune: false
     };
+  };
+
+  /**
+   * ダメージの計算に使う属性。ふつうは技の属性（element）。
+   * 2つの属性を持つ技（element2。烈火崩地斬の火・地）は、相手ひとりずつについて、
+   * 耐性・無効・特性・装備まで見て、よく効くほうの属性で当たる。同じなら element のほう
+   */
+  BattleSystem.prototype._damageElementOf = function (attacker, defender, skill) {
+    var first = skill.element || "none";
+    if (!skill.element2) return first;
+    var self = this;
+    function strength(id) {
+      if (self._isImmune(defender, id)) return 0;
+      var value = self._elementMultiplier(defender, id);
+      if (self.effects) {
+        value *= self.effects.getDamageDealtMultiplier(attacker, id, skill)
+               * self.effects.getDamageTakenMultiplier(defender, id);
+      }
+      return value;
+    }
+    return (strength(skill.element2) > strength(first)) ? skill.element2 : first;
   };
 
   /**
@@ -2924,6 +3041,23 @@
     }
     events.push({ type: "fleeFailed" });
     return false;
+  };
+
+  /**
+   * 敵が逃げるかを判定する（v1.0.3）。逃げたら盤面から取り除く。倒したわけではないので経験値は入らない。
+   * 誰も残らなければ戦いは流れる（結果 "enemyFled"）。倒れた相手だけが残るときは _checkFinish が勝ちにする。
+   * @returns {boolean} 逃げたら true
+   */
+  BattleSystem.prototype._tryEnemyFlee = function (enemy, events) {
+    if (!enemy.fleeRate || this.random.next() >= enemy.fleeRate) return false;
+
+    events.push({ type: "enemyFled", actorName: enemy.getName(), target: enemy });
+    this.removeEnemy(enemy);
+    if (this.enemies.length === 0) {
+      var end = this.finishWith("enemyFled");
+      for (var i = 0; i < end.length; i++) events.push(end[i]);
+    }
+    return true;
   };
 
   /** 勝敗が決したかを判定し、決していれば終了処理を行う */
@@ -3143,7 +3277,7 @@
   BattleSystem.skillRoleOf = function (skill) {
     if (!skill) return "attack";
     if (BattleSystem.dealsDamage(skill)) return "attack";
-    if (skill.heal || skill.cureStatus) return "heal";
+    if (skill.heal || skill.cureStatus || skill.revive) return "heal";
     if (skill.status) return "status";
     if (skill.ppDamage) return "debuff";
     if (skill.modifier && !isRaising(skill.modifier) &&
@@ -3200,7 +3334,7 @@
   BattleSystem.dealsDamage = function (skill) {
     if (!skill) return false;
     if (skill.power) return true;
-    return !(skill.heal || skill.modifier || skill.status || skill.cureStatus || skill.ppDamage || skill.wardStatus || skill.charge);
+    return !(skill.heal || skill.modifier || skill.status || skill.cureStatus || skill.ppDamage || skill.wardStatus || skill.charge || skill.revive);
   };
 
   NS.BattleSystem = BattleSystem;

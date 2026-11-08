@@ -85,9 +85,15 @@
       drained:      "{target} は {amount} 吸い取った!",      // target, amount
       // HPを回復する技（data/skills.js の heal）
       healed:       "{target} の HPが {amount} 回復した!",   // target, amount
+      groupHealed:  "{target}たち の HPが 平均 {amount} 回復した!", // target, amount（キュアオール）
       healFull:     "しかし {target} は 元気なままだ",       // target
+      healFullAll:  "しかし みんな 元気なままだ",            // キュアオールで誰も減っていなかった
       cured:        "{target} の {status}が 治った!",        // target, status（クレンズ）
       cureNone:     "しかし {target} には 治すものがなかった", // target
+      // 倒れた仲間を起こす技（リザレクト）
+      revived:      "{target} は 起き上がった!",              // target
+      reviveFail:   "しかし {target} は 起き上がらなかった",  // target
+      reviveNone:   "しかし {target} は 倒れていない",        // target
       // 相手のPPを減らす技（ミステリーダンス。v1.0.0）
       ppDamage:     "{target} の PPが {amount} 減った!",      // target, amount
       ppDamageNone: "しかし {target} の PPは もう残っていない", // target
@@ -117,6 +123,7 @@
       affectionUp:  "{actor} との関係が「{stage}」になった!",  // actor, stage
       fleeSuccess:  "うまく逃げ切れた!",
       fleeFailed:   "逃げられない!",
+      enemyFled:    "{actor} は 逃げ出した!",  // actor
       win:          "戦いに勝った!",
       lose:         "目の前が真っ暗になった...",
       noSkill:      "{actor} は何もできない!",              // actor
@@ -219,6 +226,7 @@
       selectItem:  "どの道具?",
       noItems:     "使える道具がない",
       notEnoughPp: "PPが足りない!",
+      noReviveTarget: "倒れた仲間がいない",
 
       // 掛かっている強化・弱体の印は絵で出す（data/ui.js の icons、data/sprites_icons.js）
 
@@ -730,9 +738,9 @@
       hint:          "↑↓: 選択    ←→: 切替    Esc: 戻る",
       hintScrollable:"↑↓: 選択    ←→: 切替    決定: 説明を読む    Esc: 戻る",
       hintDetail:    "↑↓: 説明をスクロール    決定/Esc: 一覧へ戻る",
-      // 技の表の並べ方（Q/E で切り替え。2026-10-15）
+      // 技の表とモンスターの表の並べ方（Q/E で切り替え）
       sortLabel:     "並び：{mode}　Q/E",          // mode
-      sortModes:     { element: "属性ごと", kind: "種類ごと", role: "働きごと", name: "名前順", order: "図鑑の順" },
+      sortModes:     { family: "系統ごと", element: "属性ごと", kind: "種類ごと", role: "働きごと", name: "名前順", order: "図鑑の順" },
       hintSkills:    "↑↓: 選択    ←→: 切替    Q/E: 並び替え    Esc: 戻る",
       hintSkillsScrollable: "↑↓: 選択    ←→: 切替    Q/E: 並び替え    決定: 説明    Esc: 戻る"
     },
@@ -936,6 +944,11 @@
       fieldSkillCured:  "{user} の {skill}! {target} の {status}が治った", // user, skill, target, status
       fieldSkillNothingToCure: "{target} には治すものがない",             // target
       fieldSkillFainted:"{target} は倒れていて使えない",                  // target
+      fieldSkillAllHealed: "{user} の {skill}! みんなの HPが 回復した",    // user, skill
+      fieldSkillAllFull:   "みんな元気なままだ",
+      fieldSkillRevived:   "{user} の {skill}! {target} は 起き上がった", // user, skill, target
+      fieldSkillReviveFail:"{user} の {skill}! しかし {target} は 起き上がらなかった", // user, skill, target
+      fieldSkillNotFainted:"{target} は倒れていない",                     // target
       hintFieldSkill:   "↑↓: 技を選ぶ    決定: 決定    Esc: やめる",
       hintFieldTarget:  "↑↓: 相手を選ぶ    決定: 使う（続けて使える）    Esc: 技選びへ",
       actionCancel: "やめる",

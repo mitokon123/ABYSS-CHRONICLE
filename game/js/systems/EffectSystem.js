@@ -179,12 +179,16 @@
     });
   };
 
-  /** 自分が与えるダメージに掛かる倍率 */
-  EffectSystem.prototype.getDamageDealtMultiplier = function (monster, elementId) {
+  /**
+   * 自分が与えるダメージに掛かる倍率。
+   * skillKind を書いた効果は、その種類の技を使ったときだけ効く（特性「剣豪」の斬撃。通常攻撃は種類を持たないので入らない）
+   */
+  EffectSystem.prototype.getDamageDealtMultiplier = function (monster, elementId, skill) {
     var self = this;
     return this._multiply(monster, function (effect) {
       if (effect.type !== "damageDealt") return null;
       if (effect.element && effect.element !== elementId) return null;
+      if (effect.skillKind && (!skill || skill.kind !== effect.skillKind)) return null;
       if (!self._matchCondition(monster, effect.condition)) return null;
       return effect.value;
     });
@@ -251,6 +255,26 @@
     var self = this;
     return this._multiply(monster, function (effect) {
       if (effect.type !== "healDealt") return null;
+      if (!self._matchCondition(monster, effect.condition)) return null;
+      return effect.value;
+    });
+  };
+
+  /**
+   * 攻撃のほかのダメージ（毒・反動・罠）に掛かる倍率（何も無ければ 1）。
+   * damageTaken のうち allDamage: true のものだけを見る。ふつうの軽減（厚い皮膚など）は攻撃にしか効かない
+   */
+  EffectSystem.prototype.getAllDamageMultiplier = function (monster) {
+    return this._multiply(monster, function (effect) {
+      return (effect.type === "damageTaken" && effect.allDamage) ? effect.value : null;
+    });
+  };
+
+  /** 自分が技に払うPPに掛かる倍率（何も無ければ 1）。{ type:"ppCostMultiplier", value:1.5 }（特性「カチカチ」） */
+  EffectSystem.prototype.getPpCostMultiplier = function (monster) {
+    var self = this;
+    return this._multiply(monster, function (effect) {
+      if (effect.type !== "ppCostMultiplier") return null;
       if (!self._matchCondition(monster, effect.condition)) return null;
       return effect.value;
     });
@@ -349,8 +373,10 @@
     } else if (effect.type === "damageDealt" || effect.type === "damageTaken") {
       var element = (gameData.elements || {})[effect.element];
       var kind = (effect.type === "damageDealt") ? "与ダメージ" : "被ダメージ";
-      // 属性を書いたものだけ「火の与ダメージ」。書いていなければ全部に効くので、属性は付けない
-      text = (element ? element.name + "の" : "") + kind + " ×" + effect.value;
+      // 属性を書いたものだけ「火の与ダメージ」。書いていなければ全部に効くので、属性は付けない。
+      // 技の種類を書いたものは「斬撃の与ダメージ」
+      var skillKind = effect.skillKind ? ((gameData.categories || {}).skillKind || {})[effect.skillKind] : null;
+      text = (element ? element.name + "の" : "") + (skillKind ? skillKind.name + "の" : "") + kind + " ×" + effect.value;
     } else if (effect.type === "resistBonus") {
       // 属性の耐性（炎よけの札）と、状態異常の耐性（毒よけの護符）の両方。
       // ここが無かったころは、工房や仲間画面の効果欄に**空の行**が出ていた

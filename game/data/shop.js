@@ -165,6 +165,11 @@
           { item: "blueThunderScale", unlockedBy: "ivyCorridor" },
           { item: "glowMoss",         unlockedBy: "ivyCorridor" },
 
+          // 千年樹の根底の素材。クリアしてから取り扱いが始まる。宝珠のかけら（ジュエル）と琥珀の芯（主）は並べない
+          { item: "amberShard", unlockedBy: "ancientRoots" },
+          { item: "ancientSap", unlockedBy: "ancientRoots" },
+          { item: "brassGear",  unlockedBy: "ancientRoots" },
+
           // 大きく回復する薬。毒沼をクリアしてから並ぶ。
           //   毒沼までは回復薬（50G / 50回復）で足りる。
           //   ここで初めて「1ターンで100戻す」選択肢を出す

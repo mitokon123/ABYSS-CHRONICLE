@@ -157,6 +157,40 @@
       ] };
   }
 
+  /**
+   * --- 千年樹の根底の出現の表の1件ずつ（v1.0.3。2026-11-04） ---
+   * スライムの確率と使う技は仮。ウェポン・ジュエル・コハクカブトは作者が決めた。
+   *   コハクカブト … 技を使う確率 40%。ブレイブ 50%・シールド 30%・堅守の陣 20%（作者 2026-11-06）
+   *   スライム … 回復と足止め。傷ついた仲間を癒やす（先に倒さないと長引く）
+   *   ウェポン … 技を使う確率 55%。作戦「全力で攻める」と同じ決め方で、火水風地の斬撃からいちばんダメージの出るものを選ぶ（作者 2026-11-05）
+   *   ジュエル … ほかの敵といっしょにも、2体でも出る。毎手番 25% で逃げる。能力値はどの階でも Lv30 の表の値に固定。
+   *              そこに HP は1体ずつ ×0.3〜0.5、防御 ×5、素早さ ×5。技はロックスパイクを 40%。
+   *              状態異常と弱体はどれも効かない（全属性 10 は種族の値のまま）。どれも仲間にすると外れる（作者 2026-11-05）
+   */
+  var ROOT_BEETLE = { species: "amberBeetle", weight: 0.3,
+    skills: ["fightSong", "guardSong", "fortressForm"],
+    skillWeights: { fightSong: 0.5, guardSong: 0.3, fortressForm: 0.2 },
+    skillRate: 0.4 };
+  var ROOT_SAP = { species: "sapSlime", weight: 0.3,
+    skills: ["greaterCure", "slowDance", "bubble"],
+    skillRate: 0.6 };
+  var ROOT_WEAPON = { species: "weaponBot", weight: 0.3,
+    skills: ["flameSlash", "flowSlash", "galeSlash", "rockSlash"],
+    skillRate: 0.55,
+    tactic: "attack" };
+  function rootJewel(weight) {
+    return { species: "jewelOre", weight: weight,
+      fleeRate: 0.25,
+      fixedStatLevel: 30,
+      statMultiplier: { hp: { min: 0.3, max: 0.5 }, defense: 5, speed: 5 },
+      skills: ["rockSpike"],
+      skillRate: 0.4,
+      debuffResist: 10,
+      effects: [
+        { type: "resistBonus", status: "all", value: 10 }
+      ] };
+  }
+
   NS.rawData.dungeons = {
     mossyMine: {
       id: "mossyMine",
@@ -657,24 +691,81 @@
      *   決まっていること（作者 2026-11-01）：Lv32・主のとき HP1050 攻135 防65 速40・PP無限（infinitePp）・
      *   1ターンに1〜2回動く（actionsPerTurn）・仲間にできる・落とすものは私に任された（見た目が決まってから案を出す）・
      *   効かない状態異常は毒と麻痺（immuneToStatus: ["poison", "paralysis"]。全主共通の即死・封印・盲目も効かない。眠り・呪いは効く）
-     * モチーフ（作者 2026-11-01）：琥珀と樹液（千年の時）＋千年樹の番人＋機械のモンスター。敵の顔ぶれはまだ仮
+     * モチーフ（作者 2026-11-01）：琥珀と樹液（千年の時）＋千年樹の番人＋機械のモンスター。
+     * 在来種（作者 2026-11-04）：4種・4階・Lv28〜31。ウェポン・ジュエル・コハクカブト・樹液のスライム（data/monsters.js）。
      * 主（作者 2026-11-03）：大きなからくり（木と真鍮・根が絡む・胸に琥珀の芯）。雷・弱点は地・特性は放電。
      *   「最序盤最後のヌシなだけあってかなり強めにしたい」。行動の順番・専用技 歯車投げも作者が決めた。
      *   名前「カラクリモリ」は作者から任された仮のもの（data/bosses.js の rootsWarden・monsters.js の gearWarden）
-     * 推奨Lv 30・4階は仮（作者の予定は「推奨は30くらいに抑えたい」）。まだ準備中（ready: false）
+     * 推奨Lv 30（作者の予定は「推奨は30くらいに抑えたい」）。まだ準備中（ready: false）
      */
     ancientRoots: {
       id: "ancientRoots",
       order: 7,
       region: "houga",
       name: "千年樹の根底",
-      subtitle: "",
-      description: "",
+      // 一言と説明は私の下書き。1行は句読点こみで20文字まで
+      subtitle: "止まった時の底で、番人が根を守る。",
+      description: "千年樹の根が張りめぐらされた、穴の底。\n" +
+                   "琥珀の中で時は止まり、古いからくりが\n" +
+                   "いまも根を守り続けている。",
       floors: 4,
       recommendedLevel: 30,
       unlockedBy: "ivyCorridor",
       theme: "rootdeep",
       generation: { width: 40, height: 28, roomMin: 4, roomMax: 10, roomCount: 11, attempts: 320 },
+      /**
+       * 階ごとの出方（私の案。ジュエルは出る割合 3〜5%）。
+       *   階   Lv     体数（1/2/3体）   甲虫 スライム ウェポン ジュエル
+       *   B1F 28〜29  50/50/ 0%         45%   45%      7%      3%
+       *   B2F 28〜30  30/50/20%         33%   33%     30%      4%
+       *   B3F 29〜30  20/50/30%         27%   27%     41%      5%
+       *   B4F 30〜31  20/40/40%         22%   23%     50%      5%
+       */
+      encounter: {
+        rate: 0.07,
+        groupSize: { min: 1, max: 3 },
+        levelRange: { min: 28, max: 31 },
+        table: [ ROOT_BEETLE, ROOT_SAP, ROOT_WEAPON ],
+        perFloor: {
+          "1": {
+            levelRange: { min: 28, max: 29 },
+            groupSize: [ { count: 1, weight: 0.5 }, { count: 2, weight: 0.5 } ],
+            table: [ ivyAt(ROOT_BEETLE, 0.45), ivyAt(ROOT_SAP, 0.45), ivyAt(ROOT_WEAPON, 0.07), rootJewel(0.03) ]
+          },
+          "2": {
+            levelRange: { min: 28, max: 30 },
+            groupSize: [ { count: 1, weight: 0.3 }, { count: 2, weight: 0.5 }, { count: 3, weight: 0.2 } ],
+            table: [ ivyAt(ROOT_BEETLE, 0.33), ivyAt(ROOT_SAP, 0.33), ivyAt(ROOT_WEAPON, 0.30), rootJewel(0.04) ]
+          },
+          "3": {
+            levelRange: { min: 29, max: 30 },
+            groupSize: [ { count: 1, weight: 0.2 }, { count: 2, weight: 0.5 }, { count: 3, weight: 0.3 } ],
+            table: [ ivyAt(ROOT_BEETLE, 0.27), ivyAt(ROOT_SAP, 0.27), ivyAt(ROOT_WEAPON, 0.41), rootJewel(0.05) ]
+          },
+          "4": {
+            levelRange: { min: 30, max: 31 },
+            groupSize: [ { count: 1, weight: 0.2 }, { count: 2, weight: 0.4 }, { count: 3, weight: 0.4 } ],
+            table: [ ivyAt(ROOT_BEETLE, 0.22), ivyAt(ROOT_SAP, 0.23), ivyAt(ROOT_WEAPON, 0.50), rootJewel(0.05) ]
+          }
+        }
+      },
+      // 1階に置く仕掛けの数は回廊と同じ
+      features: {
+        chest:  { min: 4, max: 5 },
+        spring: { min: 0, max: 1 },
+        trap:   { min: 1, max: 2 }
+      },
+      featureTables: {
+        chest: [
+          { item: "amberShard",    weight: 0.30, min: 1, max: 2 },
+          { item: "ancientSap",    weight: 0.30, min: 1, max: 2 },
+          { item: "brassGear",     weight: 0.26, min: 1, max: 1 },
+          { item: "glowMoss",      weight: 0.14, min: 1, max: 1 },
+          { item: "abyssFragment", weight: 0.14, min: 1, max: 1 },
+          { item: "jewelShard",    weight: 0.03, min: 1, max: 1 },
+          { item: "elixir",        weight: 0.15, min: 1, max: 1 }
+        ]
+      },
       // 主（v1.0.3。data/bosses.js）。区画はまだ準備中なので、いまは会えない
       boss: "rootsWarden",
       ready: false

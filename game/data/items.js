@@ -1332,6 +1332,55 @@
       effect: null,
       usableIn: []
     },
+    // 千年樹の根底の在来種のドロップ（v1.0.3）。名前・説明・値段は仮。使い道（作れる物）はまだ無い
+    amberShard: {
+      id: "amberShard",
+      name: "琥珀のかけら",
+      icon: "iconItemAmberShard",
+      from: "ancientRoots",
+      category: "material",
+      description: "コハクカブトの背から欠けたかけら。中に、小さな影が閉じ込められている。",
+      maxStack: 99,
+      price: 60,
+      effect: null,
+      usableIn: []
+    },
+    ancientSap: {
+      id: "ancientSap",
+      name: "千年樹の樹液",
+      icon: "iconItemAncientSap",
+      from: "ancientRoots",
+      category: "material",
+      description: "千年樹の傷から流れた樹液。甘い匂いがして、傷口によくなじむ。",
+      maxStack: 99,
+      price: 60,
+      effect: null,
+      usableIn: []
+    },
+    brassGear: {
+      id: "brassGear",
+      name: "真鍮の歯車",
+      icon: "iconItemBrassGear",
+      from: "ancientRoots",
+      category: "material",
+      description: "ウェポンの体から外れた歯車。千年たっても、錆びひとつない。",
+      maxStack: 99,
+      price: 70,
+      effect: null,
+      usableIn: []
+    },
+    jewelShard: {
+      id: "jewelShard",
+      name: "宝珠のかけら",
+      icon: "iconItemJewelShard",
+      from: "ancientRoots",
+      category: "material",
+      description: "ジュエルの体のかけら。ひとりでに小さく光る。とても高く売れる。",
+      maxStack: 99,
+      price: 600,
+      effect: null,
+      usableIn: []
+    },
 
     /**
      * --- 萌芽の穴・蔦這う回廊の素材（v1.0.1） ---

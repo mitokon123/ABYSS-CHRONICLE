@@ -19,6 +19,10 @@
  * "damageTaken" … 自分が受けるダメージに倍率を掛ける
  *     value   : 倍率（0.8 なら20%軽減）
  *     element : 指定するとその属性を受けたときだけ効く（省略で全部）
+ *     allDamage : true なら、攻撃のほかに毒・反動・罠のダメージにも効く（カチカチ。最低1は受ける）
+ *
+ * "ppCostMultiplier" … 自分が技に払うPPに倍率を掛ける（端数は切り上げ。戦闘でも探索中でも効く。カチカチ）
+ *     value : 倍率（1.5 なら PP3 の技に 5 払う）
  *
  * "healDealt" … 自分が使う回復の技（キュアなど）の回復量に倍率を掛ける。戦闘でも探索中でも効く
  *     value : 倍率（1.2 なら2割増し）。受ける側には関係しない。道具の回復・再生・吸血には効かない
@@ -378,6 +382,31 @@
       description: "死を司る。即死を付ける技を使っても、PPが減らない。",
       effects: [
         { type: "freeDeathSkills" }
+      ]
+    },
+
+    // ウェポン（千年樹の根底。名前と効果は作者が決めたもの 2026-11-05）
+    swordMaster: {
+      id: "swordMaster",
+      name: "剣豪",
+      category: "damage",
+      description: "すべての斬撃技のダメージが1.25倍になる。",
+      effects: [
+        { type: "damageDealt", value: 1.25, skillKind: "slash" }
+      ]
+    },
+
+    // ジュエル（千年樹の根底。名前と効果は作者が決めたもの 2026-11-05）。
+    // 受けるダメージはすべて ×1/3（allDamage。毒・反動・罠も。MonsterInstance.reduceDirectDamage）。
+    // 技に払う PP ×1.5（端数は切り上げ。MonsterInstance.getSkillPpCost）
+    hardBody: {
+      id: "hardBody",
+      name: "カチカチ",
+      category: "damage",
+      description: "すべてのダメージが1/3になり、消費PPが1.5倍になる。",
+      effects: [
+        { type: "damageTaken", value: 1 / 3, allDamage: true },
+        { type: "ppCostMultiplier", value: 1.5 }
       ]
     }
   };

@@ -239,9 +239,32 @@
     return SKILL_SORTS.indexOf(mode) >= 0 ? mode : SKILL_SORTS[0];
   };
 
-  DexScene.prototype._changeSkillSort = function (direction) {
-    var i = SKILL_SORTS.indexOf(this._skillSort());
-    this.game.dexSkillSort = SKILL_SORTS[(i + direction + SKILL_SORTS.length) % SKILL_SORTS.length];
+  /** モンスターの並べ方（Q/E で切り替える。2026-11-06）。技と同じく、図鑑を閉じても覚えておく（セーブはしない） */
+  var MONSTER_SORTS = ["family", "element", "name", "order"];
+
+  DexScene.prototype._monsterSort = function () {
+    var mode = this.game.dexMonsterSort;
+    return MONSTER_SORTS.indexOf(mode) >= 0 ? mode : MONSTER_SORTS[0];
+  };
+
+  /** その表に並べ替えがあるか（技とモンスター） */
+  DexScene.prototype._hasSort = function () {
+    var tab = this.getTab();
+    return tab === "skills" || tab === "monsters";
+  };
+
+  /** いまの表の並べ方 */
+  DexScene.prototype._currentSort = function () {
+    return this.getTab() === "monsters" ? this._monsterSort() : this._skillSort();
+  };
+
+  /** いまの表の並べ方を変える */
+  DexScene.prototype._changeSort = function (direction) {
+    var monsters = this.getTab() === "monsters";
+    var modes = monsters ? MONSTER_SORTS : SKILL_SORTS;
+    var next = modes[(modes.indexOf(this._currentSort()) + direction + modes.length) % modes.length];
+    if (monsters) this.game.dexMonsterSort = next;
+    else this.game.dexSkillSort = next;
     this._rebuildList();
     this.detailScroll = 0;
   };
@@ -283,13 +306,16 @@
     return !!(pointer && pointer.clicked && this._sortRect && NS.Panel.containsPoint(this._sortRect, pointer));
   };
 
-  /** モンスターを分類（family）ごとに並べる */
+  /**
+   * モンスターを並べる。並べ方は系統ごと・属性ごと・名前順・図鑑の順（data/monsters.js に書いた順）。
+   * 名前順では、まだ出会っていないものは最後にまとめる（技の名前順と同じ）
+   */
   DexScene.prototype._buildMonsterRows = function () {
     var data = this.game.data;
     var discovery = this.game.discovery;
-    var families = (data.categories || {}).monster || {};
+    var mode = this._monsterSort();
 
-    return buildRows(data.monsters, families, "family", function (id, monster) {
+    var makeEntry = function (id, monster) {
       var seen = discovery.isMonsterSeen(id);
       var caught = discovery.isMonsterCaught(id);
       return {
@@ -297,7 +323,24 @@
         right: caught ? (this.texts.caughtLabel || "") : (seen ? (this.texts.seenLabel || "") : ""),
         value: id
       };
-    }.bind(this));
+    }.bind(this);
+
+    if (mode === "family") return buildRows(data.monsters, (data.categories || {}).monster || {}, "family", makeEntry);
+    if (mode === "element") return buildRows(data.monsters, data.elements || {}, "element", makeEntry);
+    if (mode === "order") return flatRows(data.monsters, makeEntry);
+
+    var ids = Object.keys(data.monsters);
+    var sorted = ids.slice().sort(function (a, b) {
+      var sa = discovery.isMonsterSeen(a), sb = discovery.isMonsterSeen(b);
+      if (sa !== sb) return sa ? -1 : 1;
+      if (!sa) return ids.indexOf(a) - ids.indexOf(b);
+      return data.monsters[a].name.localeCompare(data.monsters[b].name, "ja") || ids.indexOf(a) - ids.indexOf(b);
+    });
+    return sorted.map(function (id) {
+      var entry = makeEntry(id, data.monsters[id]);
+      entry.type = "entry";
+      return entry;
+    });
   };
 
   /**
@@ -362,11 +405,11 @@
     if (input.isPressed("right")) this._changeTab(1);
     if (this._clickedTab(input)) return;
 
-    // 技の表だけ、Q/E（または並びの札を押す）で並べ方を変えられる
-    if (this.getTab() === "skills") {
-      if (input.isPressed("prevTab")) this._changeSkillSort(-1);
-      if (input.isPressed("nextTab")) this._changeSkillSort(1);
-      if (this._clickedSortLabel(input)) { this._changeSkillSort(1); return; }
+    // 技とモンスターの表は、Q/E（または並びの札を押す）で並べ方を変えられる
+    if (this._hasSort()) {
+      if (input.isPressed("prevTab")) this._changeSort(-1);
+      if (input.isPressed("nextTab")) this._changeSort(1);
+      if (this._clickedSortLabel(input)) { this._changeSort(1); return; }
     }
 
     // 説明の上でホイールを回したら、そのままスクロールする
@@ -635,15 +678,15 @@
     }
   };
 
-  /** 技の表の並べ方の札（「並び：属性ごと　Q/E」）。押しても次の並びに変わる */
+  /** 技とモンスターの表の並べ方の札（「並び：属性ごと　Q/E」）。押しても次の並びに変わる */
   DexScene.prototype._renderSortLabel = function () {
     this._sortRect = null;
-    if (this.getTab() !== "skills") return;
+    if (!this._hasSort()) return;
     var pos = this.layout.sort;
     if (!pos) return;
     var t = this.theme;
     var modes = this.texts.sortModes || {};
-    var text = (this.texts.sortLabel || "{mode}").replace("{mode}", modes[this._skillSort()] || this._skillSort());
+    var text = (this.texts.sortLabel || "{mode}").replace("{mode}", modes[this._currentSort()] || this._currentSort());
     var ctx = this.panel.ctx;
     ctx.save();
     ctx.font = t.smallFont || "12px monospace";
@@ -1053,7 +1096,7 @@
     lines.push({ text: skill.name, font: t.font, color: t.textColor });
 
     var element = (data.elements || {})[skill.element];
-    lines.push({ text: (this.texts.elementLabel || "") + " " + (element ? element.name : "-"),
+    lines.push({ text: (this.texts.elementLabel || "") + " " + (element ? data.getSkillElementName(skill) : "-"),
                  color: element ? element.color : null });
     // 技の種類（共鳴・ブレスなど）。種類の決まり（note）があれば次の行に添える
     var kind = data.getSkillKind(skill);
@@ -1066,7 +1109,7 @@
     //   キュアやどくのいきに「威力」と並ぶと、殴る技のように見えてしまうため。
     //   判定は戦闘と同じ BattleSystem.dealsDamage
     if (skill.power) {
-      lines.push({ text: (this.texts.powerLabel || "") + " " + skill.power });
+      lines.push({ text: (this.texts.powerLabel || "") + " " + this.game.data.formatSkillPower(skill) });
     } else if (NS.BattleSystem.dealsDamage(skill)) {
       lines.push({ text: (this.texts.powerLabel || "") + " " + (this.texts.powerNormal || "-") });
     }
@@ -1232,7 +1275,8 @@
     var pos = this.layout.hint || { x: 48, y: 570 };
     var hint;
 
-    var skills = (this.getTab() === "skills");
+    // 並べ替えのある表（技・モンスター）は Q/E の案内も出す
+    var skills = this._hasSort();
     if (this.focus === "detail") hint = this.texts.hintDetail;
     else if (this._canScrollDetail()) hint = skills ? this.texts.hintSkillsScrollable : this.texts.hintScrollable;
     else hint = skills ? this.texts.hintSkills : this.texts.hint;

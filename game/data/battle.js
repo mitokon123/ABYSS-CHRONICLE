@@ -184,6 +184,8 @@
      *
      * 1つの作戦に書けるもの（書かなければ使わない）
      *   ai          : false なら今までどおりコマンドで選ぶ（命令する）
+     *   reviveSafeHp: 場に倒れた仲間がいて、生きている味方のHPがどれもこの割合以上なら、起こす技（リザレクト）を使う（回復より先）。
+     *                 この割合を下回った味方がいるあいだは起こさない。書いていない作戦は起こす技を使わない（作者 2026-11-06）
      *   healBelow   : 場の味方に、最大HPのこの割合を下回った者がいれば、回復の技を最優先で使う。
      *                 回復量と減ったHPに見合った技を選ぶ（全回復できる技のうち無駄のいちばん少ないもの。無ければいちばん多く治すもの）。
      *                 下回った味方が2体以上で、味方全体を治す技があればそれを使う
@@ -210,8 +212,8 @@
                    healBelow: 0.25, attack: "best",
                    description: "いちばんダメージの出る技で攻める。" },
         protect: { id: "protect", name: "仲間を守る", ai: true,
-                   healBelow: 0.5, cure: true, attack: "best", defendBelow: 0.2,
-                   description: "味方HPの回復や状態異常を回復する技を優先して使う。" },
+                   reviveSafeHp: 0.4, healBelow: 0.5, cure: true, attack: "best", defendBelow: 0.2,
+                   description: "味方HPの回復や蘇生、状態異常を回復する技を優先して使う。" },
         support: { id: "support", name: "補助中心", ai: true,
                    healBelow: 0.25, support: true, attack: "best", defendBelow: 0.2,
                    description: "強化・弱体・状態異常の技を優先して使う。" },

@@ -189,6 +189,14 @@
   };
 
   /** その効果はHPを回復するものか（画面側が回復の演出を出すかの判断に使う。蘇生もHPが戻る） */
+  /**
+   * 倒れた仲間を起こす（神鳥の羽と同じ起こし方）。技のリザレクト（戦闘・探索）からも使う。
+   * @returns {{applied:boolean, amount:number}} amount は戻ったHP
+   */
+  ItemUsage.reviveTarget = function (target, hpRatio) {
+    return EFFECT_HANDLERS.revive({ hpRatio: hpRatio }, target);
+  };
+
   ItemUsage.healsHp = function (effectType) {
     return effectType === "healHp" || effectType === "revive";
   };
