@@ -2084,7 +2084,7 @@
       ]
     },
 
-    // 琥珀の芯（仮）：千年樹の根底の主の胸にあった琥珀。真鍮の枠に収まり、中で光が揺れる
+    // 琥珀の芯：千年樹の根底の主の胸にあった琥珀。真鍮の枠に収まり、中で光が揺れる
     iconItemAmberCore: {
       palette: { ".": null, "K": "#1c130a", "B": "#5a4316", "C": "#8a6a24", "T": "#c49a3a",
                  "J": "#7a3408", "O": "#c8661a", "Q": "#f0a030", "W": "#ffe08a" },
@@ -2108,7 +2108,7 @@
       ]
     },
 
-    // 千年樹の根底の素材（v1.0.3。どれも名前は仮）
+    // 千年樹の根底の素材（v1.0.3）
     // 琥珀のかけら：コハクカブトの背から欠けたもの
     iconItemAmberShard: {
       palette: { ".": null, "K": "#241206", "A": "#e8a030", "a": "#c47818", "D": "#7a4410",
@@ -2525,4 +2525,303 @@
     if (base) ivyIcons[iconId] = { pixels: base.pixels, palette: recolor[iconId].palette };
   }
   NS.extend("sprites", ivyIcons);
+
+  /**
+   * 2026-11-10 に足した道具・素材・装備（作者の案 新装備まとめ.txt）。
+   * 既存の絵の形を借りて塗り替えた絵（作者が見て了承 11-10）。from が借りた形。
+   * 札・指輪・胴着・剣の一部は、このあとの段で形から描き直した
+   */
+  var recolor1110 = {
+    // 回復の道具
+    iconItemNumbLeaf: { from: "iconItemAntidote",      // 解毒草の葉を、しびれの黄色に
+      palette: { ".": null, "K": "#2a2408", "T": "#d8b830", "L": "#fff0a0", "D": "#8a7418", "S": "#7a6a3a" } },
+    iconItemVoiceTonic: { from: "iconItemPotion",      // 回復薬の瓶を、封印の紫に
+      palette: { ".": null, "K": "#2a2438", "C": "#a0703a", "W": "#c8e0f0", "H": "#ffffff",
+                 "R": "#9a6ad8", "P": "#d0b0ff", "D": "#5a3a98" } },
+    iconItemPurifyingSalt: { from: "iconItemGlowDust", // 光る鱗粉の山を、白い塩に
+      palette: { ".": null, "K": "#1a1a20", "N": "#6a6a78", "D": "#b8b8c4", "Y": "#e8e8f0",
+                 "H": "#f4f4fa", "W": "#ffffff" } },
+    iconItemClearEyeDew: { from: "iconItemElixir",     // 深淵の雫を、澄んだ水色に
+      palette: { ".": null, "K": "#0a1a2a", "V": "#3a8ac8", "L": "#8ad0f0", "D": "#1a4a78",
+                 "C": "#c8f4ff", "W": "#ffffff", "Y": "#e8fcff" } },
+    iconItemWakeFlower: { from: "iconItemHerb",        // 薬草を、桃色の花に
+      palette: { ".": null, "K": "#3a1424", "L": "#ffc0d8", "G": "#e870a0", "D": "#a03a68", "S": "#7a9a3a" } },
+    iconItemAncientHoney: { from: "iconItemElixir",    // 深淵の雫を、琥珀色の蜜に
+      palette: { ".": null, "K": "#241206", "V": "#c47818", "L": "#e8a030", "D": "#7a4410",
+                 "C": "#ffd884", "W": "#fff4cc", "Y": "#ffe8a8" } },
+    iconItemGreatSpiritBerry: { from: "iconItemSpiritBerry", // 精気の実を、濃い青紫に
+      palette: { ".": null, "K": "#140e3a", "B": "#7a6ae0", "H": "#f0e8ff", "D": "#3a2a9a",
+                 "G": "#5ab84a", "S": "#6a4a2a" } },
+    iconItemPanacea: { from: "iconItemPotion",         // 回復薬の瓶を、金色に
+      palette: { ".": null, "K": "#2a1a08", "C": "#a0703a", "W": "#c8e0f0", "H": "#ffffff",
+                 "R": "#e8b830", "P": "#fff0a0", "D": "#a87818" } },
+
+    // 素材
+    iconItemSunCrystal: { from: "iconItemJewelShard",  // 宝珠のかけらを、日向の黄色に
+      palette: { ".": null, "K": "#2a1a06", "G": "#ffe080", "g": "#e8b030", "D": "#a86a10", "W": "#fffbe0" } },
+    iconItemBreezeCrystal: { from: "iconItemJewelShard", // 宝珠のかけらを、風の青緑に
+      palette: { ".": null, "K": "#06201a", "G": "#b0f4e0", "g": "#3aa088", "D": "#1a5a48", "W": "#f0fffa" } },
+
+    // 防具
+    iconItemAmberArmor: { from: "iconItemMossShellArmor",
+      palette: { ".": null, "K": "#241206", "A": "#c47818", "H": "#ffd884", "D": "#7a4410",
+                 "M": "#e8a030", "F": "#fff4cc" } },
+    iconItemDuskDewCloak: { from: "iconItemMossCharm",
+      palette: { ".": null, "K": "#0a0d1e", "A": "#2a3a6a", "H": "#4a5a9a", "D": "#18203e",
+                 "N": "#06081a", "M": "#7a8ae0", "S": "#8a8098", "O": "#c8d8ff" } },
+    iconItemScorchedShellArmor: { from: "iconItemStoneMail",
+      palette: { ".": null, "K": "#2b0f08", "A": "#a8461e", "H": "#d8683a", "P": "#ff9a3c",
+                 "D": "#6a2a10", "N": "#3d1608", "S": "#8c3a1e" } },
+
+    // 武器
+    iconItemFlameFangTachi: { from: "iconItemBlazeCharm",
+      palette: { ".": null, "K": "#2b0808", "H": "#fff0c0", "B": "#ff7a2a", "D": "#c83a1a",
+                 "G": "#4a3e66", "g": "#7a6a9c", "A": "#2a1a08", "a": "#140a04", "O": "#ffd040" } },
+    iconItemRootboundSpear: { from: "iconItemMarshSpear",
+      palette: { ".": null, "K": "#0a0d08", "A": "#b8c0a8", "a": "#5a6a50", "H": "#f0f4e8",
+                 "B": "#b8c0a8", "D": "#5a6a50", "G": "#6a4424", "g": "#9a6a3a", "V": "#5f9a4a" } },
+    iconItemVenomRapier: { from: "iconItemEmberBlade",
+      palette: { ".": null, "K": "#0a0f08", "H": "#c8f0a0", "B": "#8a9a8a", "D": "#2e3a2a",
+                 "G": "#3a4a30", "g": "#6a7a5a", "A": "#4a2a6a", "a": "#2a1440", "O": "#7fd06a",
+                 "R": "#8b6fd6", "Y": "#e0ffc0" } },
+
+    // アクセサリー
+    iconItemSapCharm: { from: "iconItemSproutCharm",
+      palette: { ".": null, "K": "#1a1008", "C": "#ffd884", "c": "#e8a030", "A": "#c47818",
+                 "H": "#ffe8a8", "D": "#7a4410", "W": "#fff4cc", "G": "#84c95a" } },
+    iconItemJewelNecklace: { from: "iconItemSlimeNecklace",
+      palette: { ".": null, "K": "#141030", "C": "#d8bc78", "c": "#7fe8e0", "A": "#2fb0c8",
+                 "H": "#c8fcff", "D": "#1c6a8a", "W": "#ffffff" } },
+    iconItemAbyssNecklace: { from: "iconItemSlimeNecklace",
+      palette: { ".": null, "K": "#0a0718", "C": "#8a8098", "c": "#a880e8", "A": "#6a3ab8",
+                 "H": "#c8a8ff", "D": "#3a1a78", "W": "#f0e8ff" } },
+    iconItemRadiantLantern: { from: "iconItemGlowLantern",
+      palette: { ".": null, "K": "#14141e", "A": "#f4f4ff", "H": "#ffffff", "D": "#c8c8e8",
+                 "N": "#8a8ab0", "M": "#3a3a58", "W": "#ffffff" } },
+    iconItemJadeWindPlume: { from: "iconItemLeafPlume",
+      palette: { ".": null, "K": "#06201a", "A": "#2fb08a", "H": "#b0f4e0", "D": "#146a52",
+                 "R": "#8ae8ff", "r": "#3a8ac8", "Q": "#e0fff4" } },
+    iconItemSevenWardRing: { from: "iconItemCrownCircle",
+      palette: { ".": null, "K": "#1a1a20", "A": "#d8dce8", "H": "#ffffff", "D": "#8a90a8",
+                 "B": "#e8445a", "L": "#ffd75e", "N": "#7fd06a" } },
+    iconItemWraithBell: { from: "iconItemMourningBell",
+      palette: { ".": null, "K": "#0a0d10", "N": "#2a3440", "D": "#5a6a78", "A": "#8a9aa8",
+                 "H": "#c8d4d0", "P": "#eef4f0", "R": "#6a3ab8" } },
+    iconItemHunterFangCharm: { from: "iconItemBoneCharm",
+      palette: { ".": null, "K": "#2b0f08", "C": "#5a2211", "A": "#f0e8d8", "H": "#fffaf0",
+                 "D": "#a89a80", "N": "#3d1608", "E": "#ffc928" } }
+  };
+  var icons1110 = {};
+  for (var newIconId in recolor1110) {
+    var newBase = sprites[recolor1110[newIconId].from];
+    if (newBase) icons1110[newIconId] = { pixels: newBase.pixels, palette: recolor1110[newIconId].palette };
+  }
+
+  /**
+   * 同じ形の使い回しを減らすため、新しく描き直した装備の絵（作者「使いまわし多いから、少し回しを減らす」2026-11-10）。
+   * 札4枚は札の形をそろえたまま、真ん中の印だけをそれぞれ描いた（もとは4枚とも炎の印の塗り替え）。
+   * 指輪3つ・胴着2つ・剣1つは形から描いた。
+   */
+  // 札の外側（炎よけの札と同じ）。真ん中の6行×6列だけ差し替える
+  function wardWith(mark) {
+    var top = ["......KCCK......", "....KKKCKKKK....", "...KHHHHHHHHK...", "...KHAAAAAADK..."];
+    var bottom = ["...KHAAAAAADK...", "...KHNNNNNNDK...", "...KHAAAAAADK...", "...KHDDDDDDDK...",
+                  "....KKKKKKKK....", "................"];
+    var middle = [];
+    for (var i = 0; i < mark.length; i++) middle.push("...KH" + mark[i] + "DK...");
+    return top.concat(middle, bottom);
+  }
+  var wardPalette = function (card, mark) {
+    return { ".": null, "K": "#180b09", "A": card[0], "H": card[1], "D": card[2],
+             "R": mark[0], "O": mark[1], "C": "#7a4a2a", "N": "#5c3a30" };
+  };
+  var plainCard = ["#c8946a", "#e8b88a", "#8a5a40"];
+  NS.extend("sprites", icons1110);
+  NS.extend("sprites", {
+    // 琥珀の雷札：琥珀色の札に、青い稲妻
+    iconItemAmberThunderWard: {
+      palette: wardPalette(["#e8a030", "#ffd884", "#a86a18"], ["#3f86e0", "#a8e0fa"]),
+      pixels: wardWith(["AAAORA", "AAORAA", "AORRRA", "AAAORA", "AAORAA", "AORAAA"])
+    },
+    // 地よけの札：山の印（左が明るい面）
+    iconItemEarthWard: {
+      palette: wardPalette(plainCard, ["#6a4424", "#b08048"]),
+      pixels: wardWith(["AAAAAA", "AAORAA", "AOORRA", "AORRRA", "OORRRR", "RRRRRR"])
+    },
+    // 風よけの札：巻いて流れる風の筋
+    iconItemGaleWard: {
+      palette: wardPalette(plainCard, ["#3aa088", "#7ae0c0"]),
+      pixels: wardWith(["AAAAAA", "RRRRRA", "AAAARA", "AORRAA", "OOOOAA", "AAAAAA"])
+    },
+    // 陽よけの札：縁どりのある日輪と、四すみの光
+    iconItemSunWard: {
+      palette: wardPalette(plainCard, ["#e8b830", "#fff0a0"]),
+      pixels: wardWith(["RAAAAR", "AROORA", "ROOOOR", "ROOOOR", "AROORA", "RAAAAR"])
+    },
+
+    // 雫の指輪：平たい銀の輪に、しずく形の水色の石
+    iconItemDewdropRing: {
+      palette: { ".": null, "K": "#071a2a", "A": "#b8c8d8", "H": "#f0f8ff", "D": "#6a7a90",
+                 "V": "#5ad8f0", "G": "#a8e0fa", "W": "#e8ffff", "B": "#2a8ab8" },
+      pixels: [
+        "................",
+        ".......KK.......",
+        "......KWVK......",
+        "......KWVK......",
+        ".....KWGVVK.....",
+        ".....KGVVVK.....",
+        "....KWVVVVBK....",
+        "....KGVVVVBK....",
+        ".....KVVBBK.....",
+        "...KHHKKKKADK...",
+        "..KHAKK..KKADK..",
+        "..KHK......KDK..",
+        "..KHAKK..KKADK..",
+        "...KHAAAAAADK...",
+        "....KDDDDDDK....",
+        ".....KKKKKK....."
+      ]
+    },
+    // 炎の指輪：丸い鉄の輪に、ゆらぐ炎の石
+    iconItemEmberRing: {
+      palette: { ".": null, "K": "#180b09", "A": "#8c3a1e", "H": "#c85a2a", "D": "#5a2211",
+                 "R": "#e8542a", "O": "#ff9a3c", "Y": "#ffe080" },
+      pixels: [
+        ".......K..K.....",
+        "......KYK.KK....",
+        ".....KOYKKOK....",
+        ".....KOYYOOK....",
+        "....KROYYOOK....",
+        "....KRROOORK....",
+        "....KKRRRRKK....",
+        "...KHAKKKKADK...",
+        "..KHAK....KADK..",
+        "..KHK......KDK..",
+        "..KHK......KDK..",
+        "..KHK......KDK..",
+        "..KHAK....KDDK..",
+        "...KADKKKKDDK...",
+        "....KDDDDDDK....",
+        ".....KKKKKK....."
+      ]
+    },
+    // 古木の指輪：木目の太い輪から、若葉が2枚芽吹く
+    iconItemAncientWoodRing: {
+      palette: { ".": null, "K": "#1c130a", "A": "#9a6a3a", "H": "#c8945a", "D": "#5c4229",
+                 "N": "#3a2817", "S": "#6a4424", "L": "#c8f0a0", "G": "#5fa83f" },
+      pixels: [
+        "................",
+        ".........KKK....",
+        "...KKK..KLLLK...",
+        "..KLLGK.KLGGK...",
+        "..KLGGKKGGK.....",
+        "...KKGKGKK......",
+        ".....KSSK.......",
+        "...KKHHSAAKK....",
+        "..KHAAKKKKADK...",
+        ".KHAK......KADK.",
+        ".KNAK......KANK.",
+        ".KHDK......KDDK.",
+        "..KANKKKKKKDNK..",
+        "...KDDAAAADDK...",
+        "....KKKKKKKK....",
+        "................"
+      ]
+    },
+
+    // からくりの胴着：真鍮の胸当て。丸い肩当てと、胸に琥珀の芯の歯車
+    iconItemClockworkVest: {
+      palette: { ".": null, "K": "#1c140a", "A": "#a87828", "H": "#d8b060", "D": "#6a4a18",
+                 "S": "#fff0c0", "B": "#3a2817", "G": "#6a5020", "g": "#e8c060", "O": "#ffb030" },
+      pixels: [
+        "................",
+        "..KKK......KKK..",
+        ".KHHAK....KAHHK.",
+        ".KHAAKKKKKKAADK.",
+        "..KKHAAAAAAADK..",
+        "...KHAAKKKAADK..",
+        "...KHAKGgGKADK..",
+        "...KHKGgOgGKDK..",
+        "...KHAKGgGKADK..",
+        "...KHAAKKKAADK..",
+        "...KHSAAAAASDK..",
+        "...KHAAAAAAADK..",
+        "....KHDDDDDDK...",
+        "....KBBBBBBBK...",
+        ".....KKKKKKK....",
+        "................"
+      ]
+    },
+    // 晴嵐の胴衣：頭巾つきの上着。前を金の留め具で閉じ、袖と胸に風の筋が流れる
+    iconItemClearGaleVest: {
+      palette: { ".": null, "K": "#08201a", "A": "#3aa088", "H": "#7ae0c0", "D": "#1a5a48",
+                 "S": "#ffc840", "W": "#d0fff0" },
+      pixels: [
+        "......KKKK......",
+        ".....KHHAAK.....",
+        "....KHAKKAAK....",
+        "....KHK..KDK....",
+        "..KKKHAKKADKKK..",
+        ".KHAKHAASAADKDK.",
+        "KHAAKHAAKAADKADK",
+        "KHWAKHAWKAADKADK",
+        "KHAAKHAAKWWDKADK",
+        "KHAAKHAAKAADKADK",
+        ".KKKKHAAKAWDKKK.",
+        "....KHAAKAADK...",
+        "....KHAWKAADK...",
+        "....KHDDKDDDK...",
+        "....KKKKKKKKK...",
+        "................"
+      ]
+    },
+
+    // 歯車の大剣：真鍮の幅広の刃。峰に歯車の歯が2つ立ち、つばは丸い歯車
+    iconItemGearGreatsword: {
+      palette: { ".": null, "K": "#1c140a", "H": "#fff0c0", "B": "#d8b060", "D": "#8a6a28",
+                 "G": "#6a5020", "g": "#c89830", "A": "#3a2817", "a": "#1c130a", "O": "#ffd884" },
+      pixels: [
+        "...........KKK..",
+        "..........KHBDK.",
+        ".........KHBBDDK",
+        "........KHBBBDK.",
+        ".......KHBBBDK..",
+        "......KHBBBDDK..",
+        ".....KHBBBDK....",
+        "...KKKKHBBDK....",
+        "..KgOgKHBDK.....",
+        "..KOGOKBDK......",
+        "..KgOgKKK.......",
+        "..KKAKK.........",
+        ".KAaK...........",
+        "KAaK............",
+        "KOK.............",
+        ".K.............."
+      ]
+    },
+
+    // 轟雷の剣：刃の縁が稲妻のように折れる。金のつば
+    iconItemRoaringThunderBlade: {
+      palette: { ".": null, "K": "#0a0d24", "H": "#ffffff", "B": "#ffe35a", "D": "#3f86e0",
+                 "G": "#e09a14", "g": "#ffc928", "A": "#2a1a40", "a": "#140c24", "O": "#a8e0fa" },
+      pixels: [
+        "............KK..",
+        "...........KHBK.",
+        "..........KHBDK.",
+        ".........KHBDK..",
+        "........KHBBDK..",
+        "..........KBDK..",
+        ".........KHBK...",
+        "........KHBDK...",
+        ".......KHBBDK...",
+        ".....K..KHDK....",
+        "....KgK.KDK.....",
+        "....KggKBK......",
+        "...KKAGGK.......",
+        "..KOAaKggK......",
+        "..KOOK.KK.......",
+        "...KOK.........."
+      ]
+    }
+  });
 })(window.MyGame);

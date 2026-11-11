@@ -346,6 +346,9 @@
       case "regen":
         return fill(t.abilityRegen, { target: this._targetName(event),
           ability: event.abilityName, amount: event.healAmount });
+      case "ppRegen":
+        return fill(t.abilityPpRegen, { target: this._targetName(event),
+          ability: event.abilityName, amount: event.amount });
       case "undying":
         return fill(t.undying,
                     { target: this._targetName(event), ability: event.abilityName });

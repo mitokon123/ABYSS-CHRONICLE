@@ -131,10 +131,13 @@
     var spots = this._collectSpots(map, avoid);
     var placed = [];
 
-    // 中身の決まった宝箱（data/dungeons.js の fixedChests。v1.0.3）。その階なら、数とは別に必ず置く
+    // 中身の決まった宝箱（data/dungeons.js の fixedChests。v1.0.3）。その階なら、数とは別に置く。
+    // chance を書くと、その確率で置くかどうかを決める（回廊 B4F の絡み主根 60%。2026-11-10）。
+    // 置いた宝箱はセーブに入るので、中断して再開しても置き直さない（Game の featureData）
     var fixed = this.dungeon.fixedChests || [];
     for (var f = 0; f < fixed.length && definitions.chest; f++) {
       if (fixed[f].floor !== undefined && fixed[f].floor !== floor) continue;
+      if (typeof fixed[f].chance === "number" && this.random.next() >= fixed[f].chance) continue;
       if (spots.length === 0) break;
       var at = spots.splice(this.random.nextInt(0, spots.length - 1), 1)[0];
       placed.push({

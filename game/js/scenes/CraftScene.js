@@ -7,6 +7,7 @@
  *
  * ▼ 操作
  *   ↑↓   … 作るものを選ぶ
+ *   ←→/F … 絞り込み（すべて・作れるもの・道具・武器・防具・アクセサリー。2026-11-09）
  *   決定   … 「作りますか?」のはい／いいえへ
  *   Esc    … 1つ前へ戻る（一覧なら拠点へ）
  */
@@ -66,11 +67,17 @@
     var categories = (data.categories || {}).item || {};
     var slotDefs = (data.categories || {}).equipSlot || {};
 
+    // 絞り込みの候補は、いま並んでいるレシピから決める（武器のレシピがまだ無ければ「武器」は出さない）
+    this.filters = this._availableFilters(recipes);
+    var filter = this._currentFilter();
+
     // 見出しごとにまとめる（分類 → 装備の枠）
     var groups = {};
     for (var i = 0; i < recipes.length; i++) {
       var item = data.getItem(recipes[i].result.item);
       if (!item) continue;
+      var ready = this.craftSystem.canCraft(this.game, recipes[i]).ok;
+      if (!matchesFilter(filter, item, ready)) continue;
       var categoryId = item.category || "other";
       var slot = item.equip ? NS.EffectSystem.slotOf(item) : null;
       var key = categoryId + (slot ? "/" + slot : "");
@@ -79,7 +86,7 @@
           order: ((categories[categoryId] || {}).order || 999) * 10
                + ((slot && slotDefs[slot]) ? slotDefs[slot].order : 0) };
       }
-      groups[key].entries.push({ recipe: recipes[i], item: item });
+      groups[key].entries.push({ recipe: recipes[i], item: item, ready: ready });
     }
 
     var ordered = Object.keys(groups).sort(function (a, b) { return groups[a].order - groups[b].order; });
@@ -101,7 +108,7 @@
 
       for (var e = 0; e < group.entries.length; e++) {
         var recipe = group.entries[e].recipe;
-        var ready = this.craftSystem.canCraft(this.game, recipe).ok;
+        var ready = group.entries[e].ready;
         rows.push({
           type: "entry",
           label: group.entries[e].item.name,
@@ -115,6 +122,60 @@
       }
     }
     this.list.setRows(rows);
+  };
+
+  // --- 絞り込み（2026-11-09 作者の依頼） ---
+
+  /**
+   * 絞り込みの並び。F（または ←→・札を押す）で切り替える。
+   * 選んだものは工房を閉じても覚えておく（game.craftFilter。セーブはしない。図鑑の並べ方と同じ）
+   *   all … すべて  ready … いま作れるものだけ  use … 装備でないもの（回復・道具）
+   *   weapon / armor / accessory … 装備の枠
+   */
+  var FILTERS = ["all", "ready", "use", "weapon", "armor", "accessory"];
+
+  function matchesFilter(filter, item, ready) {
+    switch (filter) {
+      case "ready": return ready;
+      case "use":   return !item.equip;
+      case "weapon":
+      case "armor":
+      case "accessory":
+        return !!item.equip && NS.EffectSystem.slotOf(item) === filter;
+      default:      return true;
+    }
+  }
+
+  /** いまのレシピで1つも当てはまらない分類は候補から外す（「すべて」「作れるもの」はいつも出す） */
+  CraftScene.prototype._availableFilters = function (recipes) {
+    var data = this.game.data;
+    return FILTERS.filter(function (filter) {
+      if (filter === "all" || filter === "ready") return true;
+      for (var i = 0; i < recipes.length; i++) {
+        var item = data.getItem(recipes[i].result.item);
+        if (item && matchesFilter(filter, item, true)) return true;
+      }
+      return false;
+    });
+  };
+
+  CraftScene.prototype._currentFilter = function () {
+    var filters = this.filters || FILTERS;
+    var filter = this.game.craftFilter;
+    return filters.indexOf(filter) >= 0 ? filter : filters[0];
+  };
+
+  CraftScene.prototype._changeFilter = function (direction) {
+    var filters = this.filters || FILTERS;
+    var index = filters.indexOf(this._currentFilter());
+    this.game.craftFilter = filters[(index + direction + filters.length) % filters.length];
+    this._rebuildList();   // 選択は一覧の先頭に戻る（ScrollList.setRows）
+  };
+
+  /** 絞り込みの札の当たり判定（描いたときに覚える） */
+  CraftScene.prototype._clickedFilterLabel = function (input) {
+    var pointer = input.getPointer ? input.getPointer() : null;
+    return !!(pointer && pointer.clicked && this._filterRect && NS.Panel.containsPoint(this._filterRect, pointer));
   };
 
   CraftScene.prototype._selectedRecipe = function () {
@@ -137,6 +198,11 @@
     }
 
     if (this.phase === "confirm") { this._updateConfirm(input); return; }
+
+    // 絞り込み：F・←→・札を押す
+    if (input.isPressed("filter") || input.isPressed("right")) { this._changeFilter(1); return; }
+    if (input.isPressed("left")) { this._changeFilter(-1); return; }
+    if (this._clickedFilterLabel(input)) { this._changeFilter(1); return; }
 
     // ScrollList が扱うのは上下移動だけ。決定・取消はここで見る
     this.list.handleInput(input);
@@ -194,10 +260,12 @@
 
     this.phase = "list";
 
-    // 素材と所持金が変わるので一覧を作り直す（カーソル位置は保つ）
+    // 素材と所持金が変わるので一覧を作り直す（カーソル位置は保つ）。
+    // 「作れるもの」で絞っていると行が減るので、見出しに当たったら先頭のまま
     var index = this.list.index;
     this._rebuildList();
-    if (index < this.list.rows.length) this.list.setIndex(index);
+    var row = this.list.rows[index];
+    if (row && row.type === "entry") this.list.setIndex(index);
   };
 
   CraftScene.prototype._showNotice = function (text) {
@@ -214,6 +282,7 @@
 
     this._renderHeading();
     this._renderGold();
+    this._renderFilterLabel();
     this.list.render(this.game.clock);
     this._renderDetail();
 
@@ -244,6 +313,27 @@
         color: pos.color || this.theme.cursorColor });
   };
 
+  /** 一覧の右上の絞り込みの札（「絞り込み：すべて　F」）。右端を一覧の右端にそろえる。押すと次に変わる */
+  CraftScene.prototype._renderFilterLabel = function () {
+    this._filterRect = null;
+    var pos = this.layout.filter;
+    if (!pos) return;
+    var t = this.theme;
+    var names = this.texts.filters || {};
+    var filter = this._currentFilter();
+    var text = (this.texts.filterLabel || "{name}").replace("{name}", names[filter] || filter);
+    var ctx = this.panel.ctx;
+    ctx.save();
+    ctx.font = t.smallFont || "12px monospace";
+    var w = ctx.measureText(text).width;
+    ctx.restore();
+    var x = pos.right - w;
+    this._filterRect = { x: x - 6, y: pos.y - 15, w: w + 12, h: 20 };
+    ctx.fillStyle = pos.background || "rgba(74,107,168,0.25)";
+    ctx.fillRect(this._filterRect.x, this._filterRect.y, this._filterRect.w, this._filterRect.h);
+    this.panel.drawText(text, x, pos.y, { font: t.smallFont, color: t.cursorColor });
+  };
+
   /**
    * 右側：必要な素材と、できるものの説明。
    * 足りていない素材は色を変えて、ひと目で分かるようにする。
@@ -256,7 +346,9 @@
 
     var recipe = this._selectedRecipe();
     if (!recipe) {
-      this.panel.drawText(this.texts.empty || "", rect.x + (this.theme.padding || 8),
+      // 絞り込んで何も残らなかったときは、そう書く（「まだ作れるものがない」と区別する）
+      var emptyText = (this._currentFilter() !== "all" && this.texts.emptyFiltered) || this.texts.empty || "";
+      this.panel.drawText(emptyText, rect.x + (this.theme.padding || 8),
         rect.y + 30, { font: this.theme.smallFont, color: this.theme.hintColor });
       return;
     }
@@ -359,12 +451,9 @@
   }
 
   /** 文字数で折り返す（等幅フォント前提の簡易処理） */
+  // 折り返しは共通（js/namespace.js の MyGame.wrapText。行の頭に句読点を置かない）
   function wrapText(text, charsPerLine) {
-    var lines = [];
-    for (var i = 0; i < text.length; i += charsPerLine) {
-      lines.push(text.substr(i, charsPerLine));
-    }
-    return lines;
+    return NS.wrapText(text, charsPerLine);
   }
 
   NS.CraftScene = CraftScene;

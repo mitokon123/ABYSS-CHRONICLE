@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>道具の見本 - ABYSS CHRONICLE</title>
+  <script src="tools/devguard.js"></script>
+  <!--
+    ▼ このファイルについて（開発用。ゲーム本体ではない）
+
+    data/items.js の道具・素材・装備を、絵と説明文と効き目でまとめて見る（v1.0.3・2026-11-10）。
+    ・絵は ゲームの大きさ（16px）・説明欄の大きさ（32px）・拡大（64px）の3つ。
+      ほかの絵と同じ形（塗り替え）のものは「同じ形」に、その相手を書く
+    ・説明文はゲームの説明欄と同じ 18 文字で折り返して見せる（行数も出す）
+    ・効き目の文はゲームと同じ（EffectSystem.describeEffect）
+    ・手に入る所：店（並ぶ条件・値段）・工房（材料・並ぶ条件）・落とすモンスター
+    ・何も書き換えない（見るだけ）。data/ を直したら、ページを開き直すと新しい中身になる
+  -->
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #05070d; color: #c8d0e8; font-family: sans-serif; font-size: 13px; }
+    main { max-width: 1200px; margin: 0 auto; padding: 18px 16px 40px; }
+    h1 { font-size: 20px; color: #ffd75e; margin: 0 0 4px; }
+    h1 a { font-size: 12px; color: #6b7590; margin-left: 12px; font-weight: normal; }
+    .sub { color: #6b7590; font-size: 12px; line-height: 1.6; }
+    #tools { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 12px 0; position: sticky; top: 0;
+             background: #05070d; padding: 8px 0; z-index: 2; border-bottom: 1px solid #141b2e; }
+    input[type=search], select { background: #141b2e; color: #e8ecf8; border: 1px solid #2a3350; border-radius: 4px; padding: 4px 8px; font-size: 13px; }
+    input[type=search] { width: 220px; }
+    .chips button { background: #141b2e; color: #c8d0e8; border: 1px solid #2a3350; border-radius: 12px; padding: 3px 10px; margin: 0 2px; cursor: pointer; font-size: 12px; }
+    .chips button.on { background: #3a3010; border-color: #ffd75e; color: #ffd75e; }
+    #count { color: #ffd75e; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; }
+    .card { background: #0a0f1c; border: 1px solid #2a3350; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .head { display: flex; gap: 10px; align-items: flex-end; }
+    .icons { display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
+    .icons canvas { image-rendering: pixelated; image-rendering: crisp-edges; background: #141b2e; border-radius: 3px; }
+    .icons canvas.big { background: repeating-conic-gradient(#141b2e 0% 25%, #0e1424 0% 50%) 0 0 / 16px 16px; }
+    .title { min-width: 0; }
+    .title b { display: block; font-size: 16px; color: #e8ecf8; }
+    .title code { color: #6b7590; font-size: 11px; }
+    .tag { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 3px; margin-right: 4px; background: #142440; color: #8fb4e8; }
+    .price { font-size: 12px; color: #9aa4c0; }
+    .price .warn { color: #ff9a7a; }
+    .desc { background: #101626; border: 1px solid #1e2740; border-radius: 4px; padding: 6px 8px; font-size: 13px; line-height: 1.6;
+            color: #c8d0e8; white-space: pre; overflow-x: auto; }
+    .desc.none { color: #e8a0a0; white-space: normal; }
+    .meta { font-size: 11px; color: #6b7590; }
+    .eff { margin: 0; padding-left: 16px; color: #d8f0d8; line-height: 1.6; }
+    .src { font-size: 12px; color: #9aa4c0; line-height: 1.7; }
+    .src b { color: #ffd75e; font-weight: normal; margin-right: 4px; }
+    .mat { display: inline-flex; align-items: center; gap: 3px; margin-right: 8px; white-space: nowrap; }
+    .mat canvas { image-rendering: pixelated; }
+    .same { font-size: 11px; color: #c8a3e8; }
+    .hide { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>道具の見本 <a href="dev.html">← 開発用の目次</a></h1>
+    <div class="sub">
+      data/items.js の絵・説明文・効き目・手に入る所。説明文はゲームの説明欄と同じ 18 文字で折り返して見せる。見るだけで、何も書き換えない。
+    </div>
+    <div id="tools">
+      <input type="search" id="search" placeholder="名前・id・説明・効き目で絞る">
+      <span class="chips" id="cats"></span>
+      <label class="sub">並び <select id="order">
+        <option value="newest">新しく足した順（items.js の後ろから）</option>
+        <option value="file">items.js の順</option>
+        <option value="price">値段の高い順</option>
+      </select></label>
+      <span id="count"></span>
+    </div>
+    <div id="body" class="sub">ゲームのデータを読んでいます…</div>
+  </main>
+
+  <script src="tools/devpage.js"></script>
+  <script>
+  (function () {
+    "use strict";
+    var D = window.DevPage, esc = D.esc;
+    var $ = function (id) { return document.getElementById(id); };
+    var raw, ids, cat = "all";
+    var CHARS_PER_LINE = 18;   // data/ui.js の detail.charsPerLine（持ち物・店・工房・図鑑の説明欄）
+
+    var CATS = [
+      { id: "all", name: "すべて" },
+      { id: "heal", name: "回復" },
+      { id: "tool", name: "道具" },
+      { id: "material", name: "素材" },
+      { id: "weapon", name: "武器" },
+      { id: "armor", name: "防具" },
+      { id: "accessory", name: "アクセサリー" },
+      { id: "key", name: "重要" }
+    ];
+
+    D.loadGame(function () {
+      raw = window.MyGame.rawData;
+      ids = Object.keys(raw.items);
+      buildChips();
+      render();
+      $("search").oninput = filter;
+      $("order").onchange = render;
+    });
+
+    function catOf(item) {
+      if (item.equip && item.equip.slot) return item.equip.slot;
+      return item.category || "";
+    }
+
+    function buildChips() {
+      var box = $("cats");
+      CATS.forEach(function (c) {
+        var n = c.id === "all" ? ids.length : ids.filter(function (id) { return catOf(raw.items[id]) === c.id; }).length;
+        if (!n) return;
+        var b = document.createElement("button");
+        b.textContent = c.name + " " + n;
+        b.className = c.id === cat ? "on" : "";
+        b.onclick = function () {
+          cat = c.id;
+          box.querySelectorAll("button").forEach(function (x) { x.className = ""; });
+          b.className = "on";
+          filter();
+        };
+        box.appendChild(b);
+      });
+    }
+
+    // --- 絵 ---
+    function drawSprite(spriteId, size) {
+      var c = document.createElement("canvas");
+      c.width = size; c.height = size;
+      c.style.width = size + "px"; c.style.height = size + "px";
+      var s = raw.sprites[spriteId];
+      if (!s || !s.pixels) { c.title = spriteId ? spriteId + "（絵が無い）" : "絵なし"; c.style.outline = "1px solid #e85a5a"; return c; }
+      var h = s.pixels.length, w = s.pixels[0].length;
+      var g = c.getContext("2d");
+      var px = size / Math.max(w, h);
+      for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          var col = s.palette[s.pixels[y].charAt(x)];
+          if (!col) continue;
+          g.fillStyle = col;
+          g.fillRect(Math.floor(x * px), Math.floor(y * px), Math.ceil(px), Math.ceil(px));
+        }
+      }
+      return c;
+    }
+
+    // 同じ形（pixels が同じ）の絵を使っている、ほかのアイテム
+    var shapeIndex = null;
+    function sameShape(item) {
+      if (!shapeIndex) {
+        shapeIndex = {};
+        ids.forEach(function (id) {
+          var s = raw.sprites[raw.items[id].icon];
+          if (!s || !s.pixels) return;
+          var key = s.pixels.join("|");
+          (shapeIndex[key] = shapeIndex[key] || []).push(id);
+        });
+      }
+      var s = raw.sprites[item.icon];
+      if (!s || !s.pixels) return [];
+      return (shapeIndex[s.pixels.join("|")] || []).filter(function (id) { return id !== item.id; });
+    }
+
+    function dungeonName(id) {
+      var d = raw.dungeons && raw.dungeons[id];
+      return d ? d.name : id;
+    }
+    function unlockText(u) {
+      if (!u) return "最初から";
+      if (typeof u === "string") return dungeonName(u) + " クリア";
+      if (Array.isArray(u)) return u.map(dungeonName).join("・") + " クリア";
+      if (u.dungeons) return u.dungeons.map(dungeonName).join("・") + (u.count ? " のうち " + u.count : "") + " クリア";
+      if (u.region) return (raw.regions[u.region] ? raw.regions[u.region].name : u.region) + (u.count ? " を " + u.count + " か所" : "") + " クリア";
+      return JSON.stringify(u);
+    }
+
+    function useText(e) {
+      if (!e) return "";
+      var st = function (list) { return (list || []).map(function (s) { return raw.statuses[s] ? raw.statuses[s].name : s; }).join("・"); };
+      switch (e.type) {
+        case "healHp": return "HP を " + e.value + " 回復";
+        case "healPp": return "PP を " + e.value + " 戻す";
+        case "cureStatus": return (e.statuses ? st(e.statuses) : st([e.status])) + " を治す";
+        case "revive": return "倒れた仲間を HP" + Math.round((e.value || e.ratio || 0) * 100) + "% で起こす";
+        default: return e.type + " " + JSON.stringify(e);
+      }
+    }
+
+    // --- 手に入る所 ---
+    var sources = null;
+    function buildSources() {
+      sources = {};
+      var add = function (id, s) { (sources[id] = sources[id] || []).push(s); };
+      (raw.shop.shops || []).forEach(function (shop) {
+        (shop.stock || []).forEach(function (st) {
+          add(st.item, { kind: "店", text: shop.name + "（" + unlockText(st.unlockedBy || shop.unlockedBy) + "）", price: st.price });
+        });
+      });
+      Object.keys(raw.recipes || {}).forEach(function (rid) {
+        var r = raw.recipes[rid];
+        if (!r.result) return;
+        add(r.result.item, { kind: "工房", recipe: r });
+      });
+      // 区画ごとの落とすもの（dungeons の dropOverrides）がある種族は、区画の名前を添えて分ける
+      var dungeonList = Object.keys(raw.dungeons || {}).map(function (k) { return raw.dungeons[k]; })
+        .sort(function (a, b) { return (a.order || 999) - (b.order || 999); });
+      function appearsIn(d, mid) {
+        var enc = d.encounter || {}, tables = [enc.table || []];
+        Object.keys(enc.perFloor || {}).forEach(function (f) { tables.push(enc.perFloor[f].table || []); });
+        return tables.some(function (t) { return t.some(function (e) { return e && e.species === mid; }); });
+      }
+      Object.keys(raw.monsters).forEach(function (mid) {
+        var name = raw.monsters[mid].name;
+        var overridden = dungeonList.filter(function (d) { return d.dropOverrides && d.dropOverrides[mid]; });
+        var plainAreas = overridden.length === 0 ? [] : dungeonList.filter(function (d) {
+          return appearsIn(d, mid) && !(d.dropOverrides && d.dropOverrides[mid]);
+        }).map(function (d) { return d.name; });
+        var label = name + (plainAreas.length ? "（" + plainAreas.join("・") + "）" : "");
+        if (overridden.length === 0 || plainAreas.length > 0) {
+          (raw.monsters[mid].drops || []).forEach(function (d) {
+            add(d.item, { kind: "落とす", text: label + " " + Math.round(d.rate * 1000) / 10 + "%" });
+          });
+        }
+        overridden.forEach(function (dg) {
+          dg.dropOverrides[mid].forEach(function (d) {
+            add(d.item, { kind: "落とす", text: name + "（" + dg.name + "）" + " " + Math.round(d.rate * 1000) / 10 + "%" });
+          });
+        });
+      });
+    }
+
+    function sellPrice(item) { return Math.floor((item.price || 0) * (raw.shop.sellRate || 0.5)); }
+
+    // 店で買える素材だけで作れるとき、その買値の合計（作って売ると得をしないかを見る）
+    function buyCost(recipe, depth) {
+      if (depth > 4) return null;
+      var total = recipe.gold || 0;
+      for (var i = 0; i < recipe.materials.length; i++) {
+        var m = recipe.materials[i];
+        var src = (sources[m.item] || []);
+        var shop = src.filter(function (s) { return s.kind === "店"; });
+        var best = shop.length ? Math.min.apply(null, shop.map(function (s) { return s.price || raw.items[m.item].price; })) : null;
+        src.filter(function (s) { return s.kind === "工房"; }).forEach(function (s) {
+          var c = buyCost(s.recipe, depth + 1);
+          if (c !== null && (best === null || c < best)) best = c;
+        });
+        if (best === null) return null;
+        total += best * m.count;
+      }
+      return total;
+    }
+
+    // --- 画面 ---
+    function render() {
+      if (!sources) buildSources();
+      var list = ids.slice();
+      var mode = $("order").value;
+      if (mode === "newest") list.reverse();
+      if (mode === "price") list.sort(function (a, b) { return (raw.items[b].price || 0) - (raw.items[a].price || 0); });
+
+      var grid = document.createElement("div");
+      grid.className = "grid";
+      list.forEach(function (id) { grid.appendChild(card(raw.items[id])); });
+      $("body").className = "";
+      $("body").innerHTML = "";
+      $("body").appendChild(grid);
+      filter();
+    }
+
+    function card(item) {
+      var el = document.createElement("div");
+      el.className = "card";
+      el.dataset.cat = catOf(item);
+
+      // 絵と名前
+      var head = document.createElement("div");
+      head.className = "head";
+      var icons = document.createElement("div");
+      icons.className = "icons";
+      icons.title = "ゲームの大きさ 16px ・ 説明欄 32px ・ 拡大 64px";
+      icons.appendChild(drawSprite(item.icon, 16));
+      icons.appendChild(drawSprite(item.icon, 32));
+      var big = drawSprite(item.icon, 64); big.className = "big";
+      icons.appendChild(big);
+      head.appendChild(icons);
+
+      var c = catOf(item);
+      var catName = (raw.categories.equipSlot[c] || raw.categories.item[c] || { name: c }).name;
+      var title = document.createElement("div");
+      title.className = "title";
+      var sell = sellPrice(item);
+      title.innerHTML = "<b>" + esc(item.name) + "</b>" +
+        "<span class='tag'>" + esc(catName) + "</span><code>" + esc(item.id) + "</code>" +
+        "<div class='price'>" + (item.price ? item.price + "G（売ると " + sell + "G）" : "値段なし") +
+        "・持てる " + (item.maxStack || 1) + "</div>";
+      head.appendChild(title);
+      el.appendChild(head);
+
+      var same = sameShape(item);
+      if (same.length) {
+        var sm = document.createElement("div");
+        sm.className = "same";
+        sm.textContent = "同じ形の絵：" + same.map(function (id) { return raw.items[id].name; }).join("・");
+        el.appendChild(sm);
+      }
+
+      // 説明文（ゲームと同じ折り返し）
+      var lines = window.MyGame.wrapText(item.description || "", CHARS_PER_LINE);   // ゲームと同じ折り返し
+      var desc = document.createElement("div");
+      if (!item.description) { desc.className = "desc none"; desc.textContent = "説明文が無い"; }
+      else { desc.className = "desc"; desc.textContent = lines.join("\n"); }
+      el.appendChild(desc);
+      if (item.description) {
+        var meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = Array.from(item.description).length + " 文字・" + lines.length + " 行（" + CHARS_PER_LINE + " 文字で折り返し）";
+        // ゲームの折り返し（MyGame.wrapText）は句読点を前の行へ送り、言葉の途中でも切らないので、ふつうは出ない（見張り）
+        if (lines.slice(1).some(function (l) { return /^[。、）」』！？]/.test(l); })) {
+          meta.innerHTML += "　<span style='color:#ff9a7a'>行の頭に句読点が来る</span>";
+          el.dataset.punct = "1";
+        }
+        el.appendChild(meta);
+      }
+
+      // 効き目
+      var effs = [];
+      if (item.effect) effs.push(useText(item.effect));
+      if (item.equip) (item.equip.effects || []).forEach(function (e) {
+        effs.push(window.MyGame.EffectSystem.describeEffect(e, raw) || (e.type + " " + JSON.stringify(e)));
+      });
+      if (effs.length) {
+        var ul = document.createElement("ul");
+        ul.className = "eff";
+        effs.forEach(function (t) { var li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
+        el.appendChild(ul);
+      }
+
+      // 手に入る所
+      var src = document.createElement("div");
+      src.className = "src";
+      var mine = sources[item.id] || [];
+      if (item.from) src.appendChild(line("区画", dungeonName(item.from)));
+      mine.forEach(function (s) {
+        if (s.kind !== "工房") { src.appendChild(line(s.kind, s.text + (s.price ? "　" + s.price + "G" : ""))); return; }
+        var r = s.recipe;
+        var div = document.createElement("div");
+        div.innerHTML = "<b>工房</b>" + esc(unlockText(r.unlockedBy)) + (r.gold ? "・" + r.gold + "G" : "") + "<br>";
+        r.materials.forEach(function (m) {
+          var it = raw.items[m.item] || { name: m.item };
+          var span = document.createElement("span");
+          span.className = "mat";
+          span.appendChild(drawSprite(it.icon, 16));
+          span.appendChild(document.createTextNode(it.name + " ×" + m.count));
+          div.appendChild(span);
+        });
+        var cost = buyCost(r, 0);
+        if (cost !== null) {
+          var p = document.createElement("div");
+          var bad = cost <= sell;
+          p.innerHTML = "店の素材で作ると " + cost + "G ／ 売値 " + sell + "G" + (bad ? " <span class='warn' style='color:#ff9a7a'>← 作って売ると得をする</span>" : "");
+          div.appendChild(p);
+        }
+        src.appendChild(div);
+      });
+      if (!mine.length && !item.from) src.appendChild(line("手に入る所", "店・工房・ドロップには無い（宝箱・物語など）"));
+      el.appendChild(src);
+
+      el.dataset.search = [item.name, item.id, item.description || "", effs.join(" "), catName,
+        mine.map(function (s) { return s.text || unlockText(s.recipe.unlockedBy); }).join(" ")].join(" ").toLowerCase();
+      return el;
+    }
+
+    function line(label, text) {
+      var d = document.createElement("div");
+      d.innerHTML = "<b>" + esc(label) + "</b>" + esc(text);
+      return d;
+    }
+
+    function filter() {
+      var q = $("search").value.trim().toLowerCase();
+      var n = 0;
+      document.querySelectorAll(".card").forEach(function (el) {
+        var show = (cat === "all" || el.dataset.cat === cat) && (!q || el.dataset.search.indexOf(q) >= 0);
+        el.classList.toggle("hide", !show);
+        if (show) n++;
+      });
+      $("count").textContent = n + " 件";
+    }
+  })();
+  </script>
+</body>
+</html>

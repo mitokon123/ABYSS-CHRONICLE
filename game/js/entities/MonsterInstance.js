@@ -174,6 +174,7 @@
     this.fleeRate = undefined;
     this.actionsPerTurn = undefined;
     this.rewardMultiplier = undefined;
+    this.dropsOverride = undefined;
     this._bossImmuneToStatus = [];
     this._debuffResistOverride = null;
     if (this._species) this.skills = NS.MonsterData.skillsUpToLevel(this._species, this.level);

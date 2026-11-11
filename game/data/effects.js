@@ -665,6 +665,10 @@
       reviveRise: {
         shape: "healing", duration: 1200, glow: 22, color: "#ffe08a", radius: 44, crosses: 12, crossSize: 8, rise: 100, column: true
       },
+      // 樹液の膜（ジュエキスライムの絆の技。2026-11-11）。琥珀のしずくが落ち、透けた膜が頭から体を包み、光が走って泡が昇る
+      sapVeil: {
+        shape: "sapVeil", duration: 1300, glow: 12, color: "#f0b040", deepColor: "#a86414", radius: 40, drops: 4
+      },
       // クレンズ。澄んだ雫が落ちて輪が広がり、きらめく
       cleanseDrop: {
         shape: "cleanse", duration: 860, glow: 12, color: "#9fe3ff", count: 7

@@ -1205,7 +1205,7 @@
       // 深淵の欠片は宝箱でしか手に入らなかったので、こことヨミリュウにも持たせた
       drops: [
         { item: "duskDew", rate: 0.30, min: 1, max: 2 },
-        { item: "abyssFragment", rate: 0.28, min: 1, max: 1 }
+        { item: "abyssFragment", rate: 0.30, min: 1, max: 1 }
       ],
       sprite: "murkling",
       motion: "murkFloat",
@@ -1527,7 +1527,7 @@
       goldReward: 30,
       drops: [
         { item: "dragonScale", rate: 0.35, min: 1, max: 1 },
-        { item: "abyssFragment", rate: 0.28, min: 1, max: 1 },
+        { item: "abyssFragment", rate: 0.35, min: 1, max: 1 },
         // 買えない装備。
         //
         // ★ ここだけ極端に高いのは、竜そのものが出ないから。
@@ -1771,13 +1771,14 @@
       abilities: ["undeadSoul"],
       expReward: 36,
       goldReward: 17,
+      // 毒沼での落とすもの。蔦這う回廊では確率が違う（data/dungeons.js の ivyCorridor.dropOverrides。作者の表 2026-11-10）
       drops: [
         { item: "rustedBone", rate: 0.28, min: 1, max: 1 },
         { item: "abyssFragment", rate: 0.20, min: 1, max: 1 },
         // 買えない装備。ゲーム中で初めての即死耐性。
         //   ☆ 率は必ず「戦闘あたり」ではなく「挑戦（ラン）あたり」で見ること。
         //     ヌマボネは毒沼の25%を占めるので、同じ率でも他の種族より早く集まる
-        { item: "boneCharm", rate: 0.16, min: 1, max: 1 }
+        { item: "boneCharm", rate: 0.10, min: 1, max: 1 }
       ],
       // ふだんは泥の上で揺れながら、頭蓋が首の上でかくりとかしぐ（RC-1）
       sprite: ["marshBone", "marshBoneTiltL", "marshBone", "marshBoneTiltR"],
@@ -2338,13 +2339,13 @@
      * 千年樹の根底の主（v1.0.3）。昔だれかが千年樹を守らせるために置いた、木と真鍮のからくり。胸の琥珀の芯で動く。
      * ★ 作者が決めたもの（2026-11-01〜03）：大きなからくり・雷・弱点は地・特性は放電・
      *   主として Lv32 HP1050 攻135 防65 速40・PP無限・1ターンに1〜2回・行動の順番・専用技 歯車投げ（data/bosses.js の rootsWarden）。
-     * ★ 名前は作者から任された仮のもの（からくり＋森／守り）。
+     * ★ 名前「カラクリモリ」（からくり＋森／守り）は私の案を作者が確定した（2026-11-10）。
      * ★ 仲間にしたときの値は作者が決めた（2026-11-03）：
      *   能力値の目標（個体値0・素直）Lv30 170/62/71/27/35・Lv50 354/132/140/53/76・
      *   Lv70 544/263/246/76/121・Lv80 622/311/290/99/152（HP/攻/防/速/PP）。成長率はこの値にちょうどなるよう逆算した。
      *   耐性 雷6・風3・地−4・火−2／状態異常 毒10・麻痺8・呪い8・即死5／特性 放電／覚える技／勧誘率 0.12／
      *   絆の報酬 地+2・火+2・防御×1.1・攻撃×1.05。
-     *   図鑑の説明・記録・経験値・ゴールドは仮
+     *   図鑑の説明と記録は作者が確定（2026-11-11。信頼の記録は作者の文）。経験値・ゴールドは私の案を作者がそのまま確定（2026-11-11）
      */
     gearWarden: {
       id: "gearWarden",
@@ -2369,7 +2370,7 @@
       description: "雷属性。千年樹の根底の主と呼ばれている。千年樹を守るために置かれた古いからくりで、胸の琥珀の光で動き続けている。地に弱い。",
       records: {
         used:  "胸の窓をのぞくと、琥珀の奥で光がゆっくり脈を打っていた。",
-        trust: "外れた歯車を拾ってきて、自分ではめ直してくれと差し出した。",
+        trust: "外れた歯車を飛ばしては自分で拾いに行く、何度目だろうか。",
         bond:  "千年守ってきた根から離れても、隣を歩く者を守るのは変わらない。"
       },
       bondReward: { effects: [
@@ -2408,7 +2409,7 @@
         { level: 1, skill: "gearThrow" }
       ],
       abilities: ["discharge"],
-      // 経験値・ゴールドは仮（ヒコバエ 170/115 の一段上）
+      // 経験値・ゴールドはヒコバエ 170/115 の一段上（私の案を作者が確定 2026-11-11）
       expReward: 230,
       goldReward: 160,
       drops: [
@@ -2643,6 +2644,8 @@
       goldReward: 14,
       drops: [
         { item: "windChimeFeather", rate: 0.30, min: 1, max: 1 },
+        // 深淵の欠片（作者の表 2026-11-10）
+        { item: "abyssFragment", rate: 0.18, min: 1, max: 1 },
         { item: "mourningBell", rate: 0.10, min: 1, max: 1 }
       ],
       // ふだんは翼で体を包んで揺れ、風の筋の向きが変わる（2コマ）。上の5行（蔦と爪）は動かさない
@@ -2762,10 +2765,8 @@
      *               状態異常耐性のうち 毒・封印・呪いが作者の値で、ほかの4つは 5 のまま。絵と動きは私の下書き。
      *   コハクカブト … 全部作者が確定（2026-11-06）。id は amberBeetle のまま。経験値とゴールドは作者が「それでよい」と言った値。
      *               Lv30 176/49/69/38/21 ・ Lv70 512/289/334/140/82。特性 硬い殻。絆の報酬 全属性耐性+3・防×1.1。
-     *   樹液のスライム … 私の案を作者が了承。名前はまだ無く、説明をそのまま仮の名前にしている。
-     * ★ スライムで仮のもの：基礎値・成長率・耐性・技の並び・経験値・ゴールド・素材・図鑑の説明・記録・絆の報酬。
-     *   Lv30 の値（個体値0・素直。HP/攻/防/速/PP）
-     *     スライム 160/40/44/40/44
+     *   ジュエキスライム … 全部作者が確定（2026-11-11。id は sapSlime のまま）。
+     *               Lv30 160/40/44/40/42 ・ Lv70 487/172/245/150/198。特性 ねばねば。絆の報酬 樹液の膜。
      * 出る場所の役と確率は data/dungeons.js の ancientRoots の出現の表に書いてある。絵は sprites_marsh.js の末尾
      */
     weaponBot: {
@@ -2835,8 +2836,9 @@
       // 全属性10＝7つの属性はどれも効かない（仲間のときも同じ）。無属性の攻撃だけが通る
       resistances: { fire: 10, water: 10, wind: 10, earth: 10, thunder: 10, light: 10, dark: 10 },
       immunities: [],
-      statusResist: { poison: 10, paralysis: 5, sleep: 5, seal: 10,
-                      blind: 5, curse: 10, instantDeath: 5 },
+      // 毒・呪い・即死は 10、ほかは 5（作者 2026-11-09）。敵のときは出現の表で全部 10
+      statusResist: { poison: 10, paralysis: 5, sleep: 5, seal: 5,
+                      blind: 5, curse: 10, instantDeath: 10 },
       // 弱体への耐性 0（ジュエルだけ。ふつうは 1）。仲間のときは弱体が必ず入る。敵のときは出現の表で 10
       debuffResist: 0,
       maxLevel: 70,
@@ -2880,7 +2882,7 @@
       expFixed: true,
       goldReward: 30,
       drops: [
-        { item: "jewelShard", rate: 0.5, min: 1, max: 1 }
+        { item: "jewelShard", rate: 0.55, min: 1, max: 1 }
       ],
       // ふだんはふわふわ浮き、体のきらめきが動き、小さな手が交互に上下する
       sprite: ["jewelOre", "jewelOreArmL", "jewelOreShine", "jewelOreArmR"],
@@ -2940,8 +2942,12 @@
       drops: [
         { item: "amberShard", rate: 0.27, min: 1, max: 1 }
       ],
-      // ふだんは背の琥珀の中で光が揺れ、脚を左右交互に踏みかえる
-      sprite: ["amberBeetle", "amberBeetleLegL", "amberBeetleGlow", "amberBeetleLegR"],
+      // ふだんはほとんど動かない。ときどき背の琥珀の光が揺れ、たまに脚を片方ずつ踏みかえる
+      // （作者「あまり動かないようにする」2026-11-10。前の4枚を順に回す形から、止まっている絵を間にはさんだ）
+      sprite: ["amberBeetle", "amberBeetle", "amberBeetle", "amberBeetleGlow",
+               "amberBeetle", "amberBeetle", "amberBeetle", "amberBeetleLegL",
+               "amberBeetle", "amberBeetle", "amberBeetle", "amberBeetleGlow",
+               "amberBeetle", "amberBeetle", "amberBeetle", "amberBeetleLegR"],
       sizeScale: 1.1,
       motion: "beetleIdle",
       poses: { legL: "amberBeetleLegL", legR: "amberBeetleLegR", rear: "amberBeetleRear",
@@ -2952,53 +2958,60 @@
       }
     },
 
+    /**
+     * ジュエキスライム（千年樹の根底の在来種。id は sapSlime のまま）。
+     * ★ 作者が確定（2026-11-11）：名前・基礎値・耐性・状態異常耐性・特性 ねばねば・勧誘率・経験値とゴールド・ドロップ・
+     *   覚える技（ウェーブ Lv18・リカバー Lv28 を足した）・敵のときの動き・絆の技 樹液の膜・図鑑・記録。
+     *   能力値の目標（個体値0・素直）Lv25 129/31/36/30/30・Lv30 160/40/44/40/42・Lv40 215/62/82/60/79・
+     *   Lv50 298/90/129/88/114・Lv60 378/125/186/118/153・Lv70 487/172/245/150/198（HP/攻/防/速/PP）。
+     *   成長率はこの値にちょうどなるよう逆算した（Lv24 までと区間の切り方は私の案）。
+     */
     sapSlime: {
       id: "sapSlime",
-      name: "樹液のスライム",
+      name: "ジュエキスライム",
       family: "slimeKind",
       element: "water",
-      resistances: { water: 5, earth: 2, thunder: -3 },
+      resistances: { water: 5, earth: 2, thunder: -2 },
       immunities: [],
-      statusResist: { poison: 5, paralysis: 0, sleep: 0, seal: 0,
-                      blind: 3, curse: 0, instantDeath: 3 },
+      statusResist: { poison: 0, paralysis: 0, sleep: 0, seal: 0,
+                      blind: 8, curse: 0, instantDeath: 3 },
       maxLevel: 70,
       growthRate: {
-        hp:      [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.30 }, { from: 41, rate: 0.40 }, { from: 51, rate: 0.50 }, { from: 61, rate: 0.52 }],
-        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.30 }, { from: 31, rate: 0.60 }, { from: 41, rate: 0.80 }, { from: 51, rate: 1.10 }, { from: 61, rate: 1.16 }],
-        defense: [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 31, rate: 0.60 }, { from: 41, rate: 0.70 }, { from: 51, rate: 0.80 }, { from: 61, rate: 0.83 }],
-        speed:   [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.40 }, { from: 31, rate: 0.70 }, { from: 41, rate: 0.90 }, { from: 51, rate: 1.20 }, { from: 61, rate: 1.40 }],
-        pp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.50 }, { from: 51, rate: 0.55 }, { from: 61, rate: 0.65 }]
+        hp:      [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.25 }, { from: 41, rate: 0.38 }, { from: 51, rate: 0.362 }, { from: 61, rate: 0.495 }],
+        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.30 }, { from: 31, rate: 0.37 }, { from: 41, rate: 0.47 }, { from: 51, rate: 0.58 }, { from: 61, rate: 0.78 }],
+        defense: [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 31, rate: 0.54 }, { from: 41, rate: 0.67 }, { from: 51, rate: 0.81 }, { from: 61, rate: 0.845 }],
+        speed:   [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.40 }, { from: 31, rate: 0.41 }, { from: 41, rate: 0.56 }, { from: 51, rate: 0.60 }, { from: 61, rate: 0.64 }],
+        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.30 }, { from: 31, rate: 0.46 }, { from: 41, rate: 0.44 }, { from: 51, rate: 0.485 }, { from: 61, rate: 0.565 }]
       },
-      description: "水属性。千年樹の傷から流れた樹液が固まって動き出したもの。仲間の傷を塞ぎ、ねばる体で足を止める。先に倒さないと戦いが長引く。雷に弱い。",
+      description: "水属性。千年樹の傷から流れた樹液が固まって動き出したもの。仲間の傷を塞ぎ、ねばる体で足を止める。雷に弱い。",
       records: {
         used:  "触ると指がくっつく。はがすと、少しだけ甘い匂いが残る。",
-        trust: "転んだ膝に、自分の体を少しちぎって貼ってくれた。傷はすぐ塞がった。",
+        trust: "転んだ膝の傷に体を少しちぎって貼ってくれた。傷はすぐ塞がった。",
         bond:  "千年樹の傷を塞ぐために流れ出た体は、今は隣の者の傷を塞いでいる。"
       },
-      bondReward: { effects: [
-        { type: "resistBonus", element: "thunder", value: 3 },
-        { type: "statMultiplier", stat: "hp", value: 1.1 }
-      ] },
+      // 絆の技 樹液の膜（専用。data/skills.js の sapVeil）
+      bondReward: { skill: "sapVeil" },
       baseHp: 22,
       baseAttack: 6,
       baseDefense: 7,
       baseSpeed: 5,
-      basePp: 7,
-      scoutRate: 0.24,
+      basePp: 8,
+      scoutRate: 0.25,
       spawnRate: 0.5,
       learnset: [
         { level: 1,  skill: "tackle" },
         { level: 4,  skill: "bubble" },
         { level: 10, skill: "cure" },
+        { level: 18, skill: "wave" },
         { level: 22, skill: "slowDance" },
         { level: 26, skill: "greaterCure" },
-        { level: 30, skill: "wave" }
+        { level: 28, skill: "purifyLight" }
       ],
-      abilities: ["regen"],
+      abilities: ["stickyBody"],
       // 回復技は、仲間のHPが6割を切ってから使う（元気な相手に撃たない）
       enemyAi: { healBelow: 0.6 },
-      expReward: 44,
-      goldReward: 15,
+      expReward: 40,
+      goldReward: 18,
       drops: [
         { item: "ancientSap", rate: 0.30, min: 1, max: 1 }
       ],

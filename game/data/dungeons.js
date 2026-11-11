@@ -41,10 +41,14 @@
  *   ここにはその場所で手に入る素材を並べる。書き方はドロップと同じ：
  *     chest: [{ item, weight, min, max }]
  *   minFloor / maxFloor を書くと、その階だけで出る（例: 回廊の絡み主根は minFloor: 4 で B4F だけ）
- * fixedChests : 中身の決まった宝箱（v1.0.3）。[{ floor, item, count }]。その階に、features の数とは別に必ず置く。
+ * fixedChests : 中身の決まった宝箱（v1.0.3）。[{ floor, item, count, chance }]。その階に、features の数とは別に置く。
  *   抽選はせず、書いた中身だけが入る（中断して再開しても同じ中身。FeatureSystem.place）
+ *   chance を書くとその確率で置く（書かなければ必ず置く。回廊の絡み主根 0.6）
  *   ★ 主が落とす素材（苔むした核・灼熱の牙）は入れない。
  *     倒すこと自体に意味を残すため
+ * dropOverrides : 区画ごとの落とすもの（2026-11-10）。{ 種族id: [drops と同じ書き方] }。
+ *   その区画では、種族の drops（data/monsters.js）のかわりにこちらを使う（足すのではなく置き換え）。
+ *   図鑑は区画で確率が違う種族だけ、区画ごとに分けて出す（DropSystem.dropsIn・DexScene）
  * boss        : 最深階に出るボスのid（data/bosses.js を参照）
  *   書かない区画は「主なし」。最深階の階段が出口になり、抜けるとクリア（結果は「踏破」。蔦這う回廊 2026-10-27）
  * ready       : false と書くと「準備中」（名前は選択画面に出るが入れない）。中身を作り終えたら行ごと消す（v1.0.0）
@@ -159,9 +163,9 @@
 
   /**
    * --- 千年樹の根底の出現の表の1件ずつ（v1.0.3。2026-11-04） ---
-   * スライムの確率と使う技は仮。ウェポン・ジュエル・コハクカブトは作者が決めた。
+   * 4種とも敵のときの動きは作者が決めた。階ごとの重み（下の perFloor）は私の案。
    *   コハクカブト … 技を使う確率 40%。ブレイブ 50%・シールド 30%・堅守の陣 20%（作者 2026-11-06）
-   *   スライム … 回復と足止め。傷ついた仲間を癒やす（先に倒さないと長引く）
+   *   ジュエキスライム … 技を使う確率 60%。キュアラ・足止めの舞・あわ。回復は仲間のHPが6割を切ってから（作者 2026-11-11）
    *   ウェポン … 技を使う確率 55%。作戦「全力で攻める」と同じ決め方で、火水風地の斬撃からいちばんダメージの出るものを選ぶ（作者 2026-11-05）
    *   ジュエル … ほかの敵といっしょにも、2体でも出る。毎手番 25% で逃げる。能力値はどの階でも Lv30 の表の値に固定。
    *              そこに HP は1体ずつ ×0.3〜0.5、防御 ×5、素早さ ×5。技はロックスパイクを 40%。
@@ -385,16 +389,16 @@
           enemy: "abyssDragon", bgm: "boss", message: "yomiryuAmbush",
           allowFlee: true, keepItemsOnDefeat: false }
       ],
-      // 深層の宝箱。在来種を足すたびに、その素材をここにも並べる
+      // 深層の宝箱。在来種を足すたびに、その素材をここにも並べる。
+      // 深淵の欠片は宝箱1つの 8%（作者の表 2026-11-10。共通の中身 1.5 を含めた割合）。
+      // 黄泉竜の鱗は宝箱から外した（作者の表 2026-11-10。ヨミリュウを倒して手に入れる）
       featureTables: {
         chest: [
-          { item: "abyssFragment", weight: 0.40, min: 1, max: 1 },
+          { item: "abyssFragment", weight: 0.245, min: 1, max: 1 },
           { item: "duskDew",       weight: 0.45, min: 1, max: 2 },
           { item: "twistedVine",   weight: 0.30, min: 1, max: 1 },
           { item: "stormWing",     weight: 0.22, min: 1, max: 1 },
-          { item: "slimeShard",    weight: 0.35, min: 1, max: 2 },
-          // 黄泉竜の鱗だけは渋くしてある。倒して手に入れることに意味を残すため
-          { item: "dragonScale",   weight: 0.12, min: 1, max: 1 }
+          { item: "slimeShard",    weight: 0.35, min: 1, max: 2 }
         ]
       },
       boss: "abyssKing"
@@ -657,9 +661,11 @@
       },
       // 回廊の宝箱（作者の指定 2026-10-27「このステージの素材を出す」）。
       // 灯り苔・絡み主根は宝箱でしか手に入らない回廊の素材。
-      //   灯り苔はほかの素材の倍の重み（作者の指定 2026-11-01。宝箱1つで約14%）。
-      //   絡み主根は B4F だけ（minFloor: 4。FeatureSystem）で 12%。そのほかに B4F には必ず1つ入った宝箱がある（下の fixedChests）
-      // 金角のかけら（ザンガルドの珍しいドロップ）は渋くしてある（洞の芽吹きの種と同じ扱い）。
+      //   灯り苔はほかの素材の倍の重み（作者の指定 2026-11-01。宝箱1つで約15%）。
+      //   絡み主根は B4F だけ（minFloor: 4。FeatureSystem）で宝箱1つの 5%（作者の表 2026-11-10）。
+      //   そのほかに B4F には 60% で、絡み主根が1つ入った宝箱が置かれる（下の fixedChests）
+      // 深淵の欠片は宝箱1つの 3%（作者の表 2026-11-10）。
+      // 金角のかけらは宝箱から外した（作者の表 2026-11-10。ザンガルドの珍しいドロップだけ）。
       // 髑髏の護符・弔いの小鐘・神鳥の羽は装備・貴重品なので入れない
       featureTables: {
         chest: [
@@ -669,41 +675,51 @@
           { item: "windChimeFeather", weight: 0.28, min: 1, max: 1 },
           { item: "blueThunderScale", weight: 0.26, min: 1, max: 1 },
           { item: "glowMoss",         weight: 0.56, min: 1, max: 2 },
-          { item: "abyssFragment",    weight: 0.14, min: 1, max: 1 },
-          { item: "goldHornShard",    weight: 0.08, min: 1, max: 1 },
-          // 重み 0.48 で B4F の宝箱の 12%（作者の指定 2026-10-27。最初の 0.18 では 4.9% だった）
-          { item: "tangledTaproot",   weight: 0.48, min: 1, max: 1, minFloor: 4 },
+          { item: "abyssFragment",    weight: 0.11, min: 1, max: 1 },
+          // 重み 0.195 で B4F の宝箱の 5%
+          { item: "tangledTaproot",   weight: 0.195, min: 1, max: 1, minFloor: 4 },
           { item: "elixir",           weight: 0.12, min: 1, max: 1 }
         ]
       },
-      // 中身の決まった宝箱（作者の指定 2026-11-01）。B4F に、絡み主根が1つ入った宝箱を必ず1つ置く。
-      // 上の features の数とは別に置かれる（B4F の宝箱は 5〜6 個になる）
+      // 中身の決まった宝箱（作者の指定 2026-11-01）。B4F に、絡み主根が1つ入った宝箱を置く。
+      // chance … 置かれる確率（作者の表 2026-11-10 で 60%。それまでは必ず置いていた）。
+      // 上の features の数とは別に置かれる（置かれた階は B4F の宝箱が 5〜6 個になる）
       fixedChests: [
-        { floor: 4, item: "tangledTaproot", count: 1 }
-      ]
+        { floor: 4, item: "tangledTaproot", count: 1, chance: 0.6 }
+      ],
+      // 区画ごとの落とすもの（DropSystem.dropsIn。作者の表 2026-11-10）。
+      // ヌマボネは毒沼（data/monsters.js の drops）と確率を変えてある
+      dropOverrides: {
+        marshBone: [
+          { item: "rustedBone",    rate: 0.32, min: 1, max: 1 },
+          { item: "abyssFragment", rate: 0.15, min: 1, max: 1 },
+          { item: "boneCharm",     rate: 0.15, min: 1, max: 1 }
+        ]
+      }
     },
 
     /**
      * 千年樹の根底（萌芽の穴の最後の区画。v1.0.3 で入れる。区画を3つにしたのは v1.0.2.1）。
      * ★ 萌芽の穴の区画は3つ（作者 2026-10-30）。3つ目だった「胞子煙る菌床」はなくし、蔦這う回廊の次がここになった。
      *   見た目の組 spore（data/dungeonThemes.js）と、きのこの飾りの絵は使わずに残してある。
-     * ★ 主がいる（作者 2026-10-30）。どのモンスターが主か（名前・見た目・属性・役・技）は、まだ決めていない。
-     *   決まっていること（作者 2026-11-01）：Lv32・主のとき HP1050 攻135 防65 速40・PP無限（infinitePp）・
-     *   1ターンに1〜2回動く（actionsPerTurn）・仲間にできる・落とすものは私に任された（見た目が決まってから案を出す）・
+     * ★ 主がいる（作者 2026-10-30）。主は下のカラクリモリ。
+     *   作者が決めた値（2026-11-01）：Lv32・主のとき HP1050 攻135 防65 速40・PP無限（infinitePp）・
+     *   1ターンに1〜2回動く（actionsPerTurn）・仲間にできる・落とすものは私に任された（琥珀の芯を案として入れた）・
      *   効かない状態異常は毒と麻痺（immuneToStatus: ["poison", "paralysis"]。全主共通の即死・封印・盲目も効かない。眠り・呪いは効く）
      * モチーフ（作者 2026-11-01）：琥珀と樹液（千年の時）＋千年樹の番人＋機械のモンスター。
-     * 在来種（作者 2026-11-04）：4種・4階・Lv28〜31。ウェポン・ジュエル・コハクカブト・樹液のスライム（data/monsters.js）。
+     * 在来種（作者 2026-11-04）：4種・4階・Lv28〜31。ウェポン・ジュエル・コハクカブト・ジュエキスライム（data/monsters.js。4種とも作者が確定）。
      * 主（作者 2026-11-03）：大きなからくり（木と真鍮・根が絡む・胸に琥珀の芯）。雷・弱点は地・特性は放電。
      *   「最序盤最後のヌシなだけあってかなり強めにしたい」。行動の順番・専用技 歯車投げも作者が決めた。
-     *   名前「カラクリモリ」は作者から任された仮のもの（data/bosses.js の rootsWarden・monsters.js の gearWarden）
-     * 推奨Lv 30（作者の予定は「推奨は30くらいに抑えたい」）。まだ準備中（ready: false）
+     *   名前「カラクリモリ」は作者が確定（2026-11-10。data/bosses.js の rootsWarden・monsters.js の gearWarden）
+     * 推奨Lv 30（作者の予定は「推奨は30くらいに抑えたい」）。
+     * ★ 2026-11-11 に ready の行を消して遊べるようにした（作者の指定）。一言・説明・素材・琥珀の芯は私の案を作者がそのまま確定
      */
     ancientRoots: {
       id: "ancientRoots",
       order: 7,
       region: "houga",
       name: "千年樹の根底",
-      // 一言と説明は私の下書き。1行は句読点こみで20文字まで
+      // 一言と説明は私の案を作者が確定（2026-11-11）。1行は句読点こみで20文字まで
       subtitle: "止まった時の底で、番人が根を守る。",
       description: "千年樹の根が張りめぐらされた、穴の底。\n" +
                    "琥珀の中で時は止まり、古いからくりが\n" +
@@ -714,7 +730,7 @@
       theme: "rootdeep",
       generation: { width: 40, height: 28, roomMin: 4, roomMax: 10, roomCount: 11, attempts: 320 },
       /**
-       * 階ごとの出方（私の案。ジュエルは出る割合 3〜5%）。
+       * 階ごとの出方（私の案を作者が了承 2026-11-11。ジュエルは出る割合 3〜5%）。
        *   階   Lv     体数（1/2/3体）   甲虫 スライム ウェポン ジュエル
        *   B1F 28〜29  50/50/ 0%         45%   45%      7%      3%
        *   B2F 28〜30  30/50/20%         33%   33%     30%      4%
@@ -761,14 +777,13 @@
           { item: "ancientSap",    weight: 0.30, min: 1, max: 2 },
           { item: "brassGear",     weight: 0.26, min: 1, max: 1 },
           { item: "glowMoss",      weight: 0.14, min: 1, max: 1 },
-          { item: "abyssFragment", weight: 0.14, min: 1, max: 1 },
-          { item: "jewelShard",    weight: 0.03, min: 1, max: 1 },
+          // 深淵の欠片は宝箱1つの 3%。宝珠のかけらは宝箱から外した（作者の表 2026-11-10。ジュエルだけ）
+          { item: "abyssFragment", weight: 0.082, min: 1, max: 1 },
           { item: "elixir",        weight: 0.15, min: 1, max: 1 }
         ]
       },
-      // 主（v1.0.3。data/bosses.js）。区画はまだ準備中なので、いまは会えない
-      boss: "rootsWarden",
-      ready: false
+      // 主（v1.0.3。data/bosses.js）。B4F の階段で出る
+      boss: "rootsWarden"
     }
   };
 })(window.MyGame);

@@ -154,6 +154,9 @@
       if (e.type === "accuracyMultiplier") return { stat: "accuracy", up: e.value > 1 };
       // 耐性（芽吹きの加護の「全状態異常の耐性 +4」）
       if (e.type === "resistBonus")    return { stat: "other", up: e.value > 0 };
+      // 毎ターンの回復（樹液の膜。2026-11-11）
+      if (e.type === "regenOverTime")  return { stat: "hp", up: true };
+      if (e.type === "ppRegen")        return { stat: "pp", up: true };
     }
     return { stat: null, up: false };
   };

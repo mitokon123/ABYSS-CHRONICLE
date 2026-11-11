@@ -143,6 +143,9 @@
           { item: "venomStinger", unlockedBy: "venomMarsh" },
           { item: "rustedBone", unlockedBy: "venomMarsh" },
           { item: "muddyShell", unlockedBy: "venomMarsh" },
+          // 光・風の耐性の装備の材料（2026-11-10 作者の案）。店でしか手に入らない
+          { item: "sunCrystal",    unlockedBy: "venomMarsh" },
+          { item: "breezeCrystal", unlockedBy: "venomMarsh" },
 
           // 第一章クリア後の装備（お金の使いみち。値段は作者が決めたもの）。
           // 工房で作れるいちばん良い装備は超えない強さ（data/items.js のコメント）
@@ -173,7 +176,17 @@
           // 大きく回復する薬。毒沼をクリアしてから並ぶ。
           //   毒沼までは回復薬（50G / 50回復）で足りる。
           //   ここで初めて「1ターンで100戻す」選択肢を出す
-          { item: "elixir", unlockedBy: "venomMarsh" }
+          { item: "elixir", unlockedBy: "venomMarsh" },
+
+          // 2026-11-10 に足した回復の道具（値段・並ぶ条件は作者の案 新装備まとめ.txt）
+          { item: "wakeFlower",       unlockedBy: "venomMarsh" },
+          { item: "numbLeaf",         unlockedBy: "sproutHollow" },
+          { item: "voiceTonic",       unlockedBy: "sproutHollow" },
+          { item: "purifyingSalt",    unlockedBy: "sproutHollow" },
+          { item: "clearEyeDew",      unlockedBy: "sproutHollow" },
+          { item: "ancientHoney",     unlockedBy: "ivyCorridor" },
+          { item: "greatSpiritBerry", unlockedBy: "ivyCorridor" },
+          { item: "panacea",          unlockedBy: "ancientRoots" }
         ]
       },
 

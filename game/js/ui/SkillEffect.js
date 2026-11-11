@@ -2467,6 +2467,118 @@
     },
 
     /**
+     * 樹液の膜（ジュエキスライムの絆の技。2026-11-11）：
+     *   ① 上から琥珀色の樹液のしずくが落ちてくる
+     *   ② 頭の上から体を包むように、透けた琥珀の膜が垂れ下がる（下の縁はしずくの形に波打つ）
+     *   ③ 包み終わると膜の上を光が走り、中を小さな泡が昇る。最後に裾から樹液が垂れて消える
+     *   radius … 膜の大きさ  deepColor … 縁取りの濃い琥珀
+     */
+    sapVeil: function (ctx, d, t, p) {
+      var i;
+      var R = d.radius || 40;
+      var rx = R * 1.15, ry = R * 1.45;
+      var deep = d.deepColor || "#a86414";
+
+      // ① 落ちてくるしずく
+      var drops = d.drops || 4;
+      for (i = 0; i < drops; i++) {
+        var s = span(t, i * 0.06, 0.28);
+        if (s <= 0 || s >= 1) continue;
+        var x = p.x + (i - (drops - 1) / 2) * R * 0.42 + (wobble(i) - 0.5) * 6;
+        var from = p.y - ry - 90;
+        var y = from + (p.y - ry + 6 - from) * easeIn(s);
+        var size = 4 + wobble(i + 3) * 2.5;
+        setAlpha(ctx, 1);
+        ctx.fillStyle = deep;
+        sapDrop(ctx, x, y, size + 1.5);
+        ctx.fillStyle = p.color;
+        sapDrop(ctx, x, y, size);
+      }
+
+      // ② 膜が頭の上から垂れて、体を包む
+      var form = span(t, 0.2, 0.4);
+      if (form > 0) {
+        var a = (t < 0.78) ? 1 : Math.max(0, 1 - (t - 0.78) / 0.22);
+        var bottom = p.y - ry + ry * 2.1 * easeOut(form);
+        var sag = Math.sin(Math.PI * Math.min(1, form * 1.1));   // 垂れている途中ほど、裾が大きく波打つ
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(p.x - rx - 6, p.y - ry - 6);
+        ctx.lineTo(p.x + rx + 6, p.y - ry - 6);
+        // 裾：右から左へ、しずくの丸い垂れを並べる（角が立たないよう曲線でつなぐ）
+        var n = 8;
+        var prevX = p.x + rx + 6;
+        ctx.lineTo(prevX, bottom);
+        for (var k = n - 1; k >= 0; k--) {
+          var edgeX = p.x - rx - 6 + (rx * 2 + 12) * k / n;
+          var midX = (prevX + edgeX) / 2;
+          var drip = (k % 2 === 0) ? (6 + wobble(k + 11) * 9) * sag : 1;
+          ctx.quadraticCurveTo(midX + 4, bottom, midX + 3, bottom + drip * 0.6);
+          ctx.quadraticCurveTo(midX, bottom + drip * 1.6, midX - 3, bottom + drip * 0.6);
+          ctx.quadraticCurveTo(edgeX, bottom, edgeX, bottom);
+          prevX = edgeX;
+        }
+        ctx.closePath();
+        ctx.clip();
+
+        setAlpha(ctx, a * 0.3);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        setAlpha(ctx, a * 0.7);
+        ctx.strokeStyle = deep;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, rx + 2, ry + 2, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        setAlpha(ctx, a * 0.9);
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        // ③ 膜の上を走る光
+        var g = span(t, 0.5, 0.32);
+        if (g > 0 && g < 1) {
+          setAlpha(ctx, a * Math.sin(Math.PI * g));
+          ctx.strokeStyle = p.coreColor;
+          ctx.lineWidth = 3;
+          ctx.lineCap = "round";
+          var start = Math.PI * 1.02 + g * 0.6;
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y, rx * 0.84, ry * 0.86, 0, start, start + 0.5);
+          ctx.stroke();
+          ctx.lineCap = "butt";
+        }
+        // 中を昇る小さな泡
+        for (i = 0; i < 6; i++) {
+          var bs = span(t, 0.45 + wobble(i + 40) * 0.25, 0.38);
+          if (bs <= 0 || bs >= 1) continue;
+          var bx = p.x + (wobble(i + 50) - 0.5) * rx * 1.2 + Math.sin(bs * 5 + i) * 3;
+          var by = p.y + ry * 0.6 - ry * 1.1 * bs;
+          setAlpha(ctx, a * (1 - bs) * 0.9);
+          ctx.strokeStyle = p.coreColor;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(bx, by, 1.5 + wobble(i + 60) * 2, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      // 最後に裾から垂れて消える樹液
+      for (i = 0; i < 3; i++) {
+        var ds = span(t, 0.7 + i * 0.07, 0.24);
+        if (ds <= 0 || ds >= 1) continue;
+        setAlpha(ctx, 1 - ds);
+        ctx.fillStyle = p.color;
+        sapDrop(ctx, p.x + (i - 1) * R * 0.6, p.y + ry + 2 + 20 * easeIn(ds), 3);
+      }
+    },
+
+    /**
      * 清め（クレンズ）：澄んだ雫が上から降り、体に当たって輪が広がる。最後に小さなきらめき
      */
     cleanse: function (ctx, d, t, p) {
@@ -3325,6 +3437,15 @@
 
   /** 回転数をラジアンに直す */
   function turns(value) { return value * Math.PI * 2; }
+
+  /** 上がとがったしずく（樹液の膜）。(x, y) はふくらみの中心、size は半径 */
+  function sapDrop(ctx, x, y, size) {
+    ctx.beginPath();
+    ctx.moveTo(x, y - size * 1.7);
+    ctx.quadraticCurveTo(x + size * 1.15, y - size * 0.1, x, y + size);
+    ctx.quadraticCurveTo(x - size * 1.15, y - size * 0.1, x, y - size * 1.7);
+    ctx.fill();
+  }
 
   /** 円弧の三日月（両端がとがり、真ん中が width の太さ）を塗る。外側がふくらむ */
   function crescent(ctx, cx, cy, radius, from, to, width, alpha, color) {

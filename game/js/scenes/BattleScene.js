@@ -1009,7 +1009,7 @@
       }
     } else if (event.type === "ability" || event.type === "undying" || event.type === "partyFirstStrike" ||
                event.type === "tailwind" || event.type === "wardGiven" || event.type === "abilityPopup" ||
-               ((event.type === "regen" || event.type === "drain") && event.abilityName)) {
+               ((event.type === "regen" || event.type === "drain" || event.type === "ppRegen") && event.abilityName)) {
       text = event.abilityName;
       kind = event.sourceKind || "ability";
     }
@@ -3750,12 +3750,9 @@
   };
 
   /** 文字数で折り返す（等幅フォント前提の簡易処理） */
+  // 折り返しは共通（js/namespace.js の MyGame.wrapText。行の頭に句読点を置かない）
   function wrapText(text, charsPerLine) {
-    var lines = [];
-    for (var i = 0; i < text.length; i += charsPerLine) {
-      lines.push(text.substr(i, charsPerLine));
-    }
-    return lines;
+    return NS.wrapText(text, charsPerLine);
   }
 
   /** テンプレートの {key} を置き換える */

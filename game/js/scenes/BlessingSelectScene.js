@@ -320,12 +320,9 @@
   }
 
   /** 文字数で折り返す（等幅フォント前提の簡易処理） */
+  // 折り返しは共通（js/namespace.js の MyGame.wrapText。行の頭に句読点を置かない）
   function wrapText(text, charsPerLine) {
-    var lines = [];
-    for (var i = 0; i < text.length; i += charsPerLine) {
-      lines.push(text.substr(i, charsPerLine));
-    }
-    return lines;
+    return NS.wrapText(text, charsPerLine);
   }
 
   NS.BlessingSelectScene = BlessingSelectScene;

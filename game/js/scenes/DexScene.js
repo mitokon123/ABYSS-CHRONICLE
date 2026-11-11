@@ -247,24 +247,40 @@
     return MONSTER_SORTS.indexOf(mode) >= 0 ? mode : MONSTER_SORTS[0];
   };
 
-  /** その表に並べ替えがあるか（技とモンスター） */
+  /** アイテムの並べ方（Q/E で切り替える。2026-11-09 作者の依頼）。ほかの表と同じく、図鑑を閉じても覚えておく（セーブはしない） */
+  var ITEM_SORTS = ["category", "price", "name", "order"];
+
+  DexScene.prototype._itemSort = function () {
+    var mode = this.game.dexItemSort;
+    return ITEM_SORTS.indexOf(mode) >= 0 ? mode : ITEM_SORTS[0];
+  };
+
+  /** 並べ替えのある表と、その並べ方の一覧・覚えておく場所（game のこの名前） */
+  var SORTABLE = {
+    skills:   { modes: SKILL_SORTS,   key: "dexSkillSort" },
+    monsters: { modes: MONSTER_SORTS, key: "dexMonsterSort" },
+    items:    { modes: ITEM_SORTS,    key: "dexItemSort" }
+  };
+
+  /** その表に並べ替えがあるか（技・モンスター・アイテム） */
   DexScene.prototype._hasSort = function () {
-    var tab = this.getTab();
-    return tab === "skills" || tab === "monsters";
+    return !!SORTABLE[this.getTab()];
   };
 
   /** いまの表の並べ方 */
   DexScene.prototype._currentSort = function () {
-    return this.getTab() === "monsters" ? this._monsterSort() : this._skillSort();
+    var tab = this.getTab();
+    if (tab === "monsters") return this._monsterSort();
+    if (tab === "items") return this._itemSort();
+    return this._skillSort();
   };
 
   /** いまの表の並べ方を変える */
   DexScene.prototype._changeSort = function (direction) {
-    var monsters = this.getTab() === "monsters";
-    var modes = monsters ? MONSTER_SORTS : SKILL_SORTS;
-    var next = modes[(modes.indexOf(this._currentSort()) + direction + modes.length) % modes.length];
-    if (monsters) this.game.dexMonsterSort = next;
-    else this.game.dexSkillSort = next;
+    var sortable = SORTABLE[this.getTab()];
+    if (!sortable) return;
+    var modes = sortable.modes;
+    this.game[sortable.key] = modes[(modes.indexOf(this._currentSort()) + direction + modes.length) % modes.length];
     this._rebuildList();
     this.detailScroll = 0;
   };
@@ -344,13 +360,55 @@
   };
 
   /**
-   * アイテムを分類（category）ごとに並べる。
-   * 装備は「装備」のくくりの中で、さらに武器・防具・アクセサリーに分ける（見やすさのため）
+   * アイテムを並べる。並べ方は分類ごと（既定）・値段順・名前順・図鑑の順（data/items.js に書いた順）。
+   *   分類ごと … 分類（category）ごとに区切り、装備はさらに武器・防具・アクセサリー、素材は手に入るステージで分ける
+   *   値段順   … 分類ごとに区切り、その中を値段の高い順に（同じ値段なら図鑑の順）
+   *   名前順・図鑑の順 … 区切らずに並べる
+   * 値段順・名前順では、まだ手に入れていないものを最後にまとめる（並びで値段や名前が分からないように）
    */
   DexScene.prototype._buildItemRows = function () {
     var data = this.game.data;
     var discovery = this.game.discovery;
     var categories = (data.categories || {}).item || {};
+    var mode = this._itemSort();
+    var ids = Object.keys(data.items);
+
+    var makeEntry = function (id, item) {
+      var obtained = discovery.isItemObtained(id);
+      return {
+        label: obtained ? item.name : (this.texts.unknownName || "???"),
+        // 絵も、手に入れるまでは見せない
+        icon: obtained ? item.icon : null,
+        right: obtained ? (this.texts.obtainedLabel || "") : "",
+        value: id
+      };
+    }.bind(this);
+
+    if (mode === "order") return flatRows(data.items, makeEntry);
+
+    if (mode === "price" || mode === "name") {
+      var sorted = ids.slice().sort(function (a, b) {
+        var oa = discovery.isItemObtained(a), ob = discovery.isItemObtained(b);
+        if (oa !== ob) return oa ? -1 : 1;
+        if (!oa) return ids.indexOf(a) - ids.indexOf(b);
+        var ia = data.items[a], ib = data.items[b];
+        var diff = (mode === "price")
+          ? (ib.price || 0) - (ia.price || 0)
+          : ia.name.localeCompare(ib.name, "ja");
+        return diff || ids.indexOf(a) - ids.indexOf(b);
+      });
+      if (mode === "name") {
+        return sorted.map(function (id) {
+          var entry = makeEntry(id, data.items[id]);
+          entry.type = "entry";
+          return entry;
+        });
+      }
+      // 並べ替えた順に入れ直して、分類の見出しだけ付ける（buildRows は渡した順のまま並べる）
+      var byPrice = {};
+      for (var i = 0; i < sorted.length; i++) byPrice[sorted[i]] = data.items[sorted[i]];
+      return buildRows(byPrice, categories, "category", makeEntry);
+    }
 
     // 小見出し：装備は枠（武器・防具・アクセサリー）、素材は手に入るステージ（items.js の from）。
     // ステージの並びは data/dungeons.js の order（店の素材と同じ並び）
@@ -372,16 +430,7 @@
       defs: defs
     };
 
-    return buildRows(data.items, categories, "category", function (id, item) {
-      var obtained = discovery.isItemObtained(id);
-      return {
-        label: obtained ? item.name : (this.texts.unknownName || "???"),
-        // 絵も、手に入れるまでは見せない
-        icon: obtained ? item.icon : null,
-        right: obtained ? (this.texts.obtainedLabel || "") : "",
-        value: id
-      };
-    }.bind(this), subgroups);
+    return buildRows(data.items, categories, "category", makeEntry, subgroups);
   };
 
   // --- 更新 ---
@@ -405,7 +454,7 @@
     if (input.isPressed("right")) this._changeTab(1);
     if (this._clickedTab(input)) return;
 
-    // 技とモンスターの表は、Q/E（または並びの札を押す）で並べ方を変えられる
+    // 技・モンスター・アイテムの表は、Q/E（または並びの札を押す）で並べ方を変えられる
     if (this._hasSort()) {
       if (input.isPressed("prevTab")) this._changeSort(-1);
       if (input.isPressed("nextTab")) this._changeSort(1);
@@ -868,28 +917,91 @@
    * （落とさない種族では、見出しごと出さない）
    */
   DexScene.prototype._pushDropLines = function (lines, monster, data) {
-    var drops = monster.drops || [];
-    if (drops.length === 0) return;
+    // 区画で落とすものが違う種族（data/dungeons.js の dropOverrides）は、区画ごとに分けて並べる。
+    // 違わない種族は今までどおり1つの一覧（groups は1件で、区画の見出しを付けない）
+    var groups = this._dropGroups(monster);
+    var hasAny = false;
+    for (var g = 0; g < groups.length; g++) {
+      if (groups[g].drops.length > 0) hasAny = true;
+    }
+    if (!hasAny) return;
 
     var t = this.theme;
     lines.push({ text: "" });
     lines.push({ text: this.texts.dropLabel || "", color: t.cursorColor });
 
-    for (var i = 0; i < drops.length; i++) {
-      var item = data.getItem(drops[i].item);
-      if (!item) continue;
+    for (var k = 0; k < groups.length; k++) {
+      var drops = groups[k].drops;
+      if (groups.length > 1) {
+        lines.push({ text: fillText(this.texts.dropAreaLabel || "〈{area}〉", { area: groups[k].areas.join("・") }),
+                     color: t.hintColor });
+      }
+      for (var i = 0; i < drops.length; i++) {
+        var item = data.getItem(drops[i].item);
+        if (!item) continue;
 
-      // 個数に幅があるものは「（1〜2個）」を添える
-      var min = (drops[i].min === undefined) ? 1 : drops[i].min;
-      var max = (drops[i].max === undefined) ? min : drops[i].max;
-      var count = (max > min) ? ("（" + min + "〜" + max + "個）") : "";
+        // 個数に幅があるものは「（1〜2個）」を添える
+        var min = (drops[i].min === undefined) ? 1 : drops[i].min;
+        var max = (drops[i].max === undefined) ? min : drops[i].max;
+        var count = (max > min) ? ("（" + min + "〜" + max + "個）") : "";
 
-      lines.push({
-        text: "・" + item.name + count + "  " + Math.round((drops[i].rate || 0) * 100) + "%",
-        color: t.subTextColor
-      });
+        lines.push({
+          text: "・" + item.name + count + "  " + Math.round((drops[i].rate || 0) * 100) + "%",
+          color: t.subTextColor
+        });
+      }
     }
   };
+
+  /**
+   * その種族の落とすものを、区画ごとにまとめて返す。[{ areas: [区画の名前], drops }]
+   *
+   * どの区画でも同じ（dropOverrides を書いていない）なら、種族の drops の1件だけ（areas は空）。
+   * 違う区画があるときは、出る区画のうち開いているものだけを、同じ中身どうしでまとめて並べる。
+   * まだ開いていない区画の名前は出さない（先の区画の名前が図鑑から分かってしまわないように）。
+   */
+  DexScene.prototype._dropGroups = function (monster) {
+    var data = this.game.data;
+    var base = monster.drops || [];
+    var plain = [{ areas: [], drops: base }];
+    if (!NS.DungeonCatalog || !NS.DropSystem) return plain;
+
+    var dungeons = NS.DungeonCatalog.list(data);
+    var cleared = this.game.clearedDungeons;
+    var groups = [];
+    var byKey = {};
+    var varies = false;
+
+    for (var i = 0; i < dungeons.length; i++) {
+      var d = dungeons[i];
+      if (!speciesIn(NS.DungeonCatalog.getSpecies(data, d), monster.id)) continue;
+      var drops = NS.DropSystem.dropsIn(d, monster.id, base) || [];
+      if (drops !== base) varies = true;
+
+      var region = (data.regions || {})[d.region];
+      var open = NS.DungeonCatalog.isUnlocked(d, cleared, data) &&
+                 (!region || NS.DungeonCatalog.isRegionUnlocked(region, cleared, data));
+      if (!open) continue;
+
+      var key = JSON.stringify(drops);
+      if (!byKey[key]) {
+        byKey[key] = { areas: [], drops: drops };
+        groups.push(byKey[key]);
+      }
+      byKey[key].areas.push(d.name);
+    }
+
+    if (!varies || groups.length === 0) return plain;
+    if (groups.length === 1) return [{ areas: [], drops: groups[0].drops }];
+    return groups;
+  };
+
+  function speciesIn(list, id) {
+    for (var i = 0; i < (list || []).length; i++) {
+      if (list[i].id === id) return true;
+    }
+    return false;
+  }
 
   /** 0以外の耐性を「属性 +2」の形で並べる */
   DexScene.prototype._pushResistanceLines = function (lines, monster, data) {
@@ -990,18 +1102,26 @@
     var lines = [];
     var id;
 
-    // 落とすモンスター（主も種族の drops に書いてある）
+    // 落とすモンスター（主も種族の drops に書いてある）。
+    // 区画で確率が違う種族は「ヌマボネ（蔦這う回廊）  15%」のように区画ごとに出す（_dropGroups）
     var monsters = data.monsters || {};
     for (id in monsters) {
       if (!Object.prototype.hasOwnProperty.call(monsters, id)) continue;
-      var drops = monsters[id].drops || [];
-      for (var i = 0; i < drops.length; i++) {
-        if (drops[i].item !== itemId) continue;
-        var seen = discovery.isMonsterSeen(id);
-        lines.push(fillText(texts.sourceDrop || "{name}  {rate}%", {
-          name: seen ? monsters[id].name : (texts.unknownName || "???"),
-          rate: seen ? Math.round((drops[i].rate || 0) * 100) : "?"
-        }));
+      var seen = discovery.isMonsterSeen(id);
+      // 会っていない相手は区画も伏せて、1行だけ出す
+      var groups = seen ? this._dropGroups(monsters[id]) : [{ areas: [], drops: monsters[id].drops || [] }];
+      for (var g = 0; g < groups.length; g++) {
+        var drops = groups[g].drops || [];
+        for (var i = 0; i < drops.length; i++) {
+          if (drops[i].item !== itemId) continue;
+          var values = {
+            name: seen ? monsters[id].name : (texts.unknownName || "???"),
+            area: groups[g].areas.join("・"),
+            rate: seen ? Math.round((drops[i].rate || 0) * 100) : "?"
+          };
+          lines.push(fillText(groups[g].areas.length > 0 ? (texts.sourceDropAt || "{name}（{area}）  {rate}%")
+                                                         : (texts.sourceDrop || "{name}  {rate}%"), values));
+        }
       }
     }
 
@@ -1275,7 +1395,7 @@
     var pos = this.layout.hint || { x: 48, y: 570 };
     var hint;
 
-    // 並べ替えのある表（技・モンスター）は Q/E の案内も出す
+    // 並べ替えのある表（技・モンスター・アイテム）は Q/E の案内も出す
     var skills = this._hasSort();
     if (this.focus === "detail") hint = this.texts.hintDetail;
     else if (this._canScrollDetail()) hint = skills ? this.texts.hintSkillsScrollable : this.texts.hintScrollable;
@@ -1382,12 +1502,9 @@
   }
 
   /** 文字数で折り返す（等幅フォント前提の簡易処理） */
+  // 折り返しは共通（js/namespace.js の MyGame.wrapText。行の頭に句読点を置かない）
   function wrapText(text, charsPerLine) {
-    var lines = [];
-    for (var i = 0; i < text.length; i += charsPerLine) {
-      lines.push(text.substr(i, charsPerLine));
-    }
-    return lines;
+    return NS.wrapText(text, charsPerLine);
   }
 
   NS.DexScene = DexScene;

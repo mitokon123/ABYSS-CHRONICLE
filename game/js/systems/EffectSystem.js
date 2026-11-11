@@ -22,7 +22,7 @@
  *   { type:"resistBonus",    element:"fire", value:3 }  … 耐性の数値そのものを上げる
  *   { type:"accuracyMultiplier", value:0.8 }  … 命中率に倍率（盲目とは別）
  *   { type:"healDealt",      value:1.2 }  … 自分が使う回復の技の回復量に倍率（粘晶のネックレス）
- *   戦闘中に働くもの（regen / counterStatus / onHitStatus / damageByTargetHp / drain / firstStrike / undying / shedStatus / tailwind / wardAlly）は
+ *   戦闘中に働くもの（regen / regenOverTime / ppRegen / counterStatus / counterModifier / onHitStatus / damageByTargetHp / drain / firstStrike / undying / shedStatus / tailwind / wardAlly）は
  *   ここでは集めるだけで、働かせるのは BattleSystem（_findEffects で拾う）
  *
  * ▼ 倍率と加算の違い
@@ -399,6 +399,8 @@
       text = (effect.max && party.effectRegenMax)
         ? fillText(party.effectRegenMax, { percent: percentOf(effect.value), max: effect.max })
         : fillText(party.effectRegen || "HP{percent}%", { percent: percentOf(effect.value) });
+    } else if (effect.type === "ppRegen") {
+      text = fillText(party.effectPpRegen || "毎ターン PP{value}回復", { value: effect.value || 0 });
     } else if (effect.type === "damageByTargetHp") {
       // 「相手HP100%以上 ×1.2・75%以上 ×1.1・50%以下 ×0.9」のように並べる
       text = (party.effectByTargetHp || "") + (effect.tiers || []).map(function (tier) {
@@ -416,6 +418,15 @@
                         ? party.effectCounterNormal : party.effectCounter,
         { percent: percentOf(effect.chance === undefined ? 1 : effect.chance),
           status: counterDef ? counterDef.name : effect.status });
+    } else if (effect.type === "counterModifier") {
+      // 「攻撃を受けると30%で相手の素早さ ×0.75」（ねばねば）
+      var counterMod = ((effect.modifier || {}).effects || [])[0];
+      text = fillText(party.effectCounterModifier || "被弾時 {percent}%で相手の{what}",
+        { percent: percentOf(effect.chance === undefined ? 1 : effect.chance),
+          what: counterMod ? EffectSystem.describeEffect(counterMod, gameData) : "" });
+    } else if (effect.type === "regenOverTime") {
+      text = fillText(party.effectRegenOverTime || "毎ターン HP{min}〜{max}%回復",
+        { min: percentOf(effect.min), max: percentOf(effect.max || effect.min) });
     } else if (effect.type === "drain") {
       text = fillText(effect.normalAttackOnly ? party.effectDrainNormal : party.effectDrain,
         { percent: percentOf(effect.value) });

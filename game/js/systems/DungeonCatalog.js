@@ -233,7 +233,9 @@
       var result = [];
 
       for (var i = 0; i < species.length; i++) {
-        var drops = species[i].drops || [];
+        // その区画で落とすものを置き換えていれば、そちらを見る（dropOverrides。主は置き換えない）
+        var drops = (NS.DropSystem ? NS.DropSystem.dropsIn(dungeon, species[i].id, species[i].drops)
+                                   : species[i].drops) || [];
         for (var j = 0; j < drops.length; j++) {
           var id = drops[j].item;
           if (seen[id] || !items[id]) continue;

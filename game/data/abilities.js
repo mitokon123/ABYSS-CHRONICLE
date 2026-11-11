@@ -30,6 +30,7 @@
  * ▼ 戦闘中に働く効果（js/battle/BattleSystem.js が処理する）
  *
  * "regen" … ターンの終わりに、最大HPの value の割合だけ回復する
+ * "ppRegen" … ターンの終わりに、PPを value だけ戻す（割合ではなく数。2026-11-10 樹液の護符・雫の指輪）
  *     value : 割合（0.06 なら6%。最低1は戻る）
  *     max   : 1ターンに戻る量の上限（書かなければ上限なし）
  *
@@ -46,6 +47,14 @@
  *     chance  : 確率。相手の耐性（statusResist）が掛かる（技の status と同じ）
  *     trigger : "hit" … ダメージを受けたらいつでも（技・通常攻撃・範囲技）
  *               "normalAttack" … 通常攻撃を受けたときだけ
+ *
+ * "counterModifier" … 攻撃を受けたとき、攻撃してきた相手に弱体を掛けることがある（2026-11-11 ねばねば）
+ *     chance   : 確率。相手の弱体への耐性が掛かる
+ *     kinds    : 働く技の種類（["body", "slash"] など）。通常攻撃ではいつでも働く。省略すると全部
+ *     modifier : 掛ける弱体（技の modifier と同じ書き方）。名前は特性の名前になる
+ *
+ * "regenOverTime" … ターンの終わりに、最大HPの min〜max の割合を抽選して戻す（技の modifier で使う。樹液の膜）。
+ *     特性の再生とは別に戻る（重なる）
  *
  * "drain" … 与えたダメージの value の割合だけ、自分のHPを戻す（技の drain と同じ）
  *     value            : 割合
@@ -267,6 +276,20 @@
       description: "体から電気がもれている。攻撃を受けると、ときどき相手を麻痺させる。",
       effects: [
         { type: "counterStatus", status: "paralysis", chance: 0.2, trigger: "hit" }
+      ]
+    },
+
+    // ジュエキスライム（2026-11-11 作者の指定）。通常攻撃・体技・斬撃を受けたとき、30%で相手の素早さ ×0.75。
+    // 続くターン数は書かれていなかったので、足止めの舞と同じ3ターンにした（私の判断）。弱体への耐性が掛かる
+    stickyBody: {
+      id: "stickyBody",
+      name: "ねばねば",
+      category: "special",
+      description: "体がねばついている。殴られたり斬られたりすると、ときどき相手の素早さを下げる。",
+      effects: [
+        { type: "counterModifier", chance: 0.3, kinds: ["body", "slash"],
+          modifier: { duration: 3, message: "{target} の 体に 樹液が まとわりついた!",
+                      effects: [ { type: "statMultiplier", stat: "speed", value: 0.75 } ] } }
       ]
     },
 

@@ -84,6 +84,8 @@
     ["dungeons.*.boss", "bosses"],
     ["dungeons.**.enemy", "monsters"],
     ["dungeons.**.skills[]", "skills"],
+    // 区画ごとの落とすもの（{ 種族id: [...] }。中の item は下の **.item で確かめる）
+    ["dungeons.*.dropOverrides", "monsters", { keys: true }],
     ["**.actionPattern[]", "skills", { allow: ["wait"] }],
     ["bosses.*.scoutableWhen", "dungeons"],
     ["regions.*.theme", "themes"],

@@ -267,32 +267,10 @@
    * この画面は読ませるための画面なので、
    * 「。」で始まる行が出ないようにしている。
    */
-  var NO_LINE_START = "。、）」』】〉》”’!?！？…・:：;；";
-
-  /**
-   * 決められた文字数で折り返す。
-   * 日本語は単語の切れ目が無いので、文字数で切っている。
-   *
-   * ★ 切れ目の次が句読点だった場合は、その1文字を前の行へ送る。
-   *   そうしないと「。ただし毒で〜」のように、句点で始まる行ができる。
-   */
+  // 折り返しは共通（js/namespace.js の MyGame.wrapText）。
+  // 切れ目の次が句読点なら前の行へ送る作りは、もとはこの画面だけにあった（2026-11-10 に全画面へ広げた）
   function wrapText(text, charsPerLine) {
-    var lines = [];
-    var source = String(text || "");
-    var per = charsPerLine || 20;
-
-    while (source.length > per) {
-      var cut = per;
-      // 次の行の頭に句読点が来るなら、1文字ぶん多く取って前の行に収める。
-      // 句読点が続く場合もあるので、収まるあいだは繰り返す
-      while (cut < source.length && NO_LINE_START.indexOf(source.charAt(cut)) >= 0) {
-        cut++;
-      }
-      lines.push(source.slice(0, cut));
-      source = source.slice(cut);
-    }
-    if (source.length > 0) lines.push(source);
-    return lines;
+    return NS.wrapText(text, charsPerLine);
   }
 
   NS.HelpScene = HelpScene;

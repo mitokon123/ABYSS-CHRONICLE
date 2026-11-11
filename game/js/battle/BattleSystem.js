@@ -244,6 +244,8 @@
 
     // 特性「再生」。毒のあとに戻すので、毒で倒れた者は戻らない
     this._tickRegen(events);
+    // 毎ターンPPが戻る装備（樹液の護符・雫の指輪。ppRegen）
+    this._tickPpRegen(events);
 
     // バフ／デバフの残りターンを1つ減らす（ターンの最後にまとめて）
     this._tickModifiers(events);
@@ -1910,6 +1912,8 @@
       if (e.type === "damageTaken" && e.value < 1) return true;
       if (e.type === "accuracyMultiplier" && e.value > 1) return true;
       if (e.type === "resistBonus" && e.value > 0) return true;
+      // 毎ターン戻す効果（樹液の膜）
+      if ((e.type === "regenOverTime" || e.type === "ppRegen") && (e.value || e.min) > 0) return true;
     }
     return false;
   }
@@ -2403,6 +2407,11 @@
         return { name: equipments[i].name, kind: "equipment" };
       }
     }
+    // 技で掛かった効果（樹液の膜の毎ターンの回復）。札は強化の色で出す
+    var mods = monster.modifiers || [];
+    for (i = 0; i < mods.length; i++) {
+      if ((mods[i].effects || []).indexOf(effect) >= 0) return { name: mods[i].name, kind: "buff" };
+    }
     // 加護（そのラン限り）。個体には効果だけが配られているので、定義から名前を探す
     var blessings = this.data.blessings || {};
     for (var id in blessings) {
@@ -2473,6 +2482,53 @@
         statusId: spec.status, statusName: def.name, renewed: applied.renewed
       });
       this._breakDefendByStatus(attacker, def, side, events);
+    }
+
+    this._applyCounterModifier(attacker, defender, skill, side, events);
+  };
+
+  /**
+   * 特性「ねばねば」（counterModifier。2026-11-11 作者の指定。ジュエキスライム）。
+   * 攻撃を受けた側が持っていれば、攻撃してきた相手に弱体を掛けることがある。
+   *   kinds … 働く技の種類（"body" 体技・"slash" 斬撃）。通常攻撃ではいつでも働く
+   *   chance … 確率。相手の弱体への耐性が掛かる（技の弱体と同じ。入らなくても MISS は出さない）
+   *   modifier … 掛ける弱体（技の modifier と同じ書き方）
+   * すでに同じ弱体が掛かっている相手には働かない（掛け直しの文が毎回出ないように）。
+   * 弱体の名前は特性の名前（印と「効果が切れた」の文に出る）
+   */
+  BattleSystem.prototype._applyCounterModifier = function (attacker, defender, skill, side, events) {
+    if (!attacker || attacker === defender || attacker.isFainted() || !attacker.addModifier) return;
+
+    var normal = (skill.id === this.getNormalAttackId());
+    var found = this._findEffects(defender, "counterModifier", function (effect) {
+      return normal || !effect.kinds || effect.kinds.indexOf(skill.kind) >= 0;
+    });
+
+    for (var i = 0; i < found.length; i++) {
+      var spec = found[i].effect;
+      if (!spec.modifier) continue;
+      var fake = { id: "counter_" + (found[i].name || "ability"), name: found[i].name,
+                   target: "enemy", modifier: spec.modifier };
+      if (attacker.getModifier && attacker.getModifier(fake.id)) continue;
+
+      var chance = (spec.chance === undefined) ? 1 : spec.chance;
+      chance *= this._debuffResistMultiplier(attacker);
+      if (this.random.next() >= chance) continue;
+
+      var applied = attacker.addModifier(fake);
+      if (!applied) continue;
+
+      events.push(this._abilityPopupEvent(defender, opposite(side), found[i]));
+      events.push({
+        type: "modifier", side: opposite(side), targetSide: side,
+        targetName: attacker.getName(), target: attacker,
+        skillId: fake.id, skillName: fake.name,
+        effects: spec.modifier.effects || [],
+        message: spec.modifier.message || null,
+        popup: spec.modifier.popup || null,
+        renewed: applied.renewed,
+        raised: isRaising(spec.modifier)
+      });
     }
   };
 
@@ -2595,23 +2651,72 @@
         var monster = groups[g].list[i];
         if (!monster.heal || monster.isFainted()) continue;
 
+        // 特性・装備・加護の再生（いちばん先に見つかった1つだけ）と、
+        // 技で掛かった「毎ターン戻す」効果（regenOverTime。樹液の膜）は別々に戻す（重なる）
+        var sources = [];
         var found = this._findEffect(monster, "regen");
-        if (!found) continue;
+        if (found) {
+          var amount = Math.max(1, Math.floor(monster.getMaxHp() * (found.effect.value || 0)));
+          // max を書いた効果は、1ターンに戻る量に上限がある（特性「再生」は50。v1.0.0）
+          if (found.effect.max) amount = Math.min(amount, found.effect.max);
+          sources.push({ amount: amount, name: found.name, kind: found.kind });
+        }
+        var overTime = this._findEffects(monster, "regenOverTime");
+        for (var o = 0; o < overTime.length; o++) {
+          var spec = overTime[o].effect;
+          // min〜max の割合を毎ターン抽選する（樹液の膜は 10〜15%）
+          var ratio = (spec.max > spec.min) ? spec.min + (spec.max - spec.min) * this.random.next() : (spec.min || 0);
+          sources.push({ amount: Math.max(1, Math.floor(monster.getMaxHp() * ratio)),
+                         name: overTime[o].name, kind: overTime[o].kind });
+        }
 
-        var amount = Math.max(1, Math.floor(monster.getMaxHp() * (found.effect.value || 0)));
-        // max を書いた効果は、1ターンに戻る量に上限がある（特性「再生」は50。v1.0.0）
-        if (found.effect.max) amount = Math.min(amount, found.effect.max);
-        var before = monster.currentHp;
-        monster.heal(amount);
-        var healed = monster.currentHp - before;
-        if (healed <= 0) continue;
+        for (var s = 0; s < sources.length; s++) {
+          var before = monster.currentHp;
+          monster.heal(sources[s].amount);
+          var healed = monster.currentHp - before;
+          if (healed <= 0) continue;
 
-        // 形は回復の出来事とそろえてある（画面側は healAmount を見て回復の演出を出す）
+          // 形は回復の出来事とそろえてある（画面側は healAmount を見て回復の演出を出す）
+          events.push({
+            type: "regen", targetSide: groups[g].side,
+            targetName: monster.getName(), abilityName: sources[s].name, sourceKind: sources[s].kind,
+            target: monster,
+            healAmount: healed, revealTarget: monster, revealHp: monster.currentHp
+          });
+        }
+      }
+    }
+  };
+
+  /**
+   * 毎ターンPPが戻る（効果の種類 ppRegen。2026-11-10 樹液の護符・雫の指輪）。
+   * ターンの終わりに value だけ戻す（割合ではなく数）。いくつ着けていても足し合わせる。
+   * 満タン・倒れている者には何も出さない。出来事は ppTarget / ppValue を持つので、画面はPPバーをその瞬間に伸ばす
+   */
+  BattleSystem.prototype._tickPpRegen = function (events) {
+    var groups = [{ list: this.getFieldAllies(), side: "ally" },
+                  { list: this.getFieldEnemies(), side: "enemy" }];
+
+    for (var g = 0; g < groups.length; g++) {
+      for (var i = 0; i < groups[g].list.length; i++) {
+        var monster = groups[g].list[i];
+        if (monster.currentPp === undefined || !monster.getMaxPp || monster.isFainted()) continue;
+
+        var found = this._findEffects(monster, "ppRegen");
+        if (found.length === 0) continue;
+        var amount = 0;
+        for (var f = 0; f < found.length; f++) amount += found[f].effect.value || 0;
+
+        var before = monster.currentPp;
+        monster.currentPp = Math.min(monster.getMaxPp(), before + amount);
+        var restored = monster.currentPp - before;
+        if (restored <= 0) continue;
+
         events.push({
-          type: "regen", targetSide: groups[g].side,
-          targetName: monster.getName(), abilityName: found.name, sourceKind: found.kind,
-          target: monster,
-          healAmount: healed, revealTarget: monster, revealHp: monster.currentHp
+          type: "ppRegen", targetSide: groups[g].side,
+          targetName: monster.getName(), abilityName: found[0].name, sourceKind: found[0].kind,
+          target: monster, amount: restored,
+          ppTarget: monster, ppValue: monster.currentPp
         });
       }
     }

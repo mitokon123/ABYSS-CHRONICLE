@@ -2655,11 +2655,21 @@
     ctx.font = font;
     var lines = [];
     var line = "";
+    // MyGame.wrapText と同じ決まり：句読点は幅を超えても前の行に残す（行の頭に「。」を置かない）。
+    // 言葉の途中では切らず、行の中のいちばん後ろの切れ目（MyGame.canBreakBetween）まで戻って切る
     for (var i = 0; i < text.length; i++) {
-      var next = line + text.charAt(i);
-      if (line && ctx.measureText(next).width > maxWidth) {
-        lines.push(line);
-        line = text.charAt(i);
+      var ch = text.charAt(i);
+      var next = line + ch;
+      var hang = NS.NO_LINE_START.indexOf(ch) >= 0;
+      if (line && !hang && ctx.measureText(next).width > maxWidth) {
+        var cut = -1;
+        for (var b = line.length; b >= Math.ceil(line.length / 3); b--) {
+          var after = b < line.length ? line.charAt(b) : ch;
+          if (NS.canBreakBetween(line.charAt(b - 1), after)) { cut = b; break; }
+        }
+        if (cut < 0) cut = line.length;   // 切れ目が無い（長い漢字の並びなど）：幅で切る
+        lines.push(line.slice(0, cut));
+        line = line.slice(cut) + ch;
       } else {
         line = next;
       }

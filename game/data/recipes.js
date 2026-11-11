@@ -333,7 +333,7 @@
     },
 
     // ユラツボミの花粉を使う杖（作者が考えたもの）。
-    // ★ 材料の買値 230G ＜ 売値 300G（作って売ると70G得）。作者に確認したうえで、このままにしてある
+    // 材料の買値 430G ＞ 売値 300G（2026-11-10 に素材の値段が上がって、作って売っても得をしなくなった）
     sleepStaff: {
       id: "sleepStaff",
       order: 25,
@@ -377,7 +377,7 @@
      *
      * ★ 解放は前の区画（若葉の洞）のクリア。ほかの区画の作り方と同じ（作者の指定 2026-10-30）。
      * ★ 店で素材を買って作って売っても得をしないことを確かめてある（材料の買値の合計 ＞ 売値）。
-     *   風鳴りの胴衣：買値 240G ＞ 売値 220G ／ 蒼雷の剣：金角のかけらは店に無い
+     *   風鳴りの胴衣：買値 385G ＞ 売値 310G ／ 蒼雷の剣：金角のかけらは店に無い
      *   蔦断ちの護符：絡み主根・弔いの小鐘は店に無い
      */
 
@@ -448,6 +448,319 @@
         { item: "mourningBell", count: 1 }
       ],
       unlockedBy: "sproutHollow"
+    },
+
+    /**
+     * ================================================================
+     * 2026-11-10 に足したレシピ（作者の案 新装備まとめ.txt。材料は作者が決めたもの）
+     * ================================================================
+     * 解放は作者の書いた「ひとつ前のステージクリア後」＝千年樹の根底の1つ前の、回廊クリア（作者の確認 2026-11-10）。表の19個はすべて回廊クリア。
+     * 「その他」の6つ（灼殻の鎧・燃え殻の指輪＝坑道、毒針の細剣・土よけの札＝深層、嵐よけの札・陽よけの札＝毒沼）は、作者が書いた区画。
+     *
+     * ★ 材料が全部店で買えるものは、作って売っても得をしないか確かめた（材料の買値 ＞ 売値）
+     *   （2026-11-10 の素材の値上げのあとの値）
+     *   灼殻の鎧    215G ＞ 150G     燃え殻の指輪 100G ＞ 90G     毒針の細剣 200G ＞ 140G
+     *   土よけの札  130G ＞ 85G      嵐よけの札  235G ＞ 130G     陽よけの札 210G ＞ 120G
+     *   翠風の羽飾り 315G ＞ 280G（風切りの羽根は 灰の羽根×3＋燃え殻×3 の 195G で数えた）
+     *   聖輝の提灯  若芽の種（店に無い）を使う。店の分だけで 625G ＞ 450G（光る提灯は工房で作ると 150G。11-10 に材料を増やした）
+     *   晴嵐の胴衣  705G ＞ 600G（風鳴りの胴衣は 風鳴りの羽×3＋ねじれ蔦×2 の 385G）
+     *   琥珀の雷よけ札 210G ＞ 120G  琥珀の鎧 770G ＞ 425G（11-10 に材料を増やした）
+     *   ほかは店に無い素材（主の素材・深淵の欠片・金角のかけら・絡み主根・若芽の種・宝珠のかけら・落とす装備）を使う
+     *
+     * ★ 反対に「材料をそのまま売るほうが、作った装備を売るより高い」ものが無いようにしてある（2026-11-10。作者）。
+     *   素材の値上げで21個がそうなったので、装備の売値が材料の売値の約1.1倍になるように値段を上げた
+     *   （灼牙の戦刃 400・黄泉鱗の鎧 520・王冠の輪 750・毒よけの護符 300・泥重の甲 410・毒沼の冠 670・眠りよけの鈴 390・
+     *    若枝の剣 500・若芽の護符 460・若木の大剣 720・痺れよけの鱗飾り 390・声守りの鈴 350・蔦断ちの護符 1550・深淵の首飾り 340・
+     *    嵐よけの札 260・陽よけの札 240・聖輝の提灯 900・琥珀の雷よけ札 240・琥珀の鎧 850・機巧の胴衣 1200・七護の環 2700）。
+     *   七護の環は材料の護符が上がったぶん。素材や装備の値段を変えたら、道具の見本（item-viewer.html）か早見表で両方を確かめる
+     */
+
+    // --- 坑道クリア ---
+    scorchedShellArmor: {
+      id: "scorchedShellArmor",
+      order: 34,
+      result: { item: "scorchedShellArmor", count: 1 },
+      materials: [
+        { item: "scorchedShell", count: 2 },
+        { item: "ashFeather", count: 1 },
+        { item: "oreShard", count: 2 }
+      ],
+      unlockedBy: "mossyMine"
+    },
+    emberRing: {
+      id: "emberRing",
+      order: 35,
+      result: { item: "emberRing", count: 1 },
+      materials: [
+        { item: "emberAsh", count: 2 },
+        { item: "scorchedShell", count: 1 }
+      ],
+      unlockedBy: "mossyMine"
+    },
+
+    // --- 回廊クリア（作者の表「ひとつ前のステージクリア後」＝千年樹の根底の1つ前の回廊。作者の確認 11-10） ---
+    dewdropRing: {
+      id: "dewdropRing",
+      order: 36,
+      result: { item: "dewdropRing", count: 1 },
+      materials: [
+        { item: "crownShard", count: 1 },
+        { item: "slimeShard", count: 4 },
+        { item: "duskDew", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    duskDewCloak: {
+      id: "duskDewCloak",
+      order: 37,
+      result: { item: "duskDewCloak", count: 1 },
+      materials: [
+        { item: "mossCharm", count: 1 },
+        { item: "duskDew", count: 3 },
+        { item: "abyssFragment", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    abyssNecklace: {
+      id: "abyssNecklace",
+      order: 40,
+      result: { item: "abyssNecklace", count: 1 },
+      materials: [
+        { item: "abyssFragment", count: 2 },
+        { item: "venomStinger", count: 1 },
+        { item: "twistedVine", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    jadeWindPlume: {
+      id: "jadeWindPlume",
+      order: 43,
+      result: { item: "jadeWindPlume", count: 1 },
+      materials: [
+        { item: "swiftPlume", count: 1 },
+        { item: "leafFeather", count: 1 },
+        { item: "ashFeather", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+
+    // --- 深層クリア（作者の表の「その他」） ---
+    venomRapier: {
+      id: "venomRapier",
+      order: 38,
+      result: { item: "venomRapier", count: 1 },
+      materials: [
+        { item: "venomStinger", count: 2 },
+        { item: "rustedBone", count: 1 },
+        { item: "oreShard", count: 1 }
+      ],
+      unlockedBy: "silentDepths"
+    },
+    earthWard: {
+      id: "earthWard",
+      order: 39,
+      result: { item: "earthWard", count: 1 },
+      materials: [
+        { item: "oreShard", count: 2 },
+        { item: "muddyShell", count: 1 }
+      ],
+      unlockedBy: "silentDepths"
+    },
+
+    // --- 毒沼クリア（作者の表の「その他」。結晶は毒沼クリアで店に並ぶ） ---
+    galeWard: {
+      id: "galeWard",
+      order: 41,
+      result: { item: "galeWard", count: 1 },
+      materials: [
+        { item: "breezeCrystal", count: 2 },
+        { item: "leafFeather", count: 1 }
+      ],
+      unlockedBy: "venomMarsh"
+    },
+    sunWard: {
+      id: "sunWard",
+      order: 42,
+      result: { item: "sunWard", count: 1 },
+      materials: [
+        { item: "sunCrystal", count: 2 },
+        { item: "glowDust", count: 1 }
+      ],
+      unlockedBy: "venomMarsh"
+    },
+
+    // --- 回廊クリア（続き。回廊の素材・回廊で手に入る装備を使うもの） ---
+    radiantLantern: {
+      id: "radiantLantern",
+      order: 44,
+      result: { item: "radiantLantern", count: 1 },
+      materials: [
+        { item: "glowLantern", count: 1 },
+        { item: "glowMoss", count: 3 },
+        { item: "glowDust", count: 3 },
+        { item: "sunCrystal", count: 2 },
+        { item: "sproutSeed", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    // 7つのよけを1つずつ（着けているものは数えない。持ち物にあるものだけ）
+    sevenWardRing: {
+      id: "sevenWardRing",
+      order: 45,
+      result: { item: "sevenWardRing", count: 1 },
+      materials: [
+        { item: "venomWard", count: 1 },
+        { item: "boneCharm", count: 1 },
+        { item: "sleepWard", count: 1 },
+        { item: "paralysisWard", count: 1 },
+        { item: "sealWard", count: 1 },
+        { item: "curseWard", count: 1 },
+        { item: "abyssNecklace", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    flameFangTachi: {
+      id: "flameFangTachi",
+      order: 46,
+      result: { item: "flameFangTachi", count: 1 },
+      materials: [
+        { item: "blazeCharm", count: 1 },
+        { item: "blazingFang", count: 1 },
+        { item: "scorchedShell", count: 3 },
+        { item: "windChimeFeather", count: 2 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    rootboundSpear: {
+      id: "rootboundSpear",
+      order: 47,
+      result: { item: "rootboundSpear", count: 1 },
+      materials: [
+        { item: "marshSpear", count: 1 },
+        { item: "tangledTaproot", count: 1 },
+        { item: "rustedBone", count: 2 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    clearGaleVest: {
+      id: "clearGaleVest",
+      order: 48,
+      result: { item: "clearGaleVest", count: 1 },
+      materials: [
+        { item: "windChimeVest", count: 1 },
+        { item: "breezeCrystal", count: 2 },
+        { item: "sunCrystal", count: 2 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    ancientWoodRing: {
+      id: "ancientWoodRing",
+      order: 49,
+      result: { item: "ancientWoodRing", count: 1 },
+      materials: [
+        { item: "heartwood", count: 1 },
+        { item: "mossyShell", count: 2 },
+        { item: "mossSpore", count: 2 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    wraithBell: {
+      id: "wraithBell",
+      order: 50,
+      result: { item: "wraithBell", count: 1 },
+      materials: [
+        { item: "boneCharm", count: 1 },
+        { item: "mourningBell", count: 1 },
+        { item: "abyssFragment", count: 2 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    hunterFangCharm: {
+      id: "hunterFangCharm",
+      order: 51,
+      result: { item: "hunterFangCharm", count: 1 },
+      materials: [
+        { item: "blazingFang", count: 1 },
+        { item: "goldHornShard", count: 1 },
+        { item: "rustedBone", count: 2 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+
+    // --- 回廊クリア（千年樹の根底の素材） ---
+    amberThunderWard: {
+      id: "amberThunderWard",
+      order: 52,
+      result: { item: "amberThunderWard", count: 1 },
+      materials: [
+        { item: "amberShard", count: 1 },
+        { item: "ancientSap", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    amberArmor: {
+      id: "amberArmor",
+      order: 53,
+      result: { item: "amberArmor", count: 1 },
+      materials: [
+        { item: "amberShard", count: 5 },
+        { item: "mossyShell", count: 2 },
+        { item: "ancientSap", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    gearGreatsword: {
+      id: "gearGreatsword",
+      order: 54,
+      result: { item: "gearGreatsword", count: 1 },
+      materials: [
+        { item: "brassGear", count: 3 },
+        { item: "amberCore", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    roaringThunderBlade: {
+      id: "roaringThunderBlade",
+      order: 55,
+      result: { item: "roaringThunderBlade", count: 1 },
+      materials: [
+        { item: "blueThunderBlade", count: 1 },
+        { item: "brassGear", count: 2 },
+        { item: "goldHornShard", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    sapCharm: {
+      id: "sapCharm",
+      order: 56,
+      result: { item: "sapCharm", count: 1 },
+      materials: [
+        { item: "ancientSap", count: 3 },
+        { item: "sproutSeed", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    jewelNecklace: {
+      id: "jewelNecklace",
+      order: 57,
+      result: { item: "jewelNecklace", count: 1 },
+      materials: [
+        { item: "jewelShard", count: 1 },
+        { item: "amberShard", count: 2 },
+        { item: "tangledTaproot", count: 1 }
+      ],
+      unlockedBy: "ivyCorridor"
+    },
+    clockworkVest: {
+      id: "clockworkVest",
+      order: 58,
+      result: { item: "clockworkVest", count: 1 },
+      materials: [
+        { item: "amberCore", count: 1 },
+        { item: "ancientSap", count: 2 },
+        { item: "brassGear", count: 3 }
+      ],
+      unlockedBy: "ivyCorridor"
     }
   };
 })(window.MyGame);

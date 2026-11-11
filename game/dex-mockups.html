@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>図鑑の見た目の案 - ABYSS CHRONICLE</title>
+  <script src="tools/devguard.js"></script>
+  <!--
+    ▼ このファイルについて（開発用。ゲーム本体ではない）
+
+    図鑑のアップグレードの見た目の案（2026-11-10。作者が選ぶ）。
+    ゲームの画面と同じ 800×600・同じ色（data/ui.js の theme・dex）・本物の絵（data/sprites_*.js）で描いた止め絵。
+    動きはつけていない（選んだ案をゲームに入れるときに、今の図鑑と同じく動かす）。
+    中身は data/ の本物の値。図鑑の進み具合だけは見本用に作ったもの（38種のうち仲間30・出会っただけ5・まだ3）。
+    何も書き換えない（見るだけ）。
+  -->
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #05070d; color: #c8d0e8; font-family: sans-serif; font-size: 13px; }
+    main { max-width: 860px; margin: 0 auto; padding: 18px 16px 40px; }
+    h1 { font-size: 20px; color: #ffd75e; margin: 0 0 4px; }
+    h1 a { font-size: 12px; color: #6b7590; margin-left: 12px; font-weight: normal; }
+    h2 { font-size: 17px; color: #e8ecf8; margin: 28px 0 4px; }
+    h2 span { color: #ffd75e; margin-right: 6px; }
+    .sub { color: #6b7590; font-size: 12px; line-height: 1.7; }
+    .pick { color: #9aa4c0; font-size: 13px; line-height: 1.8; margin: 4px 0 8px; }
+    .pick b { color: #ffd75e; font-weight: normal; }
+    canvas.screen { display: block; width: 800px; max-width: 100%; height: auto; border: 1px solid #2a3350; image-rendering: auto; }
+    #pickMon { margin: 10px 0; }
+    select { background: #141b2e; color: #e8ecf8; border: 1px solid #2a3350; border-radius: 4px; padding: 4px 8px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>図鑑の見た目の案 <a href="dev.html">← 開発用の目次</a></h1>
+    <div class="sub">
+      ゲームと同じ 800×600・同じ色・本物の絵で描いた止め絵。中身は data/ の本物の値（図鑑の進み具合だけ見本用）。<br>
+      装備・預かり所の作り直しと同じく「画面ぜんぶを使う」形にした。どれか1つ、または組み合わせ（例：A の箱＋B の右側）を選んでください。
+    </div>
+    <div id="pickMon">表示するモンスター <select id="mon"></select></div>
+    <div id="body" class="sub">ゲームのデータを読んでいます…</div>
+  </main>
+
+  <script src="tools/devpage.js"></script>
+  <script>
+  (function () {
+    "use strict";
+    var D = window.DevPage;
+    var raw, T, ids, state = {}, sel = "marshBone";
+    var W = 800, H = 600;
+
+    var PLANS = [
+      { key: "A", name: "箱の図鑑（預かり所と同じ作り）",
+        text: "<b>左</b>：絵のマスが 7×5 で並ぶ箱（Q/E で次の箱）。番号・仲間の印★・まだ会っていない相手は「？」。" +
+              "<b>右</b>：大きな絵・番号・系統と属性の札・能力の棒・耐性の札・落とすもの（絵つき）。<b>下</b>：集めた数の棒。<br>" +
+              "決定で記録・特性を読む欄に切り替わる。アイテムの表も同じく絵のマスにできる。" },
+      { key: "B", name: "見開きの本",
+        text: "画面ぜんぶが開いた本。<b>左のページ</b>：番号・名前・系統と属性（アイコンつき）・台座に立つ絵・説明・愛情度の記録（慣れ・信頼・絆）。" +
+              "<b>右のページ</b>：能力の五角形・属性7つの耐性表（アイコンつき。弱点は赤・強いものは青）・落とすもの・特性。" +
+              "<b>下</b>：前後の相手の絵が並ぶ帯（←→ でめくる）。上の栞がタブ。<br>" +
+              "11-10 の作者の注文：属性のアイコン・判明していない所は「？」・愛情度ごとの説明をのせる。" },
+      { key: "C", name: "一覧はそのまま・中身を強く",
+        text: "今の形（左の一覧・右の詳細）を残して、<b>一覧</b>の行に小さな絵・番号・属性の色・仲間の★を足す。" +
+              "<b>右</b>は「概要／能力／落とすもの」のページに分けて Q/E で送る（様子を見る画面と同じ作り）。" +
+              "いちばん慣れた操作のまま。見本は「能力」のページ。" }
+    ];
+
+    D.loadGame(function () {
+      raw = window.MyGame.rawData;
+      T = raw.ui.theme;
+      ids = Object.keys(raw.monsters);
+      // 見本用の進み具合：後ろの3つはまだ・その前の5つは出会っただけ
+      ids.forEach(function (id, i) {
+        state[id] = i >= ids.length - 3 ? "none" : (i >= ids.length - 8 && id !== sel ? "seen" : "caught");
+      });
+      var s = document.getElementById("mon");
+      ids.forEach(function (id) {
+        var o = document.createElement("option");
+        o.value = id; o.textContent = no(id) + " " + raw.monsters[id].name;
+        if (id === sel) o.selected = true;
+        s.appendChild(o);
+      });
+      s.onchange = function () { sel = s.value; drawAll(); };
+      var body = document.getElementById("body");
+      body.className = "";
+      body.innerHTML = "";
+      // 選んだ案 B を先に。A・C は見比べ用に下へ残す
+      [PLANS[1], PLANS[0], PLANS[2]].forEach(function (p) {
+        var h = document.createElement("h2"); h.innerHTML = "<span>案 " + p.key + "</span>" + p.name + (p.key === "B" ? "（作者が選んだ案）" : "（選ばなかった案）"); body.appendChild(h);
+        var d = document.createElement("div"); d.className = "pick"; d.innerHTML = p.text; body.appendChild(d);
+        var variants = p.key === "B" ? B_VARIANTS : [{ id: "", caption: "" }];
+        variants.forEach(function (v) {
+          if (v.caption) { var cap = document.createElement("div"); cap.className = "pick"; cap.innerHTML = "<b>" + v.caption + "</b>"; body.appendChild(cap); }
+          var c = document.createElement("canvas"); c.className = "screen"; c.width = W; c.height = H; c.id = "plan" + p.key + v.id; body.appendChild(c);
+        });
+      });
+      drawAll();
+    });
+
+    var B_VARIANTS = [
+      { id: "", caption: "① 仲間にした相手（上で選んだモンスター。記録は「信頼」まで読める、として描いた）" },
+      { id: "2", caption: "② 出会っただけの相手（絵・名前・系統・属性・能力は見える。ほかは「？」）" },
+      { id: "3", caption: "③ まだ出会っていない相手（すべて「？」。下の帯でも「？」）" }
+    ];
+    function drawAll() {
+      drawA(ctxOf("A"));
+      var seenId = ids.filter(function (id) { return state[id] === "seen"; })[0];
+      var noneId = ids.filter(function (id) { return state[id] === "none"; })[0];
+      drawB(ctxOf("B"), sel, "caught", 2);
+      drawB(ctxOf("B2"), seenId, "seen", 0);
+      drawB(ctxOf("B3"), noneId, "none", 0);
+      drawC(ctxOf("C"));
+    }
+    function ctxOf(k) { var g = document.getElementById("plan" + k).getContext("2d"); g.imageSmoothingEnabled = false; return g; }
+
+    // --- 共通 ---
+    function no(id) { var n = ids.indexOf(id) + 1; return "No." + (n < 10 ? "00" : n < 100 ? "0" : "") + n; }
+    function mon(id) { return raw.monsters[id]; }
+    function firstSprite(m) { return Array.isArray(m.sprite) ? m.sprite[0] : m.sprite; }
+    function elemOf(m) { return raw.elements[m.element] || { name: "-", color: "#9aa4c0" }; }
+    function famOf(m) { return ((raw.categories || {}).monster || {})[m.family] || { name: "-", color: "#9aa4c0" }; }
+
+    function bg(g, color) { g.fillStyle = color || raw.ui.dex.background; g.fillRect(0, 0, W, H); }
+    function box(g, x, y, w, h, fill, border) {
+      g.fillStyle = fill || T.panelBg; g.fillRect(x, y, w, h);
+      g.strokeStyle = border || T.panelBorder; g.lineWidth = T.borderWidth || 2; g.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    }
+    function text(g, s, x, y, o) {
+      o = o || {};
+      g.font = o.font || T.smallFont; g.fillStyle = o.color || T.textColor;
+      g.textAlign = o.align || "left"; g.textBaseline = "alphabetic";
+      g.fillText(s, x, y);
+    }
+    function sprite(g, id, x, y, size, opt) {
+      opt = opt || {};
+      var s = raw.sprites[id]; if (!s || !s.pixels) return;
+      var h = s.pixels.length, w = s.pixels[0].length, px = size / Math.max(w, h);
+      var ox = x + (size - w * px) / 2, oy = y + (size - h * px);
+      for (var yy = 0; yy < h; yy++) for (var xx = 0; xx < w; xx++) {
+        var col = s.palette[s.pixels[yy].charAt(xx)];
+        if (!col) continue;
+        g.fillStyle = opt.silhouette ? opt.silhouette : col;
+        g.fillRect(Math.floor(ox + xx * px), Math.floor(oy + yy * px), Math.ceil(px), Math.ceil(px));
+      }
+    }
+    function chip(g, label, x, y, color, o) {
+      o = o || {};
+      g.font = o.font || T.smallFont;
+      var w = Math.ceil(g.measureText(label).width) + 14, h = o.h || 18;
+      g.fillStyle = o.fill || "rgba(255,255,255,0.06)"; g.fillRect(x, y, w, h);
+      g.strokeStyle = color; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+      text(g, label, x + 7, y + h - 5, { color: color, font: o.font });
+      return w;
+    }
+    function bar(g, x, y, w, h, ratio, color) {
+      g.fillStyle = T.hpBarBg; g.fillRect(x, y, w, h);
+      g.fillStyle = color; g.fillRect(x, y, Math.max(2, Math.round(w * Math.min(1, ratio))), h);
+    }
+    function heading(g, title, sub, ty) {
+      text(g, title, 48, ty || 62, { font: "26px monospace", color: "#e6ecff" });
+      if (sub) text(g, sub, 48, (ty || 62) + 26, { font: "13px monospace", color: "#7f8db8" });
+    }
+    var TABS = ["モンスター", "アイテム", "特性", "技", "性格", "加護"];
+    function tabs(g, x, y, w, h, gap) {
+      TABS.forEach(function (t, i) {
+        var on = i === 0, bx = x + i * (w + gap);
+        g.fillStyle = on ? "rgba(255,215,94,0.12)" : T.panelBg; g.fillRect(bx, y, w, h);
+        g.strokeStyle = on ? T.cursorColor : T.panelBorder; g.lineWidth = on ? 2 : 1; g.strokeRect(bx + 1, y + 1, w - 2, h - 2);
+        text(g, t, bx + w / 2, y + h / 2 + 5, { align: "center", color: on ? T.cursorColor : T.subTextColor, font: T.smallFont });
+      });
+    }
+    function counts() {
+      var c = { caught: 0, seen: 0 };
+      ids.forEach(function (id) { if (state[id] === "caught") c.caught++; if (state[id] !== "none") c.seen++; });
+      return c;
+    }
+    var STATS = [["HP", "baseHp"], ["攻撃", "baseAttack"], ["防御", "baseDefense"], ["素早さ", "baseSpeed"], ["PP", "basePp"]];
+    // 棒・五角形の目盛り。いちばん大きい種族（主など）に合わせると、ほとんどの種族が短くなるので、
+    // 8割の種族が収まる値を満タンにする（はみ出す種族は満タンで止まる）
+    var statScale = {};
+    function maxStat(key) {
+      if (statScale[key]) return statScale[key];
+      var v = ids.map(function (id) { return mon(id)[key] || 0; }).sort(function (a, b) { return a - b; });
+      return (statScale[key] = v[Math.floor(v.length * 0.8)] || 1);
+    }
+    var STAT_COLORS = ["#5fd18c", "#e8845a", "#6fa8e8", "#ffd75e", "#4fb0d1"];
+    function resists(m) {
+      var r = m.resistances || {}, out = [];
+      Object.keys(r).forEach(function (k) { if (r[k]) out.push({ id: k, v: r[k] }); });
+      out.sort(function (a, b) { return b.v - a.v; });
+      return out;
+    }
+    function dropsOf(m) { return (m.drops || []).filter(function (d) { return raw.items[d.item]; }); }
+    function itemIcon(g, itemId, x, y, size) { var it = raw.items[itemId]; if (it && it.icon) sprite(g, it.icon, x, y, size); }
+    function pct(r) { return Math.round((r || 0) * 100) + "%"; }
+    function abilityName(m) { var a = (m.abilities || [])[0]; return a && raw.abilities[a] ? raw.abilities[a].name : "-"; }
+    function hint(g, s) { text(g, s, 48, 584, { color: T.hintColor }); }
+    function backBtn(g) { var b = T.backButton; box(g, b.x, b.y, b.w, b.h); text(g, "戻る", b.x + b.w / 2, b.y + 20, { align: "center", color: T.subTextColor }); }
+
+    // ================= 案 A：箱の図鑑 =================
+    function drawA(g) {
+      bg(g);
+      text(g, "図鑑", 32, 40, { font: "22px monospace", color: "#e6ecff" });
+      tabs(g, 110, 20, 100, 26, 6);
+      // 箱
+      var gx = 32, gy = 60, gw = 424, gh = 432;
+      box(g, gx, gy, gw, gh);
+      var cols = 7, rows = 5, cell = 56, gap = 2, page = 0, perPage = cols * rows;
+      var cellsX = gx + (gw - (cols * cell + (cols - 1) * gap)) / 2, cellsY = gy + 44;
+      text(g, "◀", gx + 16, gy + 26, { color: T.subTextColor, font: T.font });
+      text(g, "箱 1 / 2", gx + gw / 2, gy + 26, { align: "center", font: T.font });
+      text(g, "▶", gx + gw - 16, gy + 26, { color: T.subTextColor, font: T.font, align: "right" });
+      text(g, "図鑑の順", gx + gw - 40, gy + 26, { align: "right", color: T.hintColor });
+      var selIndex = ids.indexOf(sel), list = ids.slice(page * perPage, page * perPage + perPage);
+      if (selIndex >= perPage) list = ids.slice(perPage, perPage * 2);
+      list.forEach(function (id, i) {
+        var cx = cellsX + (i % cols) * (cell + gap), cy = cellsY + Math.floor(i / cols) * (cell + gap);
+        g.fillStyle = raw.ui.party.box.cellColor; g.fillRect(cx, cy, cell, cell);
+        var st = state[id], m = mon(id);
+        if (st === "none") {
+          text(g, "？", cx + cell / 2, cy + cell / 2 + 7, { align: "center", font: "18px monospace", color: "#2e3858" });
+        } else {
+          sprite(g, firstSprite(m), cx + 8, cy + 6, cell - 16, st === "seen" ? { silhouette: "#3a4566" } : null);
+          // 属性の色の線（下）
+          g.fillStyle = elemOf(m).color; g.fillRect(cx + 4, cy + cell - 4, cell - 8, 2);
+        }
+        text(g, String(ids.indexOf(id) + 1), cx + 3, cy + 11, { font: "9px monospace", color: T.hintColor });
+        if (st === "caught") text(g, "★", cx + cell - 3, cy + 12, { font: "10px monospace", color: T.cursorColor, align: "right" });
+        if (id === sel) { g.strokeStyle = T.cursorColor; g.lineWidth = 2; g.strokeRect(cx + 1, cy + 1, cell - 2, cell - 2); }
+      });
+      text(g, "★ 仲間にした   影 出会っただけ   ？ まだ", gx + 16, gy + gh - 14, { color: T.hintColor });
+
+      // 右の詳細
+      var m = mon(sel), dx = 468, dy = 60, dw = 300, dh = 432;
+      box(g, dx, dy, dw, dh);
+      g.fillStyle = "rgba(255,255,255,0.04)"; g.beginPath(); g.ellipse(dx + 70, dy + 104, 44, 9, 0, 0, Math.PI * 2); g.fill();
+      sprite(g, firstSprite(m), dx + 22, dy + 12, 96 * Math.min(1.1, m.sizeScale || 1));
+      text(g, no(sel), dx + 132, dy + 30, { color: T.hintColor });
+      text(g, m.name, dx + 132, dy + 52, { font: T.largeFont });
+      var cw = chip(g, famOf(m).name, dx + 132, dy + 62, famOf(m).color);
+      chip(g, elemOf(m).name, dx + 132 + cw + 6, dy + 62, elemOf(m).color);
+      text(g, "スカウト率 " + pct(m.scoutRate) + "  Lv上限 " + (m.maxLevel || 50), dx + 132, dy + 100, { color: T.subTextColor });
+      var y = dy + 128;
+      text(g, "能力（基礎値）", dx + 14, y, { color: T.cursorColor }); y += 8;
+      STATS.forEach(function (s, i) {
+        y += 18;
+        text(g, s[0], dx + 14, y, { color: T.subTextColor });
+        text(g, String(m[s[1]] || 0), dx + 96, y, { align: "right" });
+        bar(g, dx + 104, y - 9, 180, 8, (m[s[1]] || 0) / maxStat(s[1]), STAT_COLORS[i]);
+      });
+      y += 26; text(g, "耐性", dx + 14, y, { color: T.cursorColor }); y += 6;
+      var rx = dx + 14;
+      resists(m).forEach(function (r) {
+        var e = raw.elements[r.id] || { name: r.id, color: "#9aa4c0" };
+        var label = e.name + (r.v > 0 ? "+" : "") + r.v;
+        g.font = T.smallFont;
+        if (rx + g.measureText(label).width + 20 > dx + dw - 10) { rx = dx + 14; y += 22; }
+        rx += chip(g, label, rx, y, r.v < 0 ? "#e8845a" : e.color, { fill: r.v < 0 ? "rgba(232,84,42,0.12)" : null }) + 4;
+      });
+      y += 40; text(g, "落とすもの", dx + 14, y, { color: T.cursorColor });
+      dropsOf(m).forEach(function (d) {
+        y += 22;
+        itemIcon(g, d.item, dx + 14, y - 14, 16);
+        text(g, raw.items[d.item].name, dx + 36, y, { color: T.subTextColor });
+        text(g, pct(d.rate), dx + dw - 16, y, { align: "right", color: T.subTextColor });
+      });
+      text(g, "決定：記録・特性を読む", dx + dw - 14, dy + dh - 12, { align: "right", color: T.hintColor });
+
+      // 下：集めた数
+      var c = counts(), fy = 502;
+      box(g, 32, fy, 736, 40);
+      text(g, "出会った", 48, fy + 25, { color: T.subTextColor });
+      bar(g, 116, fy + 16, 200, 10, c.seen / ids.length, "#4fb0d1");
+      text(g, c.seen + " / " + ids.length, 326, fy + 25);
+      text(g, "仲間", 420, fy + 25, { color: T.subTextColor });
+      bar(g, 460, fy + 16, 200, 10, c.caught / ids.length, T.cursorColor);
+      text(g, c.caught + " / " + ids.length, 670, fy + 25);
+      hint(g, "↑↓←→: 選ぶ   Q/E: 箱   決定: 詳しく   R: 並べ替え");
+      backBtn(g);
+    }
+
+    // ================= 案 B：見開きの本 =================
+    // 案 B（作者が選んだ 2026-11-10）。
+    //   属性はアイコン（data/elements.js の icon）・判明していない所は「？」・愛情度の記録を左のページに。
+    //   kind … "caught"（仲間にした）/ "seen"（出会っただけ）/ "none"（まだ出会っていない）
+    function drawB(g, id, kind, reached) {
+      bg(g, "#07090f");
+      var bx = 24, by = 44, bw = 752, bh = 452, mid = bx + bw / 2;
+      var m = mon(id), lx = bx + 28, rx = mid + 30;
+      var PAPER = "#c9c0a8", GOLD = "#b89a5a", DIM = "#5a4e36", INK = "#e0d6bc";
+      // 栞（タブ）
+      TABS.forEach(function (t, i) {
+        var on = i === 0, tx = bx + 40 + i * 92;
+        g.fillStyle = on ? "#7a5a1e" : "#1f2740"; g.fillRect(tx, by - 26, 84, 30);
+        text(g, t, tx + 42, by - 6, { align: "center", color: on ? "#ffe9a8" : T.subTextColor });
+      });
+      // 本の表紙と紙
+      g.fillStyle = "#2a2014"; g.fillRect(bx - 6, by - 4, bw + 12, bh + 10);
+      g.fillStyle = "#101626"; g.fillRect(bx, by, bw / 2 - 4, bh);
+      g.fillStyle = "#0f1524"; g.fillRect(mid + 4, by, bw / 2 - 4, bh);
+      var grad = g.createLinearGradient(mid - 18, 0, mid + 18, 0);
+      grad.addColorStop(0, "rgba(0,0,0,0)"); grad.addColorStop(0.5, "rgba(0,0,0,0.55)"); grad.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = grad; g.fillRect(mid - 18, by, 36, bh);
+      g.strokeStyle = "#3a3020"; g.lineWidth = 1; g.strokeRect(bx + 10.5, by + 10.5, bw / 2 - 24, bh - 21); g.strokeRect(mid + 13.5, by + 10.5, bw / 2 - 24, bh - 21);
+
+      // ---- 左のページ：番号・名前・絵・説明・愛情度の記録 ----
+      var known = kind !== "none", open = kind === "caught";
+      text(g, no(id), lx, by + 36, { color: GOLD });
+      text(g, known ? m.name : "？？？", lx, by + 62, { font: "22px monospace", color: known ? "#f0e6cc" : DIM });
+      if (known) {
+        var cw = chip(g, famOf(m).name, lx, by + 72, famOf(m).color, { h: 20 });
+        elemChip(g, m.element, lx + cw + 6, by + 72);
+        if (!open) text(g, "（未加入）", lx + 200, by + 87, { color: T.hintColor });
+      }
+      var px = bx + bw / 4, py = by + 196;
+      g.fillStyle = "rgba(184,154,90,0.12)"; g.beginPath(); g.ellipse(px, py, 84, 16, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = "rgba(184,154,90,0.4)"; g.beginPath(); g.ellipse(px, py, 84, 16, 0, 0, Math.PI * 2); g.stroke();
+      if (known) {
+        var size = Math.round(104 * Math.min(1.15, m.sizeScale || 1));
+        sprite(g, firstSprite(m), px - size / 2, py - size + 6, size);
+      } else {
+        text(g, "？", px, py - 22, { align: "center", font: "64px monospace", color: "#3a3020" });
+      }
+      var y = by + 230;
+      if (open) {
+        wrap(m.description, 27).slice(0, 3).forEach(function (l) { text(g, l, lx, y, { color: PAPER }); y += 18; });
+      } else {
+        text(g, known ? "仲間にすると、くわしく書きこめる。" : "まだ出会っていない。", lx, y, { color: DIM }); y += 18;
+      }
+      // 愛情度の記録（慣れ・信頼・絆）。まだの段階は見出しだけ
+      y += 10;
+      var stages = ((raw.affection || {}).stages || []).slice(1);
+      stages.forEach(function (st, i) {
+        var can = open && i < reached && (m.records || {})[st.id];
+        text(g, "― " + st.name + " ―", lx, y, { color: can ? GOLD : DIM });
+        if (can) {
+          y += 17;
+          wrap(m.records[st.id], 27).forEach(function (l) { text(g, l, lx, y, { color: PAPER }); y += 17; });
+        } else {
+          text(g, "？？？", lx + 84, y, { color: DIM }); y += 17;
+        }
+        y += 6;
+      });
+
+      // ---- 右のページ：能力・耐性・落とすもの・特性 ----
+      text(g, "能力", rx, by + 36, { color: GOLD });
+      var cx = rx + 160, cy = by + 124, R = 64;
+      function pt(i, r) { var a = -Math.PI / 2 + i * Math.PI * 2 / 5; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]; }
+      [1, 0.66, 0.33].forEach(function (k) {
+        g.beginPath(); for (var i = 0; i < 5; i++) { var p = pt(i, R * k); if (i) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); }
+        g.closePath(); g.strokeStyle = "rgba(184,154,90,0.25)"; g.stroke();
+      });
+      if (known) {
+        g.beginPath();
+        STATS.forEach(function (s, i) { var p = pt(i, R * Math.min(1, Math.max(0.08, (m[s[1]] || 0) / maxStat(s[1])))); if (i) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); });
+        g.closePath(); g.fillStyle = "rgba(255,215,94,0.28)"; g.fill(); g.strokeStyle = T.cursorColor; g.lineWidth = 2; g.stroke(); g.lineWidth = 1;
+      }
+      STATS.forEach(function (s, i) {
+        var p = pt(i, R + 18);
+        text(g, s[0] + " " + (known ? (m[s[1]] || 0) : "？"), p[0], p[1] + 4, { align: "center", color: known ? INK : DIM, font: "11px monospace" });
+      });
+      if (open) text(g, "スカウト率 " + pct(m.scoutRate) + "   Lv上限 " + (m.maxLevel || 50), rx, by + 222, { color: T.subTextColor });
+
+      var ty = by + 252;
+      text(g, "耐性", rx, ty, { color: GOLD });
+      var els = Object.keys(raw.elements).filter(function (k) { return raw.elements[k].icon; });
+      els.forEach(function (k, i) {
+        var e = raw.elements[k], v = (m.resistances || {})[k] || 0;
+        var cxx = rx + (i % 4) * 82, cyy = ty + 10 + Math.floor(i / 4) * 30;
+        g.fillStyle = !open ? "rgba(255,255,255,0.03)" : v > 0 ? "rgba(79,140,232,0.18)" : v < 0 ? "rgba(232,84,42,0.2)" : "rgba(255,255,255,0.04)";
+        g.fillRect(cxx, cyy, 76, 24);
+        sprite(g, e.icon, cxx + 4, cyy + 4, 16);
+        text(g, e.name, cxx + 24, cyy + 16, { color: open && v ? "#e8eaf0" : T.hintColor });
+        var vs = !open ? "？" : v === 0 ? "-" : (v > 0 ? "+" : "") + v;
+        text(g, vs, cxx + 70, cyy + 16, { align: "right", color: !open ? DIM : v > 0 ? "#8fb8ff" : v < 0 ? "#ff9a7a" : T.hintColor });
+      });
+      var dy2 = ty + 90;
+      text(g, "落とすもの", rx, dy2, { color: GOLD });
+      if (open) {
+        dropsOf(m).slice(0, 3).forEach(function (d, i) {
+          var yy = dy2 + 22 + i * 22;
+          itemIcon(g, d.item, rx, yy - 14, 16);
+          text(g, raw.items[d.item].name, rx + 22, yy, { color: "#d8ceb4" });
+          text(g, pct(d.rate), rx + 310, yy, { align: "right", color: "#d8ceb4" });
+        });
+      } else {
+        text(g, "？？？", rx, dy2 + 22, { color: DIM });
+      }
+      text(g, "特性  " + (open ? abilityName(m) : "？？？"), rx, by + bh - 24, { color: open ? INK : DIM });
+
+      // ---- 下：前後の相手の帯（まだ出会っていない相手は「？」）----
+      var sy = 508, i0 = ids.indexOf(id);
+      text(g, "◀", 34, sy + 30, { font: T.font, color: T.subTextColor });
+      for (var k = -4; k <= 4; k++) {
+        var nid = ids[i0 + k]; var sx = 330 + k * 66;
+        if (!nid) continue;
+        var on = k === 0, sz = on ? 40 : 32;
+        g.fillStyle = on ? "rgba(255,215,94,0.12)" : "#0e1424"; g.fillRect(sx, sy, 56, 44);
+        if (on) { g.strokeStyle = T.cursorColor; g.lineWidth = 2; g.strokeRect(sx + 1, sy + 1, 54, 42); }
+        if (kindOf(nid, id, kind) === "none") text(g, "？", sx + 28, sy + 30, { align: "center", color: "#4a5578", font: "18px monospace" });
+        else sprite(g, firstSprite(mon(nid)), sx + 28 - sz / 2, sy + 2, sz);
+        if (kindOf(nid, id, kind) === "caught") text(g, "★", sx + 53, sy + 11, { font: "10px monospace", color: T.cursorColor, align: "right" });
+      }
+      text(g, "▶", 650, sy + 30, { font: T.font, color: T.subTextColor });
+      hint(g, "←→: めくる   Q/E: 栞   ↑↓: 記録を送る   R: 並べ替え");
+      backBtn(g);
+    }
+    function kindOf(nid, id, kind) { return nid === id ? kind : state[nid]; }
+    function wrap(s, n) { var w = window.MyGame.wrapText(s || "", n); return Array.isArray(w) ? w : String(w).split("\n"); }
+    function elemChip(g, elementId, x, y) {
+      var e = raw.elements[elementId] || { name: "-", color: "#9aa4c0" };
+      g.font = T.smallFont;
+      var w = Math.ceil(g.measureText(e.name).width) + 30;
+      g.fillStyle = "rgba(255,255,255,0.06)"; g.fillRect(x, y, w, 20);
+      g.strokeStyle = e.color; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w - 1, 19);
+      if (e.icon) sprite(g, e.icon, x + 3, y + 2, 16);
+      text(g, e.name, x + 22, y + 15, { color: e.color });
+      return w;
+    }
+
+    // ================= 案 C：一覧はそのまま・中身を強く =================
+    function drawC(g) {
+      bg(g);
+      heading(g, "図鑑", "出会ったモンスターと手に入れたアイテム");
+      var c = counts();
+      text(g, "仲間 " + c.caught + " / 出会った " + c.seen + " / " + ids.length, 760, 88, { align: "right", color: T.subTextColor });
+      tabs(g, 48, 108, 112, 30, 6);
+      // 一覧
+      var lx = 48, ly = 152, lw = 400, lh = 342, rh = 30;
+      box(g, lx, ly, lw, lh);
+      var i0 = Math.max(0, ids.indexOf(sel) - 5), shown = ids.slice(i0, i0 + 11);
+      shown.forEach(function (id, i) {
+        var y = ly + 10 + i * rh, m = mon(id), st = state[id], on = id === sel;
+        if (on) { g.fillStyle = "rgba(74,107,168,0.3)"; g.fillRect(lx + 6, y, lw - 22, rh - 2); text(g, "▶", lx + 12, y + 19, { color: T.cursorColor }); }
+        text(g, String(ids.indexOf(id) + 1).padStart(3, "0"), lx + 28, y + 19, { color: T.hintColor });
+        if (st === "none") { text(g, "？？？", lx + 92, y + 19, { color: T.hintColor }); return; }
+        sprite(g, firstSprite(m), lx + 60, y + 2, 24, st === "seen" ? { silhouette: "#3a4566" } : null);
+        text(g, m.name, lx + 92 + (on ? 4 : 0), y + 19, { font: T.font, color: on ? T.cursorColor : T.textColor });
+        g.fillStyle = elemOf(m).color; g.beginPath(); g.arc(lx + 290, y + 14, 4, 0, Math.PI * 2); g.fill();
+        text(g, elemOf(m).name, lx + 298, y + 19, { color: T.subTextColor });
+        if (st === "caught") text(g, "★", lx + lw - 22, y + 19, { color: T.cursorColor, align: "right" });
+      });
+      // 詳細（ページ）
+      var m = mon(sel), dx = 470, dy = 152, dw = 290, dh = 342;
+      box(g, dx, dy, dw, dh);
+      var pages = ["概要", "能力", "落とすもの"], px = dx + 12;
+      pages.forEach(function (p, i) {
+        var on = i === 1; g.font = T.smallFont; var w = g.measureText(p).width + 16;
+        g.fillStyle = on ? "rgba(255,215,94,0.14)" : "rgba(255,255,255,0.04)"; g.fillRect(px, dy + 10, w, 20);
+        text(g, p, px + 8, dy + 25, { color: on ? T.cursorColor : T.hintColor });
+        px += w + 4;
+      });
+      text(g, "Q/E", dx + dw - 12, dy + 25, { align: "right", color: T.hintColor });
+      sprite(g, firstSprite(m), dx + 12, dy + 40, 56);
+      text(g, no(sel), dx + 80, dy + 56, { color: T.hintColor });
+      text(g, m.name, dx + 80, dy + 76, { font: T.font });
+      var cw = chip(g, famOf(m).name, dx + 80, dy + 84, famOf(m).color);
+      chip(g, elemOf(m).name, dx + 80 + cw + 6, dy + 84, elemOf(m).color);
+      var y = dy + 124;
+      STATS.forEach(function (s, i) {
+        text(g, s[0], dx + 14, y, { color: T.subTextColor });
+        text(g, String(m[s[1]] || 0), dx + 86, y, { align: "right" });
+        bar(g, dx + 94, y - 9, 180, 8, (m[s[1]] || 0) / maxStat(s[1]), STAT_COLORS[i]);
+        y += 20;
+      });
+      y += 10; text(g, "耐性", dx + 14, y, { color: T.cursorColor }); y += 6;
+      var rx = dx + 14;
+      resists(m).forEach(function (r) {
+        var e = raw.elements[r.id] || { name: r.id, color: "#9aa4c0" };
+        var label = e.name + (r.v > 0 ? "+" : "") + r.v;
+        g.font = T.smallFont;
+        if (rx + g.measureText(label).width + 20 > dx + dw - 10) { rx = dx + 14; y += 22; }
+        rx += chip(g, label, rx, y, r.v < 0 ? "#e8845a" : e.color, { fill: r.v < 0 ? "rgba(232,84,42,0.12)" : null }) + 4;
+      });
+      y += 44;
+      text(g, "スカウト率 " + pct(m.scoutRate) + "   Lv上限 " + (m.maxLevel || 50), dx + 14, y, { color: T.subTextColor });
+      hint(g, "↑↓: 選択   ←→: 切替   Q/E: ページ   R: 並び替え   Esc: 戻る");
+      backBtn(g);
+    }
+  })();
+  </script>
+</body>
+</html>

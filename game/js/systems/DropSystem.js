@@ -7,9 +7,16 @@
  * 実際に持ち物へ入れる処理は呼び出し側が行う。
  * 宝箱や採取など、別の入手経路にも同じ判定を使える。
  *
- * ▼ 確率・個数はすべて data/monsters.js の drops が持つ。
+ * ▼ 確率・個数は data/monsters.js の drops が持つ。
  *   drops の各エントリは独立して判定するので、
  *   1体から複数種類のアイテムが同時に落ちることもある。
+ *
+ * ▼ 区画ごとの落とすもの（2026-11-10）
+ *   data/dungeons.js のダンジョンに dropOverrides: { 種族id: [drops と同じ書き方] } を書くと、
+ *   その区画では種族の drops のかわりにそちらを使う（足すのではなく、まるごと置き換える）。
+ *   例: ヌマボネは毒沼と回廊で落とす確率が違う。
+ *   出会ったときに EncounterSystem.createEnemyFrom が敵に dropsOverride として持たせる。
+ *   図鑑（DexScene）・ダンジョン選び（DungeonCatalog）・道具の見本も dropsIn で同じ表を読む。
  */
 (function (NS) {
   "use strict";
@@ -24,13 +31,26 @@
   }
 
   /**
+   * その区画での、その種族の落とすもの。区画で置き換えていなければ fallback を返す。
+   * @param {object|null} dungeon data/dungeons.js の1件
+   * @param {string} speciesId
+   * @param {Array|null} fallback 置き換えがないときに返すもの（ふつうは種族の drops）
+   */
+  DropSystem.dropsIn = function (dungeon, speciesId, fallback) {
+    var table = dungeon && dungeon.dropOverrides;
+    if (table && Array.isArray(table[speciesId])) return table[speciesId];
+    return fallback === undefined ? null : fallback;
+  };
+
+  /**
    * モンスター1体分のドロップを判定する。
    * @param {object} monster MonsterInstance互換（getSpecies を持つ）
    * @returns {Array<{itemId:string, count:number}>}
    */
   DropSystem.prototype.rollFor = function (monster) {
     var species = (monster && monster.getSpecies) ? monster.getSpecies() : null;
-    var drops = (species && species.drops) || [];
+    var drops = (monster && Array.isArray(monster.dropsOverride)) ? monster.dropsOverride
+              : ((species && species.drops) || []);
     var result = [];
 
     for (var i = 0; i < drops.length; i++) {

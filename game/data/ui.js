@@ -878,6 +878,8 @@
 
       list:   { x: 48, y: 122, w: 400, h: 372, rowHeight: 26, visibleRows: 12 },
       detail: { x: 470, y: 122, w: 290, h: 372, charsPerLine: 18 },
+      // 絞り込みの札（2026-11-09）。right は札の文字の右端（一覧の右端にそろえる）、y は文字の下の線
+      filter: { right: 442, y: 110 },
 
       confirmMenu: { x: 560, y: 400, w: 190, h: 80, lineHeight: 26 },
       notice: { x: 400, y: 526 },

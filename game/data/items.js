@@ -148,6 +148,102 @@
       usableIn: ["home", "dungeon", "battle"]
     },
 
+    /**
+     * --- 2026-11-10 に足した回復の道具（名前・効き目・値段・店に並ぶ条件・説明は作者の案 新装備まとめ.txt）---
+     * 状態異常を1つずつ治す薬（麻痺・封印・呪い・盲目・眠り）と、回復薬の上位2つ、万能の薬。
+     * 封印は statuses.js で curable: false（万能の治し方では治らない）だが、statuses に書けば治せる（声戻しの薬・万癒の薬）。
+     * 毒のほかは戦闘が終わると消えるので、拠点・探索で使っても「効果がなかった」になるだけ（解毒草と同じく使える場面は3つ）
+     */
+    numbLeaf: {
+      id: "numbLeaf",
+      name: "痺れ消しの葉",
+      icon: "iconItemNumbLeaf",
+      category: "heal",
+      description: "ぴりっとする葉。噛むと体のしびれが引いていく。",
+      maxStack: 99,
+      price: 40,
+      effect: { type: "cureStatus", statuses: ["paralysis"] },
+      usableIn: ["home", "dungeon", "battle"]
+    },
+    voiceTonic: {
+      id: "voiceTonic",
+      name: "声戻しの薬",
+      icon: "iconItemVoiceTonic",
+      category: "heal",
+      description: "とろりとした薬。飲むと詰まっていた声が通る。",
+      maxStack: 99,
+      price: 50,
+      effect: { type: "cureStatus", statuses: ["seal"] },
+      usableIn: ["home", "dungeon", "battle"]
+    },
+    purifyingSalt: {
+      id: "purifyingSalt",
+      name: "祓いの塩",
+      icon: "iconItemPurifyingSalt",
+      category: "heal",
+      description: "古い祈りのこもった塩。ひとつまみで、まとわりつく黒い影が剥がれる。",
+      maxStack: 99,
+      price: 50,
+      effect: { type: "cureStatus", statuses: ["curse"] },
+      usableIn: ["home", "dungeon", "battle"]
+    },
+    clearEyeDew: {
+      id: "clearEyeDew",
+      name: "澄み目の露",
+      icon: "iconItemClearEyeDew",
+      category: "heal",
+      description: "目にさすと、かすんだ視界がすっと晴れる。",
+      maxStack: 99,
+      price: 50,
+      effect: { type: "cureStatus", statuses: ["blind"] },
+      usableIn: ["home", "dungeon", "battle"]
+    },
+    wakeFlower: {
+      id: "wakeFlower",
+      name: "目覚めの花",
+      icon: "iconItemWakeFlower",
+      category: "heal",
+      description: "甘い香りの小さな花。嗅ぐと、はっと目が覚める。",
+      maxStack: 99,
+      price: 40,
+      effect: { type: "cureStatus", statuses: ["sleep"] },
+      usableIn: ["home", "dungeon", "battle"]
+    },
+    ancientHoney: {
+      id: "ancientHoney",
+      name: "千年樹の蜜",
+      icon: "iconItemAncientHoney",
+      category: "heal",
+      description: "千年樹からにじむ濃い蜜。傷にも疲れにもよく効く。",
+      maxStack: 99,
+      price: 500,
+      effect: { type: "healHp", value: 180 },
+      usableIn: ["home", "dungeon", "battle"]
+    },
+    greatSpiritBerry: {
+      id: "greatSpiritBerry",
+      name: "大精気の実",
+      icon: "iconItemGreatSpiritBerry",
+      category: "heal",
+      description: "大ぶりの精気の実。一口で、技を出す力が戻ってくる。",
+      maxStack: 99,
+      price: 350,
+      effect: { type: "healPp", value: 15 },
+      usableIn: ["home", "dungeon", "battle"]
+    },
+    // 即死は掛かった時点で倒れるので、治す相手がいない。封印も治す（statuses に書けば curable: false でも治る）
+    panacea: {
+      id: "panacea",
+      name: "万癒の薬",
+      icon: "iconItemPanacea",
+      category: "heal",
+      description: "苦くて高い万能の薬。即死以外の状態異常を治す。",
+      maxStack: 99,
+      price: 500,
+      effect: { type: "cureStatus", statuses: ["poison", "paralysis", "sleep", "seal", "blind", "curse"] },
+      usableIn: ["home", "dungeon", "battle"]
+    },
+
     // --- 道具 ---
 
     // 帰り道の保険。持っていれば、階段まで戻らなくても引き返せる
@@ -236,7 +332,7 @@
       category: "equipment",
       description: "灼熱の獣の牙を研ぎ上げた刃。持つ者の攻める力を大きく引き上げる。",
       maxStack: 9,
-      price: 300,
+      price: 400,
       effect: null,
       usableIn: [],
       // 見返りの代償は付けていない。素材のほうが十分に重いため
@@ -569,7 +665,7 @@
       category: "equipment",
       description: "ヨミリュウの鱗を綴じ合わせた鎧。並の一撃では傷ひとつ付かない。",
       maxStack: 9,
-      price: 420,
+      price: 520,
       effect: null,
       usableIn: [],
       equip: {
@@ -590,7 +686,7 @@
       category: "equipment",
       description: "王の冠を打ち直した輪。身につけた者の全てをわずかに押し上げる。",
       maxStack: 9,
-      price: 500,
+      price: 750,
       effect: null,
       usableIn: [],
       equip: {
@@ -665,7 +761,7 @@
       category: "equipment",
       description: "毒の針をより合わせた護符。毒そのものを寄せつけなくなる。",
       maxStack: 9,
-      price: 200,
+      price: 300,
       effect: null,
       usableIn: [],
       equip: {
@@ -685,7 +781,7 @@
       category: "equipment",
       description: "泥を吸った甲羅を骨で綴じた鎧。重いが、並の攻撃はまるで通らない。",
       maxStack: 9,
-      price: 260,
+      price: 410,
       effect: null,
       usableIn: [],
       equip: {
@@ -706,7 +802,7 @@
       category: "equipment",
       description: "主の毒嚢を包んで戴く冠。毒を宿したまま、その力だけを借りる。",
       maxStack: 9,
-      price: 540,
+      price: 670,
       effect: null,
       usableIn: [],
       equip: {
@@ -852,7 +948,7 @@
       category: "equipment",
       description: "しなやかな若枝を芯に巻いて鍛えた剣。刃に淡い光が通う。",
       maxStack: 9,
-      price: 440,
+      price: 500,
       effect: null,
       usableIn: [],
       equip: {
@@ -894,7 +990,7 @@
       category: "equipment",
       description: "眠り花粉を固めた玉を入れた鈴。澄んだ音が眠気を払う。",
       maxStack: 9,
-      price: 220,
+      price: 390,
       effect: null,
       usableIn: [],
       equip: {
@@ -933,7 +1029,7 @@
       category: "equipment",
       description: "芽吹く前の種を包んだ護符。身につけた者の傷を、少しずつ塞いでいく。",
       maxStack: 9,
-      price: 380,
+      price: 460,
       effect: null,
       usableIn: [],
       equip: {
@@ -954,7 +1050,7 @@
       category: "equipment",
       description: "主の芯から削り出した大剣。若木の力が、振るうたびに地を揺らす。",
       maxStack: 9,
-      price: 620,
+      price: 720,
       effect: null,
       usableIn: [],
       equip: {
@@ -975,8 +1071,7 @@
       category: "equipment",
       description: "眠り花粉を詰めた花を先に咲かせた杖。打たれた相手は、甘い香りにまぶたを落とす。",
       maxStack: 9,
-      // 450G → 600G（作者の指定）。★ 材料を店で買うと230Gで売値300Gなので、作って売ると1本70G得をする。
-      //   作者に確認したうえで、このままにしてある（2026-10-08）
+      // 450G → 600G（作者の指定）。材料を店で買うと430G・売値300G（2026-11-10 に素材の値段が上がった）
       price: 600,
       effect: null,
       usableIn: [],
@@ -1039,7 +1134,7 @@
       category: "material",
       description: "スミビが落としていった燃えかす。まだほのかに温かい。",
       maxStack: 99,
-      price: 18,
+      price: 20,
       effect: null,
       usableIn: []
     },
@@ -1080,7 +1175,7 @@
       category: "material",
       description: "ヨドミが残していった黒い雫。触れるとひやりと重い。",
       maxStack: 99,
-      price: 22,
+      price: 25,
       effect: null,
       usableIn: []
     },
@@ -1132,7 +1227,7 @@
       category: "material",
       description: "カゲヅタの蔦を切り取ったもの。乾いてもまだ何かに絡みつこうとする。",
       maxStack: 99,
-      price: 45,
+      price: 50,
       effect: null,
       usableIn: []
     },
@@ -1148,7 +1243,7 @@
       category: "material",
       description: "ドクバチの針。抜けても先から雫が落ちつづける。",
       maxStack: 99,
-      price: 35,
+      price: 55,
       effect: null,
       usableIn: []
     },
@@ -1161,7 +1256,7 @@
       category: "material",
       description: "ドロガメの甲羅のかけら。沼の泥が染み込んで、もう洗っても落ちない。",
       maxStack: 99,
-      price: 60,
+      price: 80,
       effect: null,
       usableIn: []
     },
@@ -1174,7 +1269,7 @@
       category: "material",
       description: "沼に沈んでいた骨。長く浸かっていたせいで、赤茶けて脆い。",
       maxStack: 99,
-      price: 50,
+      price: 65,
       effect: null,
       usableIn: []
     },
@@ -1189,6 +1284,36 @@
       description: "ヌシガエルの体内にあった袋。この沼の毒は、すべてここから出ていた。",
       maxStack: 99,
       price: 280,
+      effect: null,
+      usableIn: []
+    },
+
+    /**
+     * 陽だまりの結晶・そよ風の結晶（2026-11-10 作者の案）。光・風の耐性の装備の材料。
+     * 毒沼をクリアすると店に並ぶ（店でしか手に入らない。落とすモンスター・宝箱は無い）。
+     * from は店に並ぶ区画にそろえて毒沼（店と図鑑で、毒沼の素材の見出しの下に出る）
+     */
+    sunCrystal: {
+      id: "sunCrystal",
+      name: "陽だまりの結晶",
+      icon: "iconItemSunCrystal",
+      from: "venomMarsh",
+      category: "material",
+      description: "日向の温もりが残った結晶。",
+      maxStack: 99,
+      price: 80,
+      effect: null,
+      usableIn: []
+    },
+    breezeCrystal: {
+      id: "breezeCrystal",
+      name: "そよ風の結晶",
+      icon: "iconItemBreezeCrystal",
+      from: "venomMarsh",
+      category: "material",
+      description: "握るとひんやりと風が通る。",
+      maxStack: 99,
+      price: 80,
       effect: null,
       usableIn: []
     },
@@ -1215,8 +1340,9 @@
       description: "ぷるぷるした欠片。何かの素材になりそうだ。",
       maxStack: 99,
       // RC-1 で 12 → 30（作者の指定）。12G だと、店で買ったかけらで粘晶の装備を作って売るだけで
-      // お金が増え続けた（剣 48G→売値117G など）。30G なら材料のほうが高くつく（剣 120G・鎧と首飾り 150G）
-      price: 30,
+      // お金が増え続けた（剣 48G→売値117G など）。30G なら材料のほうが高くつく（剣 120G・鎧と首飾り 150G）。
+      // 2026-11-10 に 40（作者の表）
+      price: 40,
       effect: null,
       usableIn: []
     },
@@ -1230,7 +1356,7 @@
       category: "material",
       description: "深部でまれに見つかる黒い欠片。強い力を感じる。",
       maxStack: 99,
-      price: 80,
+      price: 100,
       effect: null,
       usableIn: []
     },
@@ -1246,7 +1372,7 @@
       category: "material",
       description: "フタバムシが脱ぎ捨てた皮。薄いのに、指で押してもなかなか破れない。",
       maxStack: 99,
-      price: 40,
+      price: 85,
       effect: null,
       usableIn: []
     },
@@ -1259,7 +1385,7 @@
       category: "material",
       description: "ユラツボミのつぼみに溜まっていた花粉。嗅ぐと、まぶたが重くなる。",
       maxStack: 99,
-      price: 45,
+      price: 90,
       effect: null,
       usableIn: []
     },
@@ -1272,7 +1398,7 @@
       category: "material",
       description: "ワカバドリの羽根。葉脈のような筋が通っていて、陽にかざすと透ける。",
       maxStack: 99,
-      price: 55,
+      price: 75,
       effect: null,
       usableIn: []
     },
@@ -1285,7 +1411,7 @@
       category: "material",
       description: "コケガメの甲羅のかけら。剥がしても、苔はまだ青々としている。",
       maxStack: 99,
-      price: 70,
+      price: 80,
       effect: null,
       usableIn: []
     },
@@ -1319,7 +1445,7 @@
     },
 
     // 千年樹の根底の主のドロップ（v1.0.3）。ほかの主の素材と同じく、必ず1つ落ちる。
-    // 名前・説明・値段は仮（値段は若木の芯の一段上）。使い道（作れる物）はまだ無い
+    // 名前・説明・値段（若木の芯の一段上）は私の案を作者が確定（2026-11-11）。歯車の大剣・機巧の胴衣の材料
     amberCore: {
       id: "amberCore",
       name: "琥珀の芯",
@@ -1332,7 +1458,7 @@
       effect: null,
       usableIn: []
     },
-    // 千年樹の根底の在来種のドロップ（v1.0.3）。名前・説明・値段は仮。使い道（作れる物）はまだ無い
+    // 千年樹の根底の在来種のドロップ（v1.0.3）。名前・説明は私の案を作者が確定（2026-11-11）。値段は作者の表（2026-11-10）
     amberShard: {
       id: "amberShard",
       name: "琥珀のかけら",
@@ -1341,7 +1467,7 @@
       category: "material",
       description: "コハクカブトの背から欠けたかけら。中に、小さな影が閉じ込められている。",
       maxStack: 99,
-      price: 60,
+      price: 100,
       effect: null,
       usableIn: []
     },
@@ -1353,7 +1479,7 @@
       category: "material",
       description: "千年樹の傷から流れた樹液。甘い匂いがして、傷口によくなじむ。",
       maxStack: 99,
-      price: 60,
+      price: 110,
       effect: null,
       usableIn: []
     },
@@ -1365,7 +1491,7 @@
       category: "material",
       description: "ウェポンの体から外れた歯車。千年たっても、錆びひとつない。",
       maxStack: 99,
-      price: 70,
+      price: 130,
       effect: null,
       usableIn: []
     },
@@ -1377,7 +1503,7 @@
       category: "material",
       description: "ジュエルの体のかけら。ひとりでに小さく光る。とても高く売れる。",
       maxStack: 99,
-      price: 600,
+      price: 750,
       effect: null,
       usableIn: []
     },
@@ -1396,7 +1522,7 @@
       category: "material",
       description: "コケキノコの笠から舞う胞子。湿った場所に置くと、一晩で苔が生える。",
       maxStack: 99,
-      price: 60,
+      price: 75,
       effect: null,
       usableIn: []
     },
@@ -1404,7 +1530,7 @@
     /**
      * 風鳴りの羽：ツリガネが落とす（30%。名前と率は作者が決めたもの 2026-10-22）。
      * 声守りの鈴・風鳴りの胴衣の材料。
-     * 値段は、店で買って風鳴りの胴衣を作って売っても得をしない値（材料 75×3＋45×2＝315G ＞ 売値 310G）
+     * 値段は、店で買って風鳴りの胴衣を作って売っても得をしない値（2026-11-10 の値上げのあと 材料 95×3＋50×2＝385G ＞ 売値 310G）
      */
     windChimeFeather: {
       id: "windChimeFeather",
@@ -1414,7 +1540,7 @@
       category: "material",
       description: "ツリガネの翼から抜けた黒い羽。かざすと、風もないのにかすかに鳴る。",
       maxStack: 99,
-      price: 75,
+      price: 95,
       effect: null,
       usableIn: []
     },
@@ -1458,7 +1584,7 @@
       category: "material",
       description: "ザンガルドの鱗。指でなぞると、ぱちりと青い火花が散る。",
       maxStack: 99,
-      price: 80,
+      price: 100,
       effect: null,
       usableIn: []
     },
@@ -1477,7 +1603,7 @@
 
     /**
      * 灯り苔・絡み主根：回廊の宝箱からだけ出る素材（作者の指定 2026-10-27）。
-     * 灯り苔はほかの素材と同じくらいの確率、絡み主根は B4F だけで 12%（data/dungeons.js の featureTables）。
+     * 灯り苔はほかの素材の倍の重み、絡み主根は B4F だけで宝箱の 5%＋60% で置かれる専用の宝箱（data/dungeons.js の featureTables・fixedChests）。
      * 値段は最初 作者の指定（40G / 300G）で、2026-10-28 に任されて上げた（55G / 420G）。絡み主根は店に並べない
      */
     glowMoss: {
@@ -1520,7 +1646,7 @@
       category: "equipment",
       description: "蒼雷の鱗を胞子の糊で綴った飾り。雷に慣れた鱗が、痺れを肌の手前で散らす。",
       maxStack: 9,
-      price: 300,
+      price: 390,
       effect: null,
       usableIn: [],
       equip: {
@@ -1538,7 +1664,7 @@
       category: "equipment",
       description: "骨の鈴に風鳴りの羽を下げたもの。鳴り続ける音が、喉を塞ぐ力を払う。",
       maxStack: 9,
-      price: 300,
+      price: 350,
       effect: null,
       usableIn: [],
       equip: {
@@ -1608,8 +1734,9 @@
     },
 
     // 回廊の答えをまとめた護符。3つのよけ（各+7）より1つずつは軽いが、1枠で3つ防ぐ。
-    // 値段は作者の表で空欄だったので、任されて決めた（2026-10-28。1200G → 売値600G。
-    // 材料をそのまま売ると 210+27×3+400=691G なので、作って売っても得はしない）
+    // 値段は作者の表で空欄だったので、任されて決めた（2026-10-28 に 1200G）。
+    // 2026-11-10 に 1550G（作者）。材料をそのまま売ると 210+27×3+400=691G で、売値 775G のほうが少し高い
+    // （素材の値上げのあと、材料を売るほうが得になる装備は値段を上げた。ほかの20個も同じ）
     ivyBreakerCharm: {
       id: "ivyBreakerCharm",
       name: "蔦断ちの護符",
@@ -1617,7 +1744,7 @@
       category: "equipment",
       description: "絡み主根を断ち、灯り苔と小鐘を封じた護符。回廊の闇が伸ばす手を、まとめて退ける。",
       maxStack: 9,
-      price: 1200,
+      price: 1550,
       effect: null,
       usableIn: [],
       equip: {
@@ -1627,6 +1754,524 @@
           { type: "resistBonus", status: "seal", value: 5 },
           { type: "resistBonus", status: "curse", value: 5 },
           { type: "statBonus", stat: "hp", value: 15 }
+        ]
+      }
+    },
+
+    /**
+     * ================================================================
+     * 2026-11-10 に足した装備（作者の案 新装備まとめ.txt。名前・枠・効き目・材料は作者が決めたもの）
+     * ================================================================
+     * 値段と説明は作者の表に無かったので、私が決めた仮のもの（作者が見て直す）。
+     * 材料が全部店で買えるものは「材料の買値 ＞ できたものの売値（値段の半分）」になるようにしてある
+     * （書き出しは data/recipes.js の同じ見出しの下）。
+     * 並びはクリアで工房に並ぶ順（坑道 → … → 回廊）。図鑑と持ち物はこの順で並ぶ
+     */
+
+    // --- 坑道・深層・毒沼のクリアで作れるもの（作者の「その他のステージクリア後に足されるもの」）---
+
+    // 坑道クリア。石の帽子（防+4）の次の、火に強い防具
+    scorchedShellArmor: {
+      id: "scorchedShellArmor",
+      name: "灼殻の鎧",
+      icon: "iconItemScorchedShellArmor",
+      category: "equipment",
+      description: "焼けた殻を重ねた鎧。火の熱を、殻が先に受け止める。",
+      maxStack: 9,
+      price: 300,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "armor",
+        effects: [
+          { type: "statBonus", stat: "defense", value: 8 },
+          { type: "resistBonus", element: "fire", value: 2 }
+        ]
+      }
+    },
+
+    // 坑道クリア。火の技を伸ばす指輪（燃え殻の剣の火×1.10 をアクセサリーで）
+    emberRing: {
+      id: "emberRing",
+      name: "燃え殻の指輪",
+      icon: "iconItemEmberRing",
+      category: "equipment",
+      description: "燃え殻を焼き固めた指輪。はめると指先がほのかに熱い。",
+      maxStack: 9,
+      price: 180,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "damageDealt", value: 1.10, element: "fire" }
+        ]
+      }
+    },
+
+    // 深層クリア。殴った相手を毒にする細剣（眠花の杖の毒版。眠花の杖と同じく通常攻撃だけ）
+    venomRapier: {
+      id: "venomRapier",
+      name: "毒針の細剣",
+      icon: "iconItemVenomRapier",
+      category: "equipment",
+      description: "毒の針を刃先に仕込んだ細い剣。かすり傷からでも毒が回る。",
+      maxStack: 9,
+      price: 280,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "weapon",
+        effects: [
+          { type: "statBonus", stat: "attack", value: 15 },
+          { type: "onHitStatus", status: "poison", chance: 0.20, normalAttackOnly: true }
+        ]
+      }
+    },
+
+    // 深層クリア。属性よけの札（炎よけ・宵よけと同じ +3）
+    earthWard: {
+      id: "earthWard",
+      name: "土よけの札",
+      icon: "iconItemEarthWard",
+      category: "equipment",
+      description: "泥甲羅のかけらを貼った札。崩れる土の重さを、少し軽くする。",
+      maxStack: 9,
+      price: 170,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", element: "earth", value: 3 }
+        ]
+      }
+    },
+
+    // 毒沼クリア。そよ風の結晶で作る風よけ
+    galeWard: {
+      id: "galeWard",
+      name: "嵐よけの札",
+      icon: "iconItemGaleWard",
+      category: "equipment",
+      description: "そよ風の結晶を包んだ札。吹きつける風を、肌の手前でいなす。",
+      maxStack: 9,
+      price: 260,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", element: "wind", value: 3 }
+        ]
+      }
+    },
+
+    // 毒沼クリア。陽だまりの結晶で作る光よけ
+    sunWard: {
+      id: "sunWard",
+      name: "陽よけの札",
+      icon: "iconItemSunWard",
+      category: "equipment",
+      description: "陽だまりの結晶を包んだ札。まぶしい光を、やわらかな温もりに変える。",
+      maxStack: 9,
+      price: 240,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", element: "light", value: 3 }
+        ]
+      }
+    },
+
+    // --- 作者の装備の表（材料はひとつ前のステージクリア後） ---
+
+    // 回廊クリア。PPが毎ターン1戻る（効果の種類 ppRegen。2026-11-10 に足した）
+    dewdropRing: {
+      id: "dewdropRing",
+      name: "雫の指輪",
+      icon: "iconItemDewdropRing",
+      category: "equipment",
+      description: "王冠のかけらに雫を閉じ込めた指輪。水の力と、静かな気力が湧いてくる。",
+      maxStack: 9,
+      price: 600,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "damageDealt", value: 1.20, element: "water" },
+          { type: "ppRegen", value: 1 }
+        ]
+      }
+    },
+
+    // 回廊クリア。苔の外套から作る。攻撃を受けると、30%で相手を盲目にする（特性「放電」と同じ counterStatus）
+    duskDewCloak: {
+      id: "duskDewCloak",
+      name: "宵露の外套",
+      icon: "iconItemDuskDewCloak",
+      category: "equipment",
+      description: "宵の露を染み込ませた外套。触れた者の目を、夜の色で覆う。",
+      maxStack: 9,
+      price: 700,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "armor",
+        effects: [
+          { type: "statBonus", stat: "defense", value: 26 },
+          { type: "counterStatus", status: "blind", chance: 0.30, trigger: "hit" }
+        ]
+      }
+    },
+
+    // 回廊クリア。盲目よけ（ほかのよけと同じ +7）
+    abyssNecklace: {
+      id: "abyssNecklace",
+      name: "深淵の首飾り",
+      icon: "iconItemAbyssNecklace",
+      category: "equipment",
+      description: "深淵の欠片を蔦で吊るした首飾り。闇に慣れた目は、もう眩まない。",
+      maxStack: 9,
+      price: 340,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", status: "blind", value: 7 }
+        ]
+      }
+    },
+
+    // 回廊クリア。風切りの羽根から作る。素早さを足して、さらに掛ける
+    jadeWindPlume: {
+      id: "jadeWindPlume",
+      name: "翠風の羽飾り",
+      icon: "iconItemJadeWindPlume",
+      category: "equipment",
+      description: "三つの羽を束ねた飾り。身につけると、足もとから風が押し上げる。",
+      maxStack: 9,
+      price: 560,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "statBonus", stat: "speed", value: 15 },
+          { type: "statMultiplier", stat: "speed", value: 1.1 }
+        ]
+      }
+    },
+
+    // 回廊クリア。光る提灯から作る
+    radiantLantern: {
+      id: "radiantLantern",
+      name: "聖輝の提灯",
+      icon: "iconItemRadiantLantern",
+      category: "equipment",
+      description: "灯り苔を足して灯し直した提灯。白い光が、技の力を大きく照らす。",
+      maxStack: 9,
+      // 材料は作者の頼みで増やした（2026-11-10）。若芽の種（コダマ）は店に無いので、作って売る得は出ない。
+      // 店の分だけでも 光る提灯 150（工房）＋灯り苔 55×3＋光る鱗粉 50×3＋陽だまりの結晶 80×2＝625G ＞ 売値 450G。
+      // 700 → 900（作者 2026-11-10。素材の値上げで、材料をそのまま売るほうが高くなったため）
+      price: 900,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "damageDealt", value: 1.25, element: "light" },
+          { type: "statBonus", stat: "pp", value: 20 }
+        ]
+      }
+    },
+
+    // 回廊クリア。7つのよけをまとめた環（毒・眠り・麻痺・封印・呪い・即死・盲目）。1枠で全部の状態異常を +5
+    sevenWardRing: {
+      id: "sevenWardRing",
+      name: "七護の環",
+      icon: "iconItemSevenWardRing",
+      category: "equipment",
+      description: "七つのよけを一つに編んだ環。どんな災いも、身に届く前に弱まる。",
+      maxStack: 9,
+      price: 2700,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", status: "all", value: 5 },
+          { type: "statBonus", stat: "hp", value: 40 }
+        ]
+      }
+    },
+
+    // 回廊クリア。灼牙の戦刃から作る火の太刀
+    flameFangTachi: {
+      id: "flameFangTachi",
+      name: "焔牙の太刀",
+      icon: "iconItemFlameFangTachi",
+      category: "equipment",
+      description: "灼牙の戦刃を風鳴りの羽で鍛え直した太刀。振るうと炎が尾を引く。",
+      maxStack: 9,
+      price: 1300,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "weapon",
+        effects: [
+          { type: "statBonus", stat: "attack", value: 40 },
+          { type: "damageDealt", value: 1.15, element: "fire" }
+        ]
+      }
+    },
+
+    // 回廊クリア。沼骨の槍から作る地の槍
+    rootboundSpear: {
+      id: "rootboundSpear",
+      name: "根絡みの槍",
+      icon: "iconItemRootboundSpear",
+      category: "equipment",
+      description: "沼骨の槍に絡み主根を巻きつけた槍。突けば、地の底から根が応える。",
+      maxStack: 9,
+      price: 1350,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "weapon",
+        effects: [
+          { type: "statBonus", stat: "attack", value: 42 },
+          { type: "damageDealt", value: 1.15, element: "earth" }
+        ]
+      }
+    },
+
+    // 回廊クリア。風鳴りの胴衣から作る。風と光に強い
+    clearGaleVest: {
+      id: "clearGaleVest",
+      name: "晴嵐の胴衣",
+      icon: "iconItemClearGaleVest",
+      category: "equipment",
+      description: "風鳴りの胴衣に二つの結晶を縫いこんだもの。晴れた日の風のように軽い。",
+      maxStack: 9,
+      price: 1200,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "armor",
+        effects: [
+          { type: "statBonus", stat: "defense", value: 30 },
+          { type: "resistBonus", element: "wind", value: 3 },
+          { type: "resistBonus", element: "light", value: 3 },
+          { type: "statBonus", stat: "speed", value: 15 }
+        ]
+      }
+    },
+
+    // 回廊クリア。若木の芯から作る地の指輪
+    ancientWoodRing: {
+      id: "ancientWoodRing",
+      name: "古木の指輪",
+      icon: "iconItemAncientWoodRing",
+      category: "equipment",
+      description: "若木の芯を削った指輪。年輪の重みが、地の技に乗る。",
+      maxStack: 9,
+      price: 700,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "damageDealt", value: 1.20, element: "earth" },
+          { type: "statBonus", stat: "attack", value: 10 }
+        ]
+      }
+    },
+
+    // 回廊クリア。倒されても、そのターンの終わりまでHP0で踏みとどまる（特性「亡者の魂」と同じ undying。1戦闘に1回）
+    wraithBell: {
+      id: "wraithBell",
+      name: "亡者の鈴",
+      icon: "iconItemWraithBell",
+      category: "equipment",
+      description: "髑髏と小鐘を結んだ鈴。倒れても、鳴りやむまでは魂が離れない。",
+      maxStack: 9,
+      price: 1600,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "undying" }
+        ]
+      }
+    },
+
+    // 回廊クリア。弱っていない相手に強い（特性「万全狩り」と同じ damageByTargetHp）
+    hunterFangCharm: {
+      id: "hunterFangCharm",
+      name: "狩人の牙飾り",
+      icon: "iconItemHunterFangCharm",
+      category: "equipment",
+      description: "灼熱の牙と金角を並べた飾り。獲物が元気なうちほど、一撃が深く入る。",
+      maxStack: 9,
+      price: 900,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "damageByTargetHp", tiers: [
+            { atLeast: 0.8, value: 1.20 },
+            { atMost: 0.3, value: 0.90 }
+          ] }
+        ]
+      }
+    },
+
+    // --- 千年樹の根底の素材で作るもの（回廊クリア） ---
+
+    amberThunderWard: {
+      id: "amberThunderWard",
+      name: "琥珀の雷よけ札",
+      icon: "iconItemAmberThunderWard",
+      category: "equipment",
+      description: "琥珀のかけらを樹液で貼った札。雷は琥珀に吸われ、肌まで届かない。",
+      maxStack: 9,
+      price: 240,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", element: "thunder", value: 3 }
+        ]
+      }
+    },
+
+    // 材料が全部店で買える（琥珀のかけら100×5＋苔むした甲羅80×2＋千年樹の樹液110×1＝770G）。売値 425G（2026-11-10 に 490→850G）
+    // 雷の耐性は +1（作者 2026-11-10。+3 だと雷に強い種族が雷よけの札と合わせて無効になった）。材料も作者の頼みで増やした
+    amberArmor: {
+      id: "amberArmor",
+      name: "琥珀の鎧",
+      icon: "iconItemAmberArmor",
+      category: "equipment",
+      description: "琥珀のかけらを甲羅に流し固めた鎧。重く、雷にも少し強い。",
+      maxStack: 9,
+      price: 850,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "armor",
+        effects: [
+          { type: "statBonus", stat: "defense", value: 48 },
+          { type: "resistBonus", element: "thunder", value: 1 }
+        ]
+      }
+    },
+
+    // 攻撃がいちばん高い武器。若木の大剣と同じく、重さの代償に素早さ ×0.9
+    gearGreatsword: {
+      id: "gearGreatsword",
+      name: "歯車の大剣",
+      icon: "iconItemGearGreatsword",
+      category: "equipment",
+      description: "歯車を噛み合わせて刃にした大剣。重いが、振り下ろせば止まらない。",
+      maxStack: 9,
+      price: 1300,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "weapon",
+        effects: [
+          { type: "statBonus", stat: "attack", value: 48 },
+          { type: "statMultiplier", stat: "speed", value: 0.9 }
+        ]
+      }
+    },
+
+    // 蒼雷の剣から作る、雷の剣の上位
+    roaringThunderBlade: {
+      id: "roaringThunderBlade",
+      name: "轟雷の剣",
+      icon: "iconItemRoaringThunderBlade",
+      category: "equipment",
+      description: "蒼雷の剣に歯車を組み、金角で雷を呼ぶ剣。振るうたびに雷鳴が轟く。",
+      maxStack: 9,
+      price: 1500,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "weapon",
+        effects: [
+          { type: "statBonus", stat: "attack", value: 40 },
+          { type: "damageDealt", value: 1.18, element: "thunder" }
+        ]
+      }
+    },
+
+    // PPが毎ターン2戻る（ppRegen）
+    sapCharm: {
+      id: "sapCharm",
+      name: "樹液の護符",
+      icon: "iconItemSapCharm",
+      category: "equipment",
+      description: "千年樹の樹液に若芽の種を封じた護符。尽きかけた気力を、少しずつ満たす。",
+      maxStack: 9,
+      price: 900,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "ppRegen", value: 2 },
+          { type: "statBonus", stat: "pp", value: 12 }
+        ]
+      }
+    },
+
+    // 全属性と全状態異常に +2
+    jewelNecklace: {
+      id: "jewelNecklace",
+      name: "宝珠の首飾り",
+      icon: "iconItemJewelNecklace",
+      category: "equipment",
+      description: "宝珠のかけらを琥珀と根で包んだ首飾り。あらゆる力を、少しずつ逸らす。",
+      maxStack: 9,
+      price: 2000,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "accessory",
+        effects: [
+          { type: "resistBonus", element: "all", value: 2 },
+          { type: "resistBonus", status: "all", value: 2 }
+        ]
+      }
+    },
+
+    // 主の素材（琥珀の芯）で作る雷の胴衣。
+    // 雷の耐性は +4（作者 2026-11-10）。+5 だと雷よけの札 +3・宝珠の首飾り +2 と合わせて 10＝どの種族も雷が無効になった。いまは上限 9
+    clockworkVest: {
+      id: "clockworkVest",
+      name: "機巧の胴衣",
+      icon: "iconItemClockworkVest",
+      category: "equipment",
+      description: "琥珀の芯を胸に据え、歯車で組んだ胴衣。雷を受けても動きが止まらない。",
+      maxStack: 9,
+      price: 1200,
+      effect: null,
+      usableIn: [],
+      equip: {
+        slot: "armor",
+        effects: [
+          { type: "statBonus", stat: "defense", value: 30 },
+          { type: "resistBonus", element: "thunder", value: 4 },
+          { type: "statBonus", stat: "hp", value: 22 }
         ]
       }
     }

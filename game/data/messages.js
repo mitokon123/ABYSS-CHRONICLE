@@ -103,6 +103,7 @@
       //   状態異常を付ける特性・装備（放電・毒のとげ・眠花の杖）は名乗らない（v1.0.0・作者の指定）
       abilityTriggered: "{target} の {ability}!",             // target, ability
       abilityRegen:     "{target} は {ability}で HPが {amount} 回復した", // target, ability, amount
+      abilityPpRegen:   "{target} は {ability}で PPが {amount} 戻った",   // target, ability, amount（ppRegen。2026-11-10）
       abilityDrain:     "{target} は {ability}で HPを {amount} 吸い取った", // target, ability, amount
       undying:          "{target} は {ability}で 踏みとどまった!", // target, ability
       undyingEnd:       "{target} の魂が 尽きた…",              // target
@@ -582,6 +583,10 @@
       costLabel:    "費用",
       effectLabel:  "効果",
       empty:        "まだ作れるものがない",
+      emptyFiltered:"当てはまるものがない",
+      // 絞り込み（←→ か F で切り替え。2026-11-09）
+      filterLabel:  "絞り込み：{name}  F",
+      filters:      { all: "すべて", ready: "作れるもの", use: "道具", weapon: "武器", armor: "防具", accessory: "アクセサリー" },
       crafted:      "{name} を{count}個 作った!",            // name, count
       notEnoughMaterial:"素材が足りない",
       notEnoughGold:"お金が足りない",
@@ -589,7 +594,7 @@
       stackFull:    "これ以上は持てない",
       yes:          "はい",
       no:           "いいえ",
-      hint:         "↑↓: 選択    決定: 作る    Esc: 戻る",
+      hint:         "↑↓: 選択    ←→/F: 絞り込み    決定: 作る    Esc: 戻る",
       hintConfirm:  "↑↓: 選択    決定: 決定    Esc: やめる"
     },
 
@@ -637,6 +642,8 @@
       // 種類数に上限は無いので、持っている数だけを出す
       slotsLabel:  "{used}種類",                     // used
       selectTarget:"だれに使う?",
+      // 相手を選んでいる間、選んだ道具と残りの数を出す（続けて使えるので。2026-11-09）
+      targetItem:  "{item}  のこり {count}",              // item, count
       /**
        * 使ったあとの知らせ。**効果の種類ごとに文を分ける**。
        * 種類は data/items.js の effect.type（js/systems/ItemUsage.js が処理する）。
@@ -660,7 +667,7 @@
       notFainted:  "{name} は 倒れていない",               // name
       cannotUse:   "ここでは使えない",
       hintList:    "↑↓: 選択    決定: 使う    Esc: 戻る",
-      hintTarget:  "↑↓: 相手を選ぶ    決定: 決定    Esc: やめる"
+      hintTarget:  "↑↓: 相手を選ぶ    決定: 使う（続けて使える）    Esc: 一覧へ"
     },
 
     /** 図鑑画面 */
@@ -728,10 +735,14 @@
       sourceLabel:  "手に入る場所",
       sourceNone:   "落とす相手はいない（店か工房で）",
       sourceDrop:   "{name}  {rate}%",       // name, rate
+      // 区画で落とす確率が違う種族（data/dungeons.js の dropOverrides）は区画の名前を添える
+      sourceDropAt: "{name}（{area}）  {rate}%",   // name, area, rate
       sourceChest:  "宝箱（どこでも）",
       sourceChestAt:"宝箱（{name}）",         // name
       // 落とすもの。一度仲間にすると、その種族から取れるものが全て見える
       dropLabel:    "落とすもの",
+      // 区画で落とす確率が違う種族だけ、区画ごとに分けて見出しを付ける
+      dropAreaLabel:"〈{area}〉",               // area
       notCaught:    "（未加入）",
       // 愛情度で書き足される記録の見出し。stage は段階の名前（慣れ・信頼・絆）
       recordLabel:  "― {stage} ―",
@@ -740,7 +751,7 @@
       hintDetail:    "↑↓: 説明をスクロール    決定/Esc: 一覧へ戻る",
       // 技の表とモンスターの表の並べ方（Q/E で切り替え）
       sortLabel:     "並び：{mode}　Q/E",          // mode
-      sortModes:     { family: "系統ごと", element: "属性ごと", kind: "種類ごと", role: "働きごと", name: "名前順", order: "図鑑の順" },
+      sortModes:     { family: "系統ごと", element: "属性ごと", kind: "種類ごと", role: "働きごと", category: "分類ごと", price: "値段順", name: "名前順", order: "図鑑の順" },
       hintSkills:    "↑↓: 選択    ←→: 切替    Q/E: 並び替え    Esc: 戻る",
       hintSkillsScrollable: "↑↓: 選択    ←→: 切替    Q/E: 並び替え    決定: 説明    Esc: 戻る"
     },
@@ -980,6 +991,7 @@
       // 戦闘中に働く特性の効果を1行にしたもの（js/systems/EffectSystem.js の describeEffect）
       effectRegen:        "毎ターン HP{percent}%回復",          // percent
       effectRegenMax:     "毎ターン HP{percent}%回復（上限{max}）", // percent, max
+      effectPpRegen:      "毎ターン PP{value}回復",              // value（ppRegen。2026-11-10）
       // 相手の残りHPで与ダメージが変わる（万全狩り。v1.0.0）。後ろに「100%以上 ×1.2・…」が続く
       effectByTargetHp:   "相手HP ",
       // 攻撃を当てたときに相手を状態異常にする（v1.0.0 眠花の杖）
@@ -987,6 +999,10 @@
       effectOnHitNormal:  "通常攻撃で {percent}%で相手を{status}", // percent, status
       effectCounter:      "被弾時 {percent}%で相手を{status}",  // percent, status
       effectCounterNormal:"通常攻撃の被弾時 {percent}%で相手を{status}", // percent, status
+      // 攻撃を受けたときに相手へ弱体（ねばねば。2026-11-11）。what は「素早さ ×0.75」
+      effectCounterModifier: "被弾時 {percent}%で相手の{what}",   // percent, what
+      // 技で掛かる毎ターンの回復（樹液の膜。2026-11-11）
+      effectRegenOverTime: "毎ターン HP{min}〜{max}%回復",         // min, max
       effectDrain:        "与ダメージの{percent}%を吸収",       // percent
       effectDrainNormal:  "通常攻撃の与ダメージの{percent}%を吸収", // percent
       effectFirstStrike:  "最初のターンに必ず先に動く",
@@ -1038,7 +1054,8 @@
       noEquipmentHint:"ショップや工房で手に入る",
       // 同じ装備を maxStack いっぱいまで持っているときだけ出る（めったに無い）
       stackFull:    "これ以上は持てないので外せない",
-      allElements:  "全",
+      // 全属性の耐性の書き方（宝珠の首飾り「全属性への耐性 +2」）
+      allElements:  "全属性",
 
       hintNormal:  "↑↓: 選択    ←→: 預かり所    決定: この仲間を選ぶ    Esc: 閉じる",
       hintBox:       "決定: 出し入れ   C: ほかの操作   Q/E: 箱   R: 並べ替え   F: 絞り込み   Esc: 戻る",

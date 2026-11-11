@@ -1035,6 +1035,23 @@
       description: "味方全体のHPを大きく回復する。回復する量は使う者の強さでは変わらない。"
     },
 
+    // 樹液の膜（ジュエキスライムの絆の技。2026-11-11 作者の指定：単体・水・PP18・4ターンのあいだ毎ターン HP10〜15% と PP3）。
+    // 種類は書かれていなかったので、キュアの仲間として共鳴にした（私の判断。封印で止まる）。
+    // 戻すのはターンの終わり（BattleSystem._tickRegen の regenOverTime・_tickPpRegen）。使ったターンから数えて4回。
+    // 特性「再生」や装備の毎ターン回復とは別に戻る（重なる）。探索中は使えない（戦闘のあいだだけの効果のため）。
+    // 演出は専用の sapVeil（琥珀のしずく → 膜が体を包む → 光と泡。data/effects.js）
+    sapVeil: {
+      id: "sapVeil", name: "樹液の膜", kind: "resonance", power: 0, pp: 18, accuracy: 1.0,
+      target: "ally", element: "water", effect: "sapVeil",
+      modifier: {
+        duration: 4,
+        message: "{target} は 樹液の膜に 包まれた!",
+        popup: "HP・PP回復",
+        effects: [ { type: "regenOverTime", min: 0.10, max: 0.15 }, { type: "ppRegen", value: 3 } ]
+      },
+      description: "味方1体を樹液の膜で包み、4ターンのあいだ毎ターンHPを10〜15%、PPを3回復する。"
+    },
+
     // E. 攻撃に何かが付く技（新しい仕組み。BattleSystem の _applyRecoil・_applyCharge・hits）
     recklessTackle: {
       // 2026-10-20 作者の指定で 威力40 → 35・反動 1/4 → 与えたダメージそのまま

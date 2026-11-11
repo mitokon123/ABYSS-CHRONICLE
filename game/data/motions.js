@@ -4167,31 +4167,33 @@
       scaleY: { offset: -0.02, amplitude: 0.008, period: 5000 }
     },
 
-    // コハクカブト：ふだんは脚を左右交互に踏みかえ、背の琥珀の中で光が揺れる
+    // コハクカブト：ふだんはほとんど動かない（作者 2026-11-10）。
+    //   絵は16コマで、ほとんどが止まった絵。光が2回・脚の踏みかえが左右1回ずつ、9.6秒で1周する
     beetleIdle: {
-      frames: { interval: 520 },
-      scaleY: { amplitude: 0.012, period: 2080 }
+      frames: { interval: 600 },
+      scaleY: { amplitude: 0.005, period: 4800 }
     },
-    // 体当たり。脚を上げて構え、重く突っ込む
+    // 攻撃・技。どっしり構えたまま、少しだけ前へ押し出す
+    //   （作者「技をうったりするときもなるべく動かないように」2026-11-10。
+    //    前は 26 突っ込んで脚を左右に踏みかえていた → 8 だけ・脚の踏みかえなし）
     beetleRam: {
-      duration: 680,
-      offsetY: { amount: 26, shape: "windup", backRatio: 0.45 },
-      scaleY:  { amount: -0.05, shape: "windup", backRatio: 0.45 },
+      duration: 600,
+      offsetY: { amount: 8, shape: "windup", backRatio: 0.45 },
+      scaleY:  { amount: -0.02, shape: "windup", backRatio: 0.45 },
       poses: [
         { at: 0,    pose: "rear" },
-        { at: 0.45, pose: "legL" },
-        { at: 0.6,  pose: "legR" },
-        { at: 0.85, pose: null }
+        { at: 0.7,  pose: null }
       ]
     },
-    // 守りを固める。脚を縮めて沈み、琥珀が明るくなる
+    // 守りを固める・共鳴・ブレス。その場でわずかに沈み、琥珀が明るくなる
+    //   （作者 2026-11-10。前は縦 −0.08・横 +0.04 の伸び縮み → −0.03・+0.015）
     beetleBrace: {
-      duration: 720,
-      scaleY: { amount: -0.08, shape: "pulse" },
-      scaleX: { amount: 0.04,  shape: "pulse" },
+      duration: 640,
+      scaleY: { amount: -0.03,  shape: "pulse" },
+      scaleX: { amount: 0.015, shape: "pulse" },
       poses: [
         { at: 0,    pose: "rear" },
-        { at: 0.85, pose: null }
+        { at: 0.8,  pose: null }
       ]
     },
     beetleHit: {
@@ -4220,7 +4222,7 @@
       scaleY: { offset: -0.03, amplitude: 0.01, period: 5000 }
     },
 
-    // 樹液のスライム：ふだんはゆっくり伸び縮みし、体の下から樹液が垂れる（sprite の4枚）
+    // ジュエキスライム：ふだんはゆっくり伸び縮みし、体の下から樹液が垂れる（sprite の4枚）
     sapIdle: {
       frames: { interval: 620 },
       scaleX: { amplitude: 0.03,  period: 2480 },

@@ -5,7 +5,8 @@
  *
  * ▼ 状態（this.phase）
  *   "list"   … アイテムを選ぶ
- *   "target" … 使う相手（パーティ）を選ぶ
+ *   "target" … 使う相手（パーティ）を選ぶ。使ったあともその道具が残っていればここに留まり、
+ *              続けて使える（2026-11-09 作者の依頼）。使い切るか Esc で一覧へ
  *
  * 配置は data/ui.js の items、文言は data/messages.js の items で管理する。
  */
@@ -57,8 +58,27 @@
   /**
    * 持ち物から一覧の行を組み立てる（分類ごとに見出しを挟む）。
    * 装備は「装備」の中で武器・防具・アクセサリーに分けて、小さい見出しを挟む
+   * @param {string} [keepItemId] 作り直したあともカーソルを置いておく道具。
+   *   使い切って無くなったら、そのとき居た位置にいちばん近い道具へ
    */
-  ItemScene.prototype._rebuildList = function () {
+  ItemScene.prototype._rebuildList = function (keepItemId) {
+    var oldIndex = this.list.index;
+    this._buildRows();
+    if (!keepItemId) return;
+
+    var rows = this.list.rows;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].type === "entry" && rows[i].value === keepItemId) { this.list.setIndex(i); return; }
+    }
+    // 無くなった：前の位置から下へ、無ければ上へ、近い道具を探す
+    for (var d = 0; d < rows.length; d++) {
+      var down = oldIndex + d, up = oldIndex - d;
+      if (rows[down] && rows[down].type === "entry") { this.list.setIndex(down); return; }
+      if (rows[up] && rows[up].type === "entry") { this.list.setIndex(up); return; }
+    }
+  };
+
+  ItemScene.prototype._buildRows = function () {
     var inventory = this.game.inventory;
     var data = this.game.data;
     var slotDefs = (data.categories || {}).equipSlot || {};
@@ -176,7 +196,7 @@
     }
 
     this._showNotice((this.texts.usedAlone || "{item}").replace("{item}", result.itemName));
-    this._rebuildList();
+    this._rebuildList(itemId);
   };
 
   ItemScene.prototype._updateTarget = function () {
@@ -228,9 +248,13 @@
       this.game.playError();
     }
 
-    // 使って個数が変わるので一覧を作り直す
-    this._rebuildList();
-    this.phase = "list";
+    // 使って個数が変わるので一覧を作り直す（選んでいた道具の上にカーソルを残す）。
+    // まだ残っていれば相手を選ぶところに留まり、同じ相手にも別の相手にも続けて使える（2026-11-09 作者の依頼）。
+    // 使い切ったら一覧へ戻る
+    var itemId = selected.value;
+    this._rebuildList(itemId);
+    var still = this.list.getSelected();
+    if (!(still && still.value === itemId)) this.phase = "list";
   };
 
   ItemScene.prototype._showNotice = function (text) {
@@ -338,6 +362,17 @@
     this.panel.drawText(this.texts.selectTarget || "", origin.x, origin.y + 16,
       { color: t.cursorColor });
 
+    // 選んだ道具と残りの数（続けて使うので、あといくつあるかが分かるように）
+    var chosen = this.list.getSelected();
+    var chosenItem = chosen ? this.game.data.getItem(chosen.value) : null;
+    if (chosenItem && this.texts.targetItem) {
+      this.panel.drawText(this.texts.targetItem
+          .replace("{item}", chosenItem.name)
+          .replace("{count}", this.game.inventory.getCount(chosenItem.id)),
+        rect.x + rect.w - (t.padding || 8), origin.y + 16,
+        { align: "right", font: t.smallFont, color: t.subTextColor });
+    }
+
     var party = this.game.party;
     if (!party) return;
 
@@ -402,12 +437,9 @@
   };
 
   /** 文字数で折り返す（等幅フォント前提の簡易処理） */
+  // 折り返しは共通（js/namespace.js の MyGame.wrapText。行の頭に句読点を置かない）
   function wrapText(text, charsPerLine) {
-    var lines = [];
-    for (var i = 0; i < text.length; i += charsPerLine) {
-      lines.push(text.substr(i, charsPerLine));
-    }
-    return lines;
+    return NS.wrapText(text, charsPerLine);
   }
 
   NS.ItemScene = ItemScene;

@@ -161,6 +161,7 @@
    *   debuffResist   … 敵のあいだの弱体への耐性（ジュエル）
    *   rewardMultiplier … 倒したときの経験値・ゴールドの倍率（種族の値は変えずに、その場所だけ。回廊のカゲヅタ 1.5）
    *   effects        … 敵のあいだだけ足す効果。特性・装備と同じ書き方（シニガミの耐性の上乗せ）
+   *   （落とすものは表の1件ではなく、ダンジョンの dropOverrides に種族ごとに書く。DropSystem.dropsIn）
    *   ※ どれも仲間にすると外れる（スカウトした個体は覚える技の一覧で作り直す）
    *
    * @param {object} entry data/dungeons.js の table の1件
@@ -202,6 +203,9 @@
     if (typeof entry.debuffResist === "number" && enemy.setDebuffResist) enemy.setDebuffResist(entry.debuffResist);
     // その場所でだけ、倒したときの経験値・ゴールドに倍率を掛ける（蔦這う回廊のカゲヅタ。MonsterInstance.getExpReward）
     if (typeof entry.rewardMultiplier === "number") enemy.rewardMultiplier = entry.rewardMultiplier;
+    // その区画でだけの落とすもの（data/dungeons.js の dropOverrides。回廊のヌマボネ。DropSystem.rollFor）
+    var dropsHere = NS.DropSystem && NS.DropSystem.dropsIn(this.dungeon, entry.species, null);
+    if (dropsHere) enemy.dropsOverride = dropsHere;
     // 敵のときだけ足す効果（特性・装備と同じ書き方。シニガミの「敵のときは耐性が高い」）。statMultiplier のあとに足す
     if (Array.isArray(entry.effects) && entry.effects.length > 0) {
       enemy.encounterEffects = (enemy.encounterEffects || []).concat(entry.effects);
