@@ -3,7 +3,7 @@
  * パーティ編成画面。手持ちの一覧表示と並び替えを行う。
  * 先頭に近い個体から戦闘に出るため、並び順の変更がそのまま編成になる。
  *
- * 拠点の「預かり所」との出し入れもここで行う（左右キーで預かり所の画面を開く。v1.0.3 から箱に絵を並べる画面）。
+ * 拠点の「預かり所」との出し入れもここで行う（左右キーで預かり所の画面を開く。v1.3.0 から箱に絵を並べる画面）。
  *
  * ▼ 操作
  *   上下   … カーソル移動
@@ -53,7 +53,7 @@
     this.reorderFrom = -1;  // 並び替えの移動元
 
     var self = this;
-    // 装備の画面の候補（v1.0.3）。行は _renderEquipRow が描く
+    // 装備の画面の候補（v1.3.0）。行は _renderEquipRow が描く
     this.equipList = new NS.ScrollList(this.panel, this._equipListRect(), {
       renderRow: function (row, index, y, selected) { self._renderEquipRow(row, y, selected); }
     });
@@ -75,7 +75,7 @@
       { label: this.texts.releaseNo  || "no",  value: "no" },
       { label: this.texts.releaseYes || "yes", value: "yes" }
     ]);
-    // 預かり所の画面（v1.0.3。30体ずつの箱に絵を並べる）。状態は _openBoxView で整える
+    // 預かり所の画面（v1.3.0。30体ずつの箱に絵を並べる）。状態は _openBoxView で整える
     this.boxView = false;
     this.boxFocus = "box";      // "party"（左の連れていく列）/ "box"（箱のマス）
     this.boxPartyIndex = 0;
@@ -155,7 +155,7 @@
 
     this._moveCursor(input);
 
-    // 左右で預かり所の画面を開く（預かり所が使えるときだけ。v1.0.3 から別の画面）
+    // 左右で預かり所の画面を開く（預かり所が使えるときだけ。v1.3.0 から別の画面）
     if (this.allowStorage) {
       if (input.isPressed("left") || input.isPressed("right")) { this._openBoxView(); return; }
       if (this._clickedTab(input)) return;
@@ -285,7 +285,7 @@
     if (this.allowStorage) {
       items.push({ label: this.texts.actionRelease || "release", value: "release" });
     }
-    // 預かり所の仲間は、印をつけてまとめて逃がせる（v1.0.3）
+    // 預かり所の仲間は、印をつけてまとめて逃がせる（v1.3.0）
     if (this.boxView && this.tab === "storage") {
       items.push({ label: this.texts.actionReleaseMany || "release many", value: "releaseMany" });
     }
@@ -447,7 +447,7 @@
   /** 「逃がしますか?」の窓。後ろを暗く落として、問いかけだけに目を向けさせる */
   PartyScene.prototype._renderReleaseConfirm = function (ctx) {
     var C = this.layout.releaseConfirm;
-    // まとめて逃がすときは、印をつけた仲間ぜんぶ（v1.0.3）
+    // まとめて逃がすときは、印をつけた仲間ぜんぶ（v1.3.0）
     var many = (this.mode === "releaseMany");
     var targets = many ? this.marks : [this._selected()];
     if (!C || !targets[0]) return;
@@ -578,7 +578,7 @@
 
   // --- 様子を見る ---
 
-  // ページの並び（左上の札もこの順）。技が多いと左の欄からはみ出したので、技は専用のページにした（v1.0.3）
+  // ページの並び（左上の札もこの順）。技が多いと左の欄からはみ出したので、技は専用のページにした（v1.3.0）
   var INSPECT_PAGES = ["stats", "skills", "notes"];
 
   /**
@@ -693,7 +693,7 @@
 
   // --- 装備 ---
 
-  // --- 装備の画面（v1.0.3。画面ぜんぶを使う） ---
+  // --- 装備の画面（v1.3.0。画面ぜんぶを使う） ---
   //
   //   左上 … 仲間（◀ ▶ と ←→ で、いま見ている表の中の仲間を切り替える）
   //   左   … 枠（武器・防具・アクセサリー1・2）と「すべて外す」
@@ -1017,7 +1017,7 @@
     return this.texts.stackFull || null;
   };
 
-  // --- 預かり所の画面（v1.0.3。30体ずつの箱に絵を並べる） ---
+  // --- 預かり所の画面（v1.3.0。30体ずつの箱に絵を並べる） ---
   //
   //   左 … 連れていく仲間（決定で預ける）
   //   中 … 箱（6×5 のマス。決定でパーティに加える。いっぱいなら入れ替える相手を選ぶ）
@@ -1549,7 +1549,7 @@
       return;
     }
 
-    // 装備も画面ぜんぶを使う（v1.0.3）
+    // 装備も画面ぜんぶを使う（v1.3.0）
     if (this.mode === "equip") {
       this._renderEquipScreen(this._equipMonster());
       this._renderHint(L, t);
@@ -1558,7 +1558,7 @@
     }
 
     if (this.boxView) {
-      // 預かり所（v1.0.3）：左に連れていく仲間、中に箱、右に詳細
+      // 預かり所（v1.3.0）：左に連れていく仲間、中に箱、右に詳細
       this._renderBoxView();
     } else {
       this.panel.drawText(this.texts.title || "party",
@@ -1947,7 +1947,7 @@
   };
 
   /** 上部の「パーティ / 預かり所」切り替え表示 */
-  /** 預かり所の画面ぜんぶ（v1.0.3） */
+  /** 預かり所の画面ぜんぶ（v1.3.0） */
   PartyScene.prototype._renderBoxView = function () {
     var B = this._boxLayout();
     var t = this.theme;
@@ -2330,7 +2330,7 @@
       x, y, { color: t.subTextColor, font: t.smallFont });
     y += lh + 4;
 
-    // 技は数だけ（「技（11）」）。技はこの先も増えて欄からはみ出すので、中身は「様子を見る」の技・特性のページで見る（v1.0.3）
+    // 技は数だけ（「技（11）」）。技はこの先も増えて欄からはみ出すので、中身は「様子を見る」の技・特性のページで見る（v1.3.0）
     this.panel.drawText(fill(this.texts.skillCount || "{label} {n}", {
       label: this.texts.skillLabel || "skills", n: monster.skills.length
     }), x, y, { font: t.smallFont });

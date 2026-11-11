@@ -438,7 +438,7 @@
     this.panel.drawText(subtitle, origin.x, origin.y + 40,
       { font: t.smallFont, color: t.subTextColor });
 
-    // 準備中の区画は、階数と推奨レベル（どちらも仮の値）を出さない
+    // 準備中の区画（ready: false）は、階数と推奨レベルを出さない（作っている途中で変わるため）
     if (preparing) return;
 
     var floors = unlocked

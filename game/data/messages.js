@@ -272,8 +272,7 @@
       // 左下のクレジット1件ぶん。{label} {name} {url} は data/audio.js の credits から
       credit:   "{label}：{name} {url}",
 
-      // 「続きから」を選んだが、3つとも空だったとき。
-      // 空の一覧を見せても選べるものが無いので、ここで止める
+      // いまは使っていない（v1.3.1 から、3つとも空でも「続きから」の一覧へ進み、ファイルから読み込める）
       noSaveAny: "セーブデータがありません"
     },
 
@@ -365,7 +364,7 @@
       colorLabel: "ふくの色",
       genderLabel: "性別",
       firstPersonLabel: "一人称",
-      // 新しい絵（v1.0.2）のときだけ出る欄
+      // 新しい絵（v1.2.0）のときだけ出る欄
       hairLabel: "髪型",
       hairColorLabel: "髪の色",
       pantsLabel: "ズボンの色",
@@ -456,7 +455,7 @@
        * 「つづきから」の一覧で Q/E を押すと入る。
        */
       titleManage:    "ファイルの整理",
-      subtitleManage: "コピー・移動・削除ができます",
+      subtitleManage: "コピー・移動・削除・ファイルへの書き出しができます",
       titleCopyTo:    "どこにコピーしますか",
       titleMoveTo:    "どこへ移しますか",
       subtitlePick:   "スロット{n} の行き先を選んでください",   // n
@@ -469,7 +468,23 @@
       actionCopy:   "コピーする",
       actionMove:   "移動する",
       actionDelete: "削除する",
+      actionExport: "ファイルに書き出す",
       actionBack:   "やめる",
+
+      /**
+       * --- ファイルへの書き出しと読み込み（v1.3.1）---
+       * 書き出しは整理のメニューから。読み込みは「つづきから」の一覧のボタンか L キー。
+       */
+      importButton:          "ファイルから読み込む",
+      subtitleContinueEmpty: "データがありません。書き出したファイルから読み込めます",
+      titleImportTo:   "どこに読み込みますか",
+      subtitleImport:  "{name} Lv{level} のファイルを入れる先を選んでください",   // name, level
+      confirmImport:   "スロット{to} に読み込みますか?",                       // to
+      exported:     "書き出しました（ダウンロードの場所を見てください）",
+      imported:     "読み込みました",
+      importBroken: "このファイルは読み込めません",
+      importVersion:"形式が違うので読み込めません",
+      unavailable:  "この環境ではセーブを使えません",
 
       sameSlotNote: "同じファイルは選べません",
 
@@ -490,8 +505,9 @@
 
       hint:           "↑↓: 選択    決定: 決定    Esc: タイトルへ",
       hintSave:       "↑↓: 選択    決定: ここにセーブ    Esc: 拠点へ",
-      hintWithManage: "↑↓: 選択    決定: 遊ぶ    Q/E: ファイルの整理    Esc: タイトルへ",
-      hintManaging:   "↑↓: 選択    決定: このファイルを整理    Q/E: 整理をやめる",
+      hintWithManage: "↑↓: 選択  決定: 遊ぶ  Q/E: 整理  L: 読み込む  Esc: 戻る",
+      hintImportOnly: "L: ファイルから読み込む    Esc: タイトルへ",
+      hintManaging:   "↑↓: 選択  決定: このファイルを整理  Q/E: やめる  L: 読み込む",
       hintAction:     "↑↓: 選択    決定: 決定    Esc: やめる",
       hintPick:       "↑↓: 行き先を選ぶ    決定: 決定    Esc: 戻る",
       hintConfirm:    "↑↓: 選択    決定: 決定    Esc: やめる"
@@ -907,7 +923,7 @@
       // 預かり所（拠点にいる仲間）
       tabParty:    "連れていく",
       tabStorage:  "預かり所",
-      // 預かり所の画面（v1.0.3。30体ずつの箱に絵を並べる）
+      // 預かり所の画面（v1.3.0。30体ずつの箱に絵を並べる）
       boxTitle:        "預かり所",
       boxCount:        "預けている数 {n}/{max}",            // n, max
       boxPartyHead:    "連れていく {n}/{max}",              // n, max
@@ -1020,7 +1036,7 @@
       // 一覧の詳細欄（狭い）では、空いている枠を数でまとめる
       slotsEmpty:   "空き {n}",                         // n
       unequipLabel: "外す",
-      // 装備の画面（v1.0.3）
+      // 装備の画面（v1.3.0）
       equipScreenTitle: "装備",
       equipCandidates:  "{slot}の候補",                 // slot（「アクセサリー1」など）
       equipSort:        "並び：{mode}（R）",            // mode（下の equipSortLabels）

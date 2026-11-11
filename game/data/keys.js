@@ -30,11 +30,13 @@
       prevTab:    ["KeyQ"],
       nextTab:    ["KeyE"],
       save:       ["KeyF"],
-      // 装備の画面・預かり所で並べ替える（v1.0.3）
+      // 装備の画面・預かり所で並べ替える（v1.3.0）
       sort:       ["KeyR"],
-      // 預かり所の画面（v1.0.3）。F は探索中のセーブと同じキーだが、預かり所は拠点にしか無いのでぶつからない
+      // 預かり所の画面（v1.3.0）。F は探索中のセーブと同じキーだが、預かり所は拠点にしか無いのでぶつからない
       filter:     ["KeyF"],
-      menu:       ["KeyC"]
+      menu:       ["KeyC"],
+      // 「つづきから」の一覧で、書き出したセーブのファイルを読み込む（v1.3.1）
+      importSave: ["KeyL"]
       // regenerate（R でマップ作り直し）は生成の確認用だったので外した。
       // また要るときは "regenerate": ["KeyR"] を戻し、
       // DungeonScene.update に呼び出しを足せばよい
@@ -43,7 +45,7 @@
     preventDefault: ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Tab"],
 
     order: ["up", "down", "left", "right", "confirm", "cancel",
-            "party", "items", "store", "equip", "prevTab", "nextTab", "save", "sort", "filter", "menu"],
+            "party", "items", "store", "equip", "prevTab", "nextTab", "save", "sort", "filter", "menu", "importSave"],
 
     actionLabels: {
       up:         "上へ移動",
@@ -61,14 +63,15 @@
       save:       "セーブ",
       sort:       "並べ替え（装備の候補・預かり所）",
       filter:     "絞り込み（預かり所・工房）",
-      menu:       "ほかの操作（預かり所）"
+      menu:       "ほかの操作（預かり所）",
+      importSave: "ファイルから読み込む（つづきから）"
     },
 
     keyLabels: {
       ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→",
       KeyW: "W", KeyA: "A", KeyS: "S", KeyD: "D",
       KeyZ: "Z", KeyX: "X", KeyP: "P", KeyQ: "Q", KeyE: "E", KeyF: "F", KeyR: "R", KeyC: "C",
-      KeyI: "I",
+      KeyI: "I", KeyL: "L",
       Enter: "Enter", Space: "Space", Escape: "Esc", Tab: "Tab"
     }
   };

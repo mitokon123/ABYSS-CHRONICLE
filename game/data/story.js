@@ -86,7 +86,7 @@
   //   たき火の左に、右から 主人公・スライム・オルド・イレーネ と並ぶ
   var PLAYER = { player: true, x: 596, y: 414, size: 64, enter: "fade" };
   var SLIME  = { monster: "slime", x: 534, y: 414, size: 46, enter: "fade" };
-  //   person は data/sprites_story.js の charaLooks のid（v1.0.2。部品を重ねた新しい絵で、大きさは data/ui.js の story.personSize）。
+  //   person は data/sprites_story.js の charaLooks のid（v1.2.0。部品を重ねた新しい絵で、大きさは data/ui.js の story.personSize）。
   //   新しい絵が使えないときは sprite・size の 32×32 の絵で描く
   var ORD    = { id: "ord", person: "ord", sprite: "npcOrd", motion: "breathe", x: 462, y: 414, size: 68, enter: "fade" };
   var IRENE  = { id: "irene", person: "irene", sprite: "npcIrene", motion: "breathe", x: 388, y: 414, size: 66, enter: "fade" };

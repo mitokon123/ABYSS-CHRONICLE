@@ -127,7 +127,7 @@
       // 主人公の名前と服の色（ファイルごとに違う）
       playerName: state.playerName || null,
       playerColor: state.playerColor || null,
-      // 新しい絵の見た目（v1.0.2）。ズボンの色・髪型・髪の色・飾り（id の配列）・飾りの色（飾りの id → 色）
+      // 新しい絵の見た目（v1.2.0）。ズボンの色・髪型・髪の色・飾り（id の配列）・飾りの色（飾りの id → 色）
       playerPants: state.playerPants || null,
       playerHair: state.playerHair || null,
       playerHairColor: state.playerHairColor || null,
@@ -367,6 +367,135 @@
     this.clear(from);
     return { success: true, reason: "moved" };
   };
+
+  /**
+   * --- ファイルへの書き出しと、ファイルからの読み込み（v1.3.1）---
+   *
+   * セーブはブラウザの中（localStorage）にしか無いので、ブラウザのデータを消すと無くなる。
+   * 1つのファイル（JSON）に書き出しておけば、控えにも、別のパソコンへ移すのにも使える。
+   *
+   * ★ コピー・移動と同じく、保存されている文字列をそのまま入れて運ぶ（中身を組み立て直さない）。
+   *   セーブ本体・中断・設定の3つを一緒に運ぶ。
+   *
+   * ファイルの形：
+   *   { format: "abyss-chronicle-save", formatVersion: 1, gameVersion, exportedAt, slot,
+   *     save: "本体の文字列", suspend: "中断の文字列" | null, settings: "設定の文字列" | null }
+   */
+  var EXPORT_FORMAT = "abyss-chronicle-save";
+
+  /**
+   * そのスロットを、書き出すファイルの中身にする。
+   * @returns {{success:boolean, reason:string, text?:string, fileName?:string}}
+   *   reason: "exported" | "empty" | "unavailable"
+   */
+  SaveManager.prototype.exportSlot = function (slot) {
+    if (!this.isAvailable()) return { success: false, reason: "unavailable" };
+    var n = clampSlot(slot, this.slotCount);
+    var raw = this.readRaw(n);
+    if (!raw) return { success: false, reason: "empty" };
+
+    var file = {
+      format: EXPORT_FORMAT,
+      formatVersion: 1,
+      gameVersion: (this.data.config || {}).version || "",
+      exportedAt: new Date().toISOString(),
+      slot: n,
+      save: raw,
+      suspend: getRaw(this.suspendKeyFor(n)),
+      settings: getRaw(this.settingsKeyFor(n))
+    };
+
+    var d = new Date();
+    function pad(v) { return (v < 10 ? "0" : "") + v; }
+    var stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate())
+      + "-" + pad(d.getHours()) + pad(d.getMinutes());
+
+    return {
+      success: true,
+      reason: "exported",
+      text: JSON.stringify(file, null, 1),
+      fileName: "ABYSS-CHRONICLE_slot" + n + "_" + stamp + ".json"
+    };
+  };
+
+  /**
+   * 読み込んだファイルの文字列を調べる。まだどこにも書かない。
+   * @returns {{success:boolean, reason:string, file?:object, summary?:object}}
+   *   reason: "ok" | "importBroken" | "importVersion"
+   *   summary は確かめの窓に出す { playerName, leadName, level }
+   */
+  SaveManager.prototype.parseImport = function (text) {
+    var file;
+    try {
+      file = JSON.parse(text);
+    } catch (e) {
+      return { success: false, reason: "importBroken" };
+    }
+    if (!file || file.format !== EXPORT_FORMAT || typeof file.save !== "string") {
+      return { success: false, reason: "importBroken" };
+    }
+
+    var payload;
+    try {
+      payload = JSON.parse(file.save);
+    } catch (e) {
+      return { success: false, reason: "importBroken" };
+    }
+    if (!payload || typeof payload !== "object") return { success: false, reason: "importBroken" };
+    // 形式が違うセーブは入れない（入れても「読み込めません」になるだけなので）
+    if (payload.version !== this.saveVersion) return { success: false, reason: "importVersion" };
+
+    var party = (payload.party && payload.party.members) || payload.party || [];
+    if (!party.length) return { success: false, reason: "importBroken" };
+    var lead = party[0];
+    var species = this.data.getMonsterData ? this.data.getMonsterData(lead.speciesId) : null;
+
+    return {
+      success: true,
+      reason: "ok",
+      file: {
+        save: file.save,
+        suspend: (typeof file.suspend === "string") ? file.suspend : null,
+        settings: (typeof file.settings === "string") ? file.settings : null
+      },
+      summary: {
+        playerName: payload.playerName || "",
+        leadName: lead.nickname || (species ? species.name : lead.speciesId),
+        level: lead.level || 1
+      }
+    };
+  };
+
+  /**
+   * parseImport で調べた中身を、そのスロットへ書く。行き先の中断と設定は、ファイルのもので置き換える
+   * （ファイルに無ければ消す。本体だけ新しくなって、中断や設定が別の冒険のもの、という食い違いを防ぐ）。
+   * @returns {{success:boolean, reason:string}} reason: "imported" | "unavailable" | "error"
+   */
+  SaveManager.prototype.importToSlot = function (file, slot) {
+    if (!this.isAvailable()) return { success: false, reason: "unavailable" };
+    if (!file || typeof file.save !== "string") return { success: false, reason: "error" };
+    var n = clampSlot(slot, this.slotCount);
+
+    try {
+      window.localStorage.setItem(this.keyFor(n), file.save);
+      var extras = [[this.suspendKeyFor(n), file.suspend], [this.settingsKeyFor(n), file.settings]];
+      for (var i = 0; i < extras.length; i++) {
+        if (extras[i][1]) window.localStorage.setItem(extras[i][0], extras[i][1]);
+        else window.localStorage.removeItem(extras[i][0]);
+      }
+      return { success: true, reason: "imported" };
+    } catch (e) {
+      return { success: false, reason: "error" };
+    }
+  };
+
+  function getRaw(key) {
+    try {
+      return window.localStorage.getItem(key) || null;
+    } catch (e) {
+      return null;
+    }
+  }
 
   /**
    * スロットの中身を、選択画面に出せる形だけ読む（遊べる状態には戻さない）。

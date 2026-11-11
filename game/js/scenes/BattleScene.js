@@ -1075,7 +1075,7 @@
 
   /**
    * 札が薄れ始める時刻。消す合図が来ても、出てから minShow ミリ秒たつまでは出したままにする
-   * （v1.0.2.1・作者の指定「少なくとも0.8秒は表示」。次の行動がすぐ始まると、読めないうちに消えていた）
+   * （v1.2.1・作者の指定「少なくとも0.8秒は表示」。次の行動がすぐ始まると、読めないうちに消えていた）
    */
   BattleScene.prototype._popupDismissAt = function (p, now) {
     var minShow = this.layout.effectPopup.minShow || 0;
@@ -1540,7 +1540,7 @@
     // ダメージの無い状態異常の技（青い眼光など）は damage が来ないので、状態異常の出来事も合図にする
     // 治した出来事は、いまの技で治したときだけ（特性「脱皮」で治ったときに、前の技の演出を出さない）
     if (event.type === "cure" && event.skillId !== this._currentSkill.id) return;
-    // 回復の技（キュア・やくそう）は、回復した仲間ごとに演出を出す。道具の回復（skillId が無い）では出さない（v1.0.3）
+    // 回復の技（キュア・やくそう）は、回復した仲間ごとに演出を出す。道具の回復（skillId が無い）では出さない（v1.3.0）
     // 起こす技（リザレクト）は、起きたときだけ出す
     var healed = ((event.type === "heal" || event.type === "revive") && event.skillId === this._currentSkill.id);
     var statusOnly = isStatusResultEvent(event.type) && !NS.BattleSystem.dealsDamage(this._currentSkill);
@@ -3183,7 +3183,7 @@
         rect.x + rect.w - (t.padding || 8), origin.y + 10,
         { align: "right", font: t.smallFont, color: t.subTextColor });
     } else if (this._isCaughtSpecies(monster)) {
-      // 仲間にしたことのある種族の敵には、空いている右上に印を出す（図鑑の「仲間」と同じ。v1.0.3）
+      // 仲間にしたことのある種族の敵には、空いている右上に印を出す（図鑑の「仲間」と同じ。v1.3.0）
       var markSize = ((this.game.data.ui || {}).icons || {}).size || 14;
       NS.StatusMarks.drawIcon(this.spriteRenderer, "iconCaught",
         rect.x + rect.w - (t.padding || 8) - markSize, origin.y + 10, markSize);

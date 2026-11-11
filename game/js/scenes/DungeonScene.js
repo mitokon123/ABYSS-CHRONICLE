@@ -402,7 +402,7 @@
       return;
     }
 
-    // 押した方を向く（壁で進めなくても向きは変わる。v1.0.2 の4方向の絵で使う）
+    // 押した方を向く（壁で進めなくても向きは変わる。v1.2.0 の4方向の絵で使う）
     this._facing = dRow < 0 ? "up" : (dRow > 0 ? "down" : (dCol < 0 ? "left" : "right"));
 
     if (this._moveTimer <= 0) {
@@ -781,7 +781,7 @@
     if (enemy.setEncounterMultipliers) enemy.setEncounterMultipliers(boss.statMultiplier);
     // 決まった順番で動く主は、ここで手順を渡す
     if (enemy.setActionPattern) enemy.setActionPattern(boss.actionPattern);
-    // PPが減らない主・1ターンに何度も動く主（v1.0.3）。スカウトすると個体は作り直されるので、仲間には付いてこない
+    // PPが減らない主・1ターンに何度も動く主（v1.3.0）。スカウトすると個体は作り直されるので、仲間には付いてこない
     if (boss.infinitePp) enemy.infinitePp = true;
     if (boss.actionsPerTurn) enemy.actionsPerTurn = boss.actionsPerTurn;
     // 主として立ちはだかるあいだだけ効かない状態異常。
@@ -1174,7 +1174,7 @@
   DungeonScene.prototype._renderPlayer = function (ts) {
     var look = (this.game.data.player || {}).appearance || {};
 
-    // 部品を重ねて作る新しい絵（v1.0.2）。4方向を向き、歩きの上下と腕の振りは絵の中に入っている。
+    // 部品を重ねて作る新しい絵（v1.2.0）。4方向を向き、歩きの上下と腕の振りは絵の中に入っている。
     // 足をマスの下にそろえ、マスより大きいぶんは上へはみ出す。
     // 位置は整数にそろえる（小数だと点がにじむ）
     if (NS.PlayerLook && NS.PlayerLook.usesRig && NS.PlayerLook.usesRig(this.game.data)) {

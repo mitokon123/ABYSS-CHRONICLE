@@ -206,24 +206,6 @@
       },
 
       /**
-       * 高まる。輪が足元から立ち上がり、粒がゆっくり昇る。
-       * 強化・弱体の技に使う（当てるのではなく「まとう」感じにしてある）。
-       *   rings … 立ち上がる輪の数   rise … どこまで昇るか
-       */
-      aura: {
-        shape: "aura",
-        duration: 620,
-        glow: 12,
-        rings: 3,
-        radius: 34,
-        rise: 46,
-        lineWidth: 3,
-        count: 10,
-        minSize: 3,
-        maxSize: 5
-      },
-
-      /**
        * 共鳴（RC-1）。共鳴の技を出した本人のまわりに出す（当てる演出とは別）。
        * 足元に響きの輪が何重にも広がり、光の粒が本人のまわりを巡りながら昇る。
        * 色は技の属性（回復の共鳴はHPの緑）。data/categories.js の skillKind.resonance.casterEffect が指す
@@ -645,7 +627,7 @@
       },
 
       /**
-       * --- v1.0.3：ほかの技の演出を借りていた技の専用の型（2026-11-03 作者の指定で全部専用に） ---
+       * --- v1.3.0：ほかの技の演出を借りていた技の専用の型（2026-11-03 作者の指定で全部専用に） ---
        * 色を書いていないものは、属性の色か、変わる能力の色（statColors）になる
        */
 
@@ -749,7 +731,7 @@
       shadowGrasp: {
         shape: "shadowGrasp", duration: 760, glow: 12, count: 6
       },
-      // 火炎斬り（v1.0.3）。三日月の太刀筋が右上から左下へ走り、筋に沿って炎の舌が立ち昇る。
+      // 火炎斬り（v1.3.0）。三日月の太刀筋が右上から左下へ走り、筋に沿って炎の舌が立ち昇る。
       //   radius / width … 太刀筋の大きさと太さ   flames / flameHeight … 炎の数と高さ   embers … 火の粉
       flameSlash: {
         shape: "flameSlash", hitSe: "slash", duration: 720, glow: 18,

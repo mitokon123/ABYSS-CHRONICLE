@@ -474,54 +474,6 @@
     },
 
     /**
-     * 高まる（弱体では 沈む）：輪が流れ、粒が一緒に動く。
-     * 当てる技と違って中心で弾けず、上下へ抜けていく形にしてある。
-     *
-     * direction が 1 なら下から上へ（強化）、-1 なら上から下へ（弱体）。
-     * すぼまり方も向きに合わせるので、逆さにしても「沈んでいく」ように見える。
-     */
-    aura: function (ctx, d, t, p) {
-      var rings = d.rings || 3;
-      var radius = d.radius || 30;
-      var rise = d.rise || 40;
-      var dir = (p.direction === -1) ? -1 : 1;
-      var i;
-
-      // 流れる輪。少しずつ遅れて始まり、進むほど細くなる
-      for (i = 0; i < rings; i++) {
-        var sub = span(t, i * 0.18, 0.62);
-        if (sub <= 0) continue;
-
-        var y = p.y + dir * (rise * 0.5 - rise * easeOut(sub));
-        // 進む先ほど小さくすぼまる
-        var r = radius * (1 - sub * 0.55);
-
-        setAlpha(ctx, fadeOut(sub) * (1 - sub * 0.4));
-        ctx.strokeStyle = (sub < 0.3) ? p.coreColor : p.color;
-        ctx.lineWidth = Math.max(1, (d.lineWidth || 3) * (1 - sub * 0.5));
-        ctx.beginPath();
-        // 平たい輪にして「面が流れていく」ように見せる
-        ctx.ellipse(p.x, y, r, r * 0.34, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // 一緒に流れる粒
-      var count = d.count || 10;
-      ctx.fillStyle = p.color;
-      for (i = 0; i < count; i++) {
-        var ps = span(t, wobble(i) * 0.5, 0.5);
-        if (ps <= 0) continue;
-
-        var lane = (wobble(i + 11) - 0.5) * radius * 1.8;
-        var py = p.y + dir * (rise * 0.5 - rise * 1.2 * easeOut(ps));
-        var size = sizeOf(d, i);
-
-        setAlpha(ctx, fadeOut(ps));
-        ctx.fillRect(p.x + lane - size / 2, py - size / 2, size, size);
-      }
-    },
-
-    /**
      * 共鳴（RC-1）：技を出した本人のまわりで、力が響き合う。
      *   1. 足元から、平たい響きの輪が何重にも外へ広がる（少しずつ遅れて）
      *   2. 光の粒が本人のまわりを巡りながら、足元から頭の上へ昇る
@@ -2422,7 +2374,7 @@
     },
 
     // ─────────────────────────────────────────
-    // v1.0.3：ほかの技の演出を借りていた技の専用の型（2026-11-03 作者の指定）
+    // v1.3.0：ほかの技の演出を借りていた技の専用の型（2026-11-03 作者の指定）
     // ─────────────────────────────────────────
 
     /**

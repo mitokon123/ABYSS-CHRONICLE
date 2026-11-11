@@ -995,10 +995,19 @@
     // rewardMultiplier … 出る場所の表で決めた倍率（EncounterSystem。蔦這う回廊のカゲヅタ）
     var base = (this._species.expReward || 0) * (this.rewardMultiplier || 1);
     var perLevel = (this._data.growth || {}).expRewardPerLevel;
-    if (!perLevel || this._species.expFixed) return Math.floor(base);
+    if (!perLevel || this._species.expFixed) return floorReward(base);
 
-    return Math.floor(base * (1 + (this.level - 1) * perLevel));
+    return floorReward(base * (1 + (this.level - 1) * perLevel));
   };
+
+  /**
+   * 報酬の切り捨て（v1.3.1）。0.15 のような小数は計算機の中でわずかに小さく持たれるため、
+   * 160 × (1 + 31 × 0.15) が 904 ではなく 903.999… になり、1 足りなくなっていた。
+   * 小数第6位で丸めてから切り捨てる
+   */
+  function floorReward(value) {
+    return Math.floor(Math.round(value * 1e6) / 1e6);
+  }
 
   /**
    * この個体を倒したときに得られるゴールド。
@@ -1009,9 +1018,9 @@
 
     var base = (this._species.goldReward || 0) * (this.rewardMultiplier || 1);
     var perLevel = (this._data.growth || {}).goldRewardPerLevel;
-    if (!perLevel) return Math.floor(base);
+    if (!perLevel) return floorReward(base);
 
-    return Math.floor(base * (1 + (this.level - 1) * perLevel));
+    return floorReward(base * (1 + (this.level - 1) * perLevel));
   };
 
   /**

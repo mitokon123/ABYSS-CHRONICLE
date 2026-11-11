@@ -33,7 +33,7 @@
 
   /**
    * できあがった描画物（canvas）をそのまま登録する。
-   * 部品を重ねてその場で描く人物の絵（js/systems/CharaRig.js）で使う（v1.0.2）
+   * 部品を重ねてその場で描く人物の絵（js/systems/CharaRig.js）で使う（v1.2.0）
    */
   AssetLoader.prototype.put = function (id, drawable) {
     this._sprites[id] = drawable;

@@ -249,6 +249,8 @@
 
     // バフ／デバフの残りターンを1つ減らす（ターンの最後にまとめて）
     this._tickModifiers(events);
+    // 控えに下がっている仲間も、状態異常と強化・弱体のターンだけは進む（v1.3.1）
+    this._tickBench();
 
     // 特性「追い風」が切れるターンなら知らせる
     this._tickTailwindEnd(events);
@@ -353,6 +355,23 @@
   BattleSystem.prototype._tickModifiers = function (events) {
     this._tickSide(this.getFieldAllies(), "ally", events);
     this._tickSide(this.getFieldEnemies(), "enemy", events);
+  };
+
+  /**
+   * 控え（場に出ていない仲間）の状態異常と強化・弱体を、1ターン分進める（v1.3.1。作者の希望）。
+   * 交代で下げても、裏でターンが経てば麻痺や足止めは解ける（樹液の膜などの強化も同じく減る）。
+   *   ・残りターンが減るだけ。毒のダメージ・再生・PPの回復など、ターンの終わりの効き目は場に出ている者だけ
+   *   ・毒のように残りターンを持たないものは、控えでも減らない（いままでどおり）
+   *   ・控えのことなので、切れても文は出さない（前に出たときの印で分かる）
+   */
+  BattleSystem.prototype._tickBench = function () {
+    var field = this.slots || [];
+    for (var i = 0; i < this.allies.length; i++) {
+      var monster = this.allies[i];
+      if (field.indexOf(monster) >= 0 || monster.isFainted()) continue;
+      if (monster.tickStatuses) monster.tickStatuses();
+      if (monster.tickModifiers) monster.tickModifiers();
+    }
   };
 
   BattleSystem.prototype._tickSide = function (group, side, events) {
@@ -493,7 +512,7 @@
   };
 
   /**
-   * このターンに何回動くか（v1.0.3）。ふつうは1回。
+   * このターンに何回動くか（v1.3.0）。ふつうは1回。
    * 主の actionsPerTurn（data/bosses.js。{ min, max }）があれば、その幅で毎ターン引き直す。
    * 2回目以降は1回目のすぐ後に続けて動く（takeTurn）
    */
@@ -588,7 +607,7 @@
       if (this._healTooEarly(enemy, skills[i])) continue;
       usable.push(skills[i]);
     }
-    // skillWeights に criticalAttack（必ずクリティカルの通常攻撃）があれば、技と並べて選択肢に入れる（v1.0.1 ザンガルド）。
+    // skillWeights に criticalAttack（必ずクリティカルの通常攻撃）があれば、技と並べて選択肢に入れる（v1.1.0 ザンガルド）。
     // PP が尽きたときは、上の _outOfSkills で技の確率に関係なく毎回これになる
     if (critWeight > 0) usable.push(CRITICAL_ATTACK);
     if (usable.length === 0) return fallback;
@@ -1661,7 +1680,7 @@
       healAmount: healed,
       revealTarget: target,
       revealHp: target.currentHp,
-      // 画面が回復の技の演出を出すのに使う（キュアなど。v1.0.3）。道具の回復には付かない
+      // 画面が回復の技の演出を出すのに使う（キュアなど。v1.3.0）。道具の回復には付かない
       target: target, skillId: skill.id
     });
   };
@@ -1924,7 +1943,7 @@
     if (!skill) return;
 
     // 何回か当てる技（二段斬り。技の hits）。1回ずつ命中を判定し、相手が倒れたらそこで止める
-    // randomTargets（歯車投げ。v1.0.3）は1回ごとに向かい側の盤面からでたらめに1体選ぶ（立ち塞がる者がいればそちらへ）。
+    // randomTargets（歯車投げ。v1.3.0）は1回ごとに向かい側の盤面からでたらめに1体選ぶ（立ち塞がる者がいればそちらへ）。
     // 相手が全員倒れるまで続ける
     var hits = Math.max(1, skill.hits || 1);
     for (var h = 0; h < hits; h++) {
@@ -1958,9 +1977,10 @@
     var skill = this._prepareSkill(actor, skillId, side, events);
     if (!skill) return;
 
-    // PPが足りずに通常攻撃へ切り替わった場合は、範囲技ではないので1体だけ
+    // PPが足りずに通常攻撃へ切り替わった場合は、範囲技ではないので1体だけ。
+    // 立ち塞がっている者がいれば、ほかの攻撃と同じくそちらへ向く（v1.3.1 で直した。前は素通りしていた）
     if (skill.target !== "allEnemies") {
-      if (targets[0]) this._resolveHit(actor, targets[0], skill, side, events);
+      if (targets[0]) this._resolveHit(actor, this._coverFor(targets[0], side), skill, side, events);
       return;
     }
 
@@ -3139,9 +3159,10 @@
     var rate = (this.data.battle || {}).fleeSuccessRate || 0;
     if (this.random.next() < rate) {
       events.push({ type: "fleeSuccess" });
-      this.finished = true;
-      this.result = "flee";
-      events.push({ type: "battleEnd", result: "flee" });
+      // ほかの終わり方（勝ち・負け・スカウト）と同じ後片づけをする（v1.3.1 で直した）。
+      // 前はここで外していなかったので、逃げたあとも強化・弱体と麻痺・眠りなどが残り、次の戦闘へ持ち越していた
+      var end = this.finishWith("flee");
+      for (var i = 0; i < end.length; i++) events.push(end[i]);
       return true;
     }
     events.push({ type: "fleeFailed" });
@@ -3149,7 +3170,7 @@
   };
 
   /**
-   * 敵が逃げるかを判定する（v1.0.3）。逃げたら盤面から取り除く。倒したわけではないので経験値は入らない。
+   * 敵が逃げるかを判定する（v1.3.0）。逃げたら盤面から取り除く。倒したわけではないので経験値は入らない。
    * 誰も残らなければ戦いは流れる（結果 "enemyFled"）。倒れた相手だけが残るときは _checkFinish が勝ちにする。
    * @returns {boolean} 逃げたら true
    */

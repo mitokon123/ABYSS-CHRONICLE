@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>動作の確かめ - ABYSS CHRONICLE</title>
+  <script src="tools/devguard.js"></script>
+  <!--
+    ▼ このファイルについて（開発用。ゲーム本体ではない）
+
+    直した不具合が戻っていないか・決めた動きが崩れていないかを、ボタン1つで確かめる（v1.3.1）。
+    ゲームの本物のコード（app.html が読むファイル）をそのまま読み込んで、その場で動かして比べる。
+
+    ・セーブの確かめは、ふだんのセーブとは別のキー（__abyss_check__.save）にだけ書き、終わったら消す。
+      ふだんのセーブ（my-first-app.save …）は読むだけで、確かめの前後で1文字も変わっていないことも確かめる
+    ・確かめを足すときは、下の CHECKS に1つ足す（title・why・run）。run は { ok, lines } を返す
+
+    データの書き間違いは「データの点検」（data-check.html）、強さは「強さの試算」（balance-sim.html）。
+  -->
+  <style>
+    body { margin: 0; background: #05070d; color: #c8d0e8; font-family: sans-serif; font-size: 13px; }
+    main { max-width: 980px; margin: 0 auto; padding: 18px 16px 40px; }
+    h1 { font-size: 20px; color: #ffd75e; margin: 0 0 4px; }
+    h1 a { font-size: 12px; color: #6b7590; margin-left: 12px; font-weight: normal; }
+    .sub { color: #6b7590; font-size: 12px; line-height: 1.6; margin-bottom: 12px; }
+    #summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
+    .pill { padding: 6px 12px; border-radius: 14px; border: 1px solid #2a3350; background: #0a0f1c; }
+    .pill b { font-size: 16px; margin-right: 4px; }
+    .pill.err b { color: #ff7a7a; } .pill.good b { color: #8fd18f; }
+    details { border: 1px solid #2a3350; border-radius: 6px; margin: 8px 0; background: #0a0f1c; }
+    details summary { padding: 8px 12px; cursor: pointer; list-style: none; display: flex; gap: 10px; align-items: center; }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::before { content: "▸"; color: #4e5876; }
+    details[open] summary::before { content: "▾"; }
+    .tag { font-size: 11px; padding: 1px 7px; border-radius: 3px; flex: none; }
+    .tag.err { background: #4a1818; color: #ff9a9a; } .tag.good { background: #143018; color: #8fd18f; }
+    .since { color: #6b7590; font-size: 11px; margin-left: auto; }
+    .why { color: #6b7590; font-size: 12px; padding: 0 12px 6px 34px; line-height: 1.6; }
+    ul { margin: 0; padding: 4px 12px 10px 34px; }
+    li { padding: 2px 0; line-height: 1.6; }
+    li.bad { color: #ff9a9a; }
+    code { font-family: monospace; color: #e8ecf8; background: #141b2e; padding: 0 4px; border-radius: 3px; }
+    #loading { color: #6b7590; }
+    button { background: #141b2e; color: #e8ecf8; border: 1px solid #2a3350; border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+    button:hover { border-color: #ffd75e; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>動作の確かめ <a href="dev.html">← 開発用の目次</a></h1>
+    <div class="sub">
+      直した不具合が戻っていないか・決めた動きが崩れていないかを、本物のゲームのコードを動かして確かめる。
+      ふだんのセーブには書かない。コードを直したら <button onclick="location.reload()">もう一度確かめる</button>
+    </div>
+    <div id="loading">ゲームのコードを読んでいます…</div>
+    <div id="summary"></div>
+    <div id="results"></div>
+  </main>
+
+  <script src="tools/devpage.js"></script>
+  <script>
+  (function () {
+    "use strict";
+    var D = window.DevPage, esc = D.esc;
+    var CHECK_KEY = "__abyss_check__.save";
+
+    // ─────────────────────────────────────────
+    // 確かめの一覧。足すときはここに1つ足す
+    //   title … 何を確かめるか   since … いつ直した・決めたか   why … 崩れるとどうなるか
+    //   run(ctx) … { ok: true/false, lines: ["…", …] }。lines の先頭に "✗ " を付けた行は赤くなる
+    // ─────────────────────────────────────────
+    var CHECKS = [
+      {
+        title: "経験値・ゴールドが 1 少なくならない",
+        since: "v1.3.1",
+        why: "基礎 × (1 + (Lv−1) × 0.15) を小数のまま切り捨てると、計算機の誤差で 1 少なくなることがあった（カラクリモリ Lv32 の G が 903）。全種族・Lv1〜99 を、誤差の出ない整数の計算と比べる。",
+        run: checkRewards
+      },
+      {
+        title: "控えの仲間も状態異常・強化弱体のターンが進む",
+        since: "v1.3.1",
+        why: "控えに下げた仲間の麻痺・強化が、場の仲間と同じく毎ターン1つ減って切れる。毒（残りターンなし）は控えでは減らず、ダメージも受けない。",
+        run: checkBench
+      },
+      {
+        title: "セーブをファイルに書き出して、読み込める",
+        since: "v1.3.1",
+        why: "書き出したファイルを別のスロットへ読み込むと、本体・設定が1文字も変わらずに入り、古い中断は消える。壊れたファイル・形式の違うファイルは断る。ふだんのセーブには触らない。",
+        run: checkSaveFile
+      },
+      {
+        title: "逃げたあと、強化・弱体と状態異常を持ち越さない",
+        since: "v1.3.1",
+        why: "逃げるのに成功したときだけ後片づけをしていなかったので、強化・弱体と麻痺・眠りなどが次の戦闘まで残っていた。毒だけは持ち帰る（ほかの終わり方と同じ）。",
+        run: checkFlee
+      },
+      {
+        title: "範囲の技が通常攻撃に変わっても「立ち塞がる」が効く",
+        since: "v1.3.1",
+        why: "全体攻撃の技を出す番に PP が足りないと通常攻撃に変わる。そのとき立ち塞がっている相手を素通りして、先頭の1体を殴っていた。",
+        run: checkCoverFallback
+      },
+      {
+        title: "戦闘を乱数で 300 回まわしても壊れない",
+        since: "v1.3.1",
+        why: "でたらめな仲間・装備・作戦・敵（主も）で戦わせ、止まる・HP や PP が範囲の外・文に undefined や NaN・枠に同じ仲間が2回、などが起きないかを見る。毎回同じ乱数なので、崩れたら同じ所で崩れる。",
+        run: checkBattleFuzz
+      },
+      {
+        title: "版の名前がそろっている",
+        since: "v1.3.1",
+        why: "data/config.js の version・パッチノートの先頭・README の「現在のバージョン」が同じ。「開発中」の日付は先頭の版だけ。",
+        run: checkVersion
+      }
+    ];
+
+    D.loadGame(function () {
+      var NS = window.MyGame;
+      if (!NS || !NS.rawData || !NS.DataLoader) {
+        document.getElementById("loading").textContent = "ゲームのコードを読めませんでした。";
+        return;
+      }
+      var ctx = { NS: NS, raw: NS.rawData, gd: NS.DataLoader.build(NS.rawData) };
+      var results = [];
+      (function next(i) {
+        if (i >= CHECKS.length) { render(results); return; }
+        var c = CHECKS[i];
+        Promise.resolve().then(function () { return c.run(ctx); }).then(function (r) {
+          results.push({ check: c, result: r });
+        }, function (e) {
+          results.push({ check: c, result: { ok: false, lines: ["✗ 途中で止まった：" + (e && e.message || e)] } });
+        }).then(function () { next(i + 1); });
+      })(0);
+    });
+
+    // --- 1. 報酬 ---
+    function checkRewards(ctx) {
+      var NS = ctx.NS, gd = ctx.gd, growth = gd.growth || {};
+      var lines = [], bad = [], count = 0;
+      var kinds = [["exp", "expReward", "expRewardPerLevel", "getExpReward"],
+                   ["gold", "goldReward", "goldRewardPerLevel", "getGoldReward"]];
+      Object.keys(gd.monsters).forEach(function (id) {
+        var m = new NS.MonsterInstance(id, 1, gd, {});
+        var sp = gd.monsters[id];
+        for (var lv = 1; lv <= 99; lv++) {
+          m.level = lv;
+          kinds.forEach(function (k) {
+            var base = sp[k[1]] || 0;
+            var per = growth[k[2]];
+            var fixed = !per || (k[0] === "exp" && sp.expFixed);
+            // 0.15 を 150/1000 にして、整数だけで計算する（誤差が出ない）
+            var expect = fixed ? Math.floor(base)
+              : Math.floor(base * (1000 + (lv - 1) * Math.round(per * 1000)) / 1000);
+            var got = m[k[3]]();
+            count++;
+            if (got !== expect && bad.length < 20) bad.push("✗ " + sp.name + " Lv" + lv + " の " + k[0] + "：" + got + "（正しくは " + expect + "）");
+          });
+        }
+      });
+      var gw = gd.monsters.gearWarden ? new NS.MonsterInstance("gearWarden", 32, gd, {}) : null;
+      if (gw) {
+        var g = gw.getGoldReward();
+        lines.push((g === 904 ? "" : "✗ ") + "カラクリモリ Lv32 の G：" + g + "（904 のはず）");
+        if (g !== 904) bad.push("x");
+      }
+      lines.unshift(Object.keys(gd.monsters).length + " 種族 × Lv1〜99 × 経験値・ゴールド ＝ " + count + " 通りを比べた");
+      return { ok: bad.length === 0, lines: lines.concat(bad.filter(function (b) { return b !== "x"; })) };
+    }
+
+    // --- 2. 控えのターン ---
+    function checkBench(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var rnd = new NS.Random(12345);
+      function mk(id, lv) { return new NS.MonsterInstance(id, lv, gd, {}); }
+      var ids = Object.keys(gd.monsters).filter(function (id) { return id !== "shinigami"; });
+      var allies = [mk(ids[0], 30), mk(ids[1], 30), mk(ids[2], 30), mk(ids[3], 30), mk(ids[4], 30)];
+      var enemy = mk("slime", 1);
+      var sys = new NS.BattleSystem(gd, rnd);
+      sys.start(allies, [enemy]);
+
+      var field = allies[0], benchA = allies[3], benchP = allies[4];
+      var harden = gd.skills.harden;
+      field.addModifier(harden);
+      benchA.addModifier(harden);
+      benchA.addStatus("paralysis");          // 乱数なし ＝ いちばん長い残りターン
+      benchP.addStatus("poison");
+      var hpBefore = benchP.currentHp;
+      var para0 = benchA.getStatus("paralysis").remaining;
+      var mod0 = benchA.getModifier("harden").remaining;
+
+      var lines = ["場の外：" + gd.monsters[benchA.speciesId].name + "（麻痺 " + para0 + " ターン・こうか " + mod0 + " ターン）・"
+        + gd.monsters[benchP.speciesId].name + "（毒）"];
+      var ok = true;
+      for (var t = 1; t <= para0 + 1; t++) {
+        sys.takeTurn([{ type: "skip" }, { type: "skip" }, { type: "skip" }]);
+        var p = benchA.getStatus("paralysis"), mb = benchA.getModifier("harden"), mf = field.getModifier("harden");
+        var pWant = Math.max(0, para0 - t), mWant = Math.max(0, mod0 - t);
+        var pGot = p ? p.remaining : 0, mbGot = mb ? mb.remaining : 0, mfGot = mf ? mf.remaining : 0;
+        var good = pGot === pWant && mbGot === mWant && mbGot === mfGot;
+        if (!good) ok = false;
+        lines.push((good ? "" : "✗ ") + t + " ターン後：控えの麻痺 " + pGot + "（" + pWant + " のはず）・控えのこうか " + mbGot + "・場のこうか " + mfGot);
+        if (sys.finished) { lines.push("✗ 戦闘が途中で終わった"); ok = false; break; }
+      }
+      var poison = benchP.getStatus("poison");
+      var poisonOk = !!poison && benchP.currentHp === hpBefore;
+      if (!poisonOk) ok = false;
+      lines.push((poisonOk ? "" : "✗ ") + "控えの毒：" + (poison ? "残っている" : "消えた") + "・HP " + hpBefore + " → " + benchP.currentHp);
+      if (sys.slots.indexOf(benchA) >= 0 || sys.slots.indexOf(benchP) >= 0) { ok = false; lines.push("✗ 控えのはずの仲間が場にいる"); }
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 3. セーブのファイル ---
+    function checkSaveFile(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var realPrefix = (gd.save || {}).storageKey || "game.save";
+      var before = snapshot(realPrefix);
+
+      // ふだんとは別のキーに書く SaveManager
+      var gdCheck = Object.create(gd);
+      gdCheck.save = {};
+      Object.keys(gd.save || {}).forEach(function (k) { gdCheck.save[k] = gd.save[k]; });
+      gdCheck.save.storageKey = CHECK_KEY;
+      var sm = new NS.SaveManager(gdCheck);
+
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+
+      try {
+        clearCheckKeys();
+        var lead = new NS.MonsterInstance("slime", 12, gd, { nickname: "かくにん" });
+        var payload = sm._buildPayload({
+          party: { toSaveData: function () { return { members: [lead.toSaveData()] }; } },
+          gold: 4321, playerName: "確かめ", clearedDungeons: { cradleCave: true }
+        });
+        localStorage.setItem(sm.keyFor(1), JSON.stringify(payload));
+        localStorage.setItem(sm.settingsKeyFor(1), JSON.stringify({ bgmVolume: 0.3 }));
+        // 行き先に古い中断を置いておく（読み込んだら消えるはず）
+        localStorage.setItem(sm.suspendKeyFor(2), "{\"old\":true}");
+
+        var ex = sm.exportSlot(1);
+        expect(ex.success && /^ABYSS-CHRONICLE_slot1_\d{8}-\d{4}\.json$/.test(ex.fileName), "書き出し：" + ex.reason + "（" + (ex.fileName || "") + "）");
+        var parsed = sm.parseImport(ex.text);
+        expect(parsed.success && parsed.summary.leadName === "かくにん" && parsed.summary.level === 12,
+          "ファイルを調べる：" + parsed.reason + "（" + (parsed.summary ? parsed.summary.leadName + " Lv" + parsed.summary.level : "") + "）");
+        var im = sm.importToSlot(parsed.file, 2);
+        expect(im.success, "スロット2へ読み込む：" + im.reason);
+        expect(localStorage.getItem(sm.keyFor(2)) === localStorage.getItem(sm.keyFor(1)), "本体が1文字も変わらずに入った");
+        expect(localStorage.getItem(sm.settingsKeyFor(2)) === localStorage.getItem(sm.settingsKeyFor(1)), "設定も一緒に入った");
+        expect(localStorage.getItem(sm.suspendKeyFor(2)) === null, "行き先にあった古い中断は消えた");
+        sm.setSlot(2);
+        var loaded = sm.load();
+        expect(loaded.success && loaded.state.gold === 4321, "読み込んだスロットで遊べる（load：" + loaded.reason + "）");
+
+        expect(sm.parseImport("こわれた文字").reason === "importBroken", "JSON でない文字は断る");
+        expect(sm.parseImport("{\"format\":\"other\",\"save\":\"{}\"}").reason === "importBroken", "ほかのファイル（format が違う）は断る");
+        var old = JSON.parse(ex.text), oldSave = JSON.parse(old.save);
+        oldSave.version = 999; old.save = JSON.stringify(oldSave);
+        expect(sm.parseImport(JSON.stringify(old)).reason === "importVersion", "セーブの形式（version）が違うファイルは断る");
+      } finally {
+        clearCheckKeys();
+      }
+      expect(snapshot(realPrefix) === before, "ふだんのセーブ（" + realPrefix + " …）は変わっていない");
+      expect(snapshot(CHECK_KEY) === "", "確かめに使ったキーは消した");
+      return { ok: ok, lines: lines };
+    }
+
+    function snapshot(prefix) {
+      var keys = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k.indexOf(prefix) === 0) keys.push(k);
+      }
+      keys.sort();
+      return keys.map(function (k) { return k + "=" + localStorage.getItem(k); }).join("\n");
+    }
+    function clearCheckKeys() {
+      var keys = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k.indexOf(CHECK_KEY) === 0) keys.push(k);
+      }
+      keys.forEach(function (k) { localStorage.removeItem(k); });
+    }
+
+    // 必ず同じ値を返す乱数（next は 0 ＝ 逃走・命中などが必ず決まる）
+    var FIXED_ZERO = { next: function () { return 0; }, nextInt: function (a) { return a; }, pick: function (x) { return x[0]; } };
+
+    // --- 逃走のあと ---
+    function checkFlee(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var a = [new NS.MonsterInstance("slime", 20, gd, {}), new NS.MonsterInstance("batty", 20, gd, {})];
+      var sys = new NS.BattleSystem(gd, FIXED_ZERO);
+      sys.start(a, [new NS.MonsterInstance("slime", 5, gd, {})]);
+      a[0].addModifier(gd.skills.harden);
+      a[0].addStatus("paralysis");
+      a[1].addStatus("sleep");
+      a[1].addStatus("poison");
+      sys.takeTurn([{ type: "flee" }, { type: "skip" }]);
+
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      expect(sys.result === "flee", "結果：" + sys.result);
+      expect(a[0].modifiers.length === 0, "強化・弱体：" + (a[0].modifiers.map(function (m) { return m.id; }).join("・") || "なし"));
+      expect(!a[0].getStatus("paralysis") && !a[1].getStatus("sleep"), "麻痺・眠り：" +
+        ([a[0].getStatus("paralysis") ? "麻痺が残った" : "", a[1].getStatus("sleep") ? "眠りが残った" : ""].filter(Boolean).join("・") || "外れた"));
+      expect(!!a[1].getStatus("poison"), "毒は持ち帰る：" + (a[1].getStatus("poison") ? "残っている" : "消えた"));
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 立ち塞がる × PP 切れの範囲技 ---
+    function checkCoverFallback(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var allEnemySkill = Object.keys(gd.skills).filter(function (id) {
+        var s = gd.skills[id];
+        return s.target === "allEnemies" && s.pp > 0 && NS.BattleSystem.dealsDamage(s);
+      })[0];
+      if (!allEnemySkill) return { ok: true, lines: ["全体攻撃の技が無いので飛ばした"] };
+
+      var attacker = new NS.MonsterInstance("slime", 30, gd, {});
+      attacker.currentPp = 0;
+      var front = new NS.MonsterInstance("slime", 30, gd, {}), guard = new NS.MonsterInstance("iwagoro" in gd.monsters ? "iwagoro" : "slime", 30, gd, {});
+      var sys = new NS.BattleSystem(gd, { next: function () { return 0.5; }, nextInt: function (a) { return a; }, pick: function (x) { return x[0]; } });
+      sys.start([attacker], [front, guard]);
+      guard._covering = true;
+      var hpFront = front.currentHp, hpGuard = guard.currentHp;
+      var events = [];
+      sys._performSkillOnAll(attacker, sys.getFieldEnemies().slice(), allEnemySkill, "ally", events);
+      var ok = front.currentHp === hpFront && guard.currentHp < hpGuard;
+      return { ok: ok, lines: [
+        (ok ? "" : "✗ ") + gd.skills[allEnemySkill].name + "（PP 0）→ 通常攻撃：先頭 " + hpFront + " → " + front.currentHp +
+        "・立ち塞がる側 " + hpGuard + " → " + guard.currentHp + "（立ち塞がる側だけ減るはず）"
+      ] };
+    }
+
+    // --- 乱数で戦闘を回す ---
+    function checkBattleFuzz(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var R = new NS.Random(777);
+      var species = Object.keys(gd.monsters);
+      var gear = { weapon: [], armor: [], accessory: [] };
+      Object.keys(gd.items).forEach(function (id) { var e = gd.items[id].equip; if (e && gear[e.slot]) gear[e.slot].push(id); });
+      var tl = ((gd.battle || {}).tactics || {}).list || [];
+      var tacticIds = Array.isArray(tl) ? tl.map(function (t) { return t.id; }) : Object.keys(tl);
+      var bosses = Object.keys(gd.bosses || {});
+      var fmt = new NS.BattleMessageFormatter(gd.messages, gd.statuses, gd.elements);
+      var problems = {}, battles = 0, turns = 0, results = {};
+      function pick(a) { return a[Math.floor(R.next() * a.length)]; }
+      function bad(key, detail) { if (!problems[key]) problems[key] = { count: 0, ex: detail }; problems[key].count++; }
+      function makeBoss(boss) {
+        var e = NS.MonsterInstance.create(boss.species, boss.level, gd, R);
+        if (e.useEnemySkills) e.useEnemySkills();
+        if (e.setEncounterMultipliers) e.setEncounterMultipliers(boss.statMultiplier);
+        if (e.setActionPattern) e.setActionPattern(boss.actionPattern);
+        if (boss.infinitePp) e.infinitePp = true;
+        if (boss.actionsPerTurn) e.actionsPerTurn = boss.actionsPerTurn;
+        return e;
+      }
+      function checkMon(m) {
+        var name = (gd.monsters[m.speciesId] || {}).name, hp = m.currentHp, mx = m.getMaxHp(), pp = m.currentPp, mp = m.getMaxPp();
+        if (!Number.isInteger(hp) || hp < 0 || hp > mx) bad("HP が範囲の外", name + " " + hp + "/" + mx);
+        if (!Number.isInteger(pp) || pp < 0 || pp > mp) bad("PP が範囲の外", name + " " + pp + "/" + mp);
+        if (m.isFainted() !== (hp === 0)) bad("倒れたと HP 0 が食い違う", name + " HP " + hp);
+        (m.modifiers || []).forEach(function (x) { if (!(x.remaining > 0)) bad("強化・弱体の残りが 0 以下", name + " " + x.id); });
+      }
+      for (var b = 0; b < 300; b++) {
+        try {
+          var lv = 1 + Math.floor(R.next() * 80), allies = [];
+          for (var i = 0, n = 1 + Math.floor(R.next() * 6); i < n; i++) {
+            var sp = pick(species), eq = [];
+            if (R.next() < 0.7) eq.push(pick(gear.weapon));
+            if (R.next() < 0.7) eq.push(pick(gear.armor));
+            if (R.next() < 0.6) eq.push(pick(gear.accessory));
+            var m = new NS.MonsterInstance(sp, sp === "shinigami" ? 1 : lv, gd, { equipment: eq });
+            m.tactic = pick(tacticIds);
+            allies.push(m);
+          }
+          var enemies = [];
+          if (R.next() < 0.25 && bosses.length) enemies.push(makeBoss(gd.bosses[pick(bosses)]));
+          else for (var j = 0, ne = 1 + Math.floor(R.next() * 3); j < ne; j++) {
+            var en = NS.MonsterInstance.create(pick(species), Math.max(1, lv + Math.floor(R.next() * 10) - 5), gd, R);
+            if (en.useEnemySkills) en.useEnemySkills();
+            enemies.push(en);
+          }
+          var sys = new NS.BattleSystem(gd, R);
+          sys.onNonSkillAction = function (step) {
+            if (step.action.type === "swap" && !sys.replaceSlot(step.actor, step.action.incoming)) bad("交代できなかった", "");
+          };
+          sys.start(allies, enemies);
+          battles++;
+          var turn = 0;
+          while (!sys.finished && turn < 150) {
+            turn++; turns++;
+            var slots = sys.getFieldSlots(), used = [];
+            var bench = allies.filter(function (x) { return slots.indexOf(x) < 0 && !x.isFainted(); });
+            var acts = slots.map(function (x) {
+              var free = bench.filter(function (y) { return used.indexOf(y) < 0; });
+              if (x.isFainted()) {
+                if (free.length && R.next() < 0.8) { var inc = pick(free); used.push(inc); return { type: "swap", incoming: inc }; }
+                return { type: "skip" };
+              }
+              var r = R.next();
+              if (r < 0.55) return { type: "tactic" };
+              if (r < 0.80) return { type: "skill", skillId: pick(x.skills.concat([sys.getNormalAttackId()])), targetIndex: Math.floor(R.next() * 3) };
+              if (r < 0.88) return { type: "defend" };
+              if (r < 0.95 && free.length) { var inc2 = pick(free); used.push(inc2); return { type: "swap", incoming: inc2 }; }
+              return { type: "skip" };
+            });
+            var ev = sys.takeTurn(acts);
+            fmt.annotate(ev);
+            ev.forEach(function (e) {
+              var txt;
+              try { txt = fmt.formatOne(e); } catch (err) { bad("文を作るところで止まった：" + e.type, err.message); return; }
+              [txt, e.logText].forEach(function (t) {
+                if (typeof t === "string" && /undefined|NaN|null|\{[a-z]+\}/.test(t)) bad("文がおかしい：" + e.type, t);
+              });
+            });
+            allies.concat(enemies).forEach(checkMon);
+            var seen = [];
+            sys.getFieldSlots().forEach(function (x) {
+              if (allies.indexOf(x) < 0) bad("枠に仲間でない者", "");
+              if (seen.indexOf(x) >= 0) bad("枠に同じ仲間が2回", "");
+              seen.push(x);
+            });
+          }
+          if (!sys.finished) bad("150 ターンで終わらない", "");
+          results[sys.result] = (results[sys.result] || 0) + 1;
+        } catch (err) {
+          bad("止まった：" + err.message, (err.stack || "").split("\n").slice(0, 3).join(" | "));
+        }
+      }
+      var keys = Object.keys(problems);
+      var lines = [battles + " 戦・" + turns + " ターン（" + Object.keys(results).map(function (k) { return k + " " + results[k]; }).join("・") + "）"];
+      keys.forEach(function (k) { lines.push("✗ " + k + "（" + problems[k].count + " 回）" + (problems[k].ex ? "：" + problems[k].ex : "")); });
+      return { ok: keys.length === 0, lines: lines };
+    }
+
+    // --- 4. 版の名前 ---
+    function checkVersion(ctx) {
+      var raw = ctx.raw;
+      var version = (raw.config || {}).version;
+      var versions = ((raw.patchnotes || {}).versions) || [];
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+
+      expect(versions.length && versions[0].version === version,
+        "data/config.js は " + version + "・パッチノートの先頭は " + (versions[0] ? versions[0].version : "なし"));
+      var devLater = versions.slice(1).filter(function (v) { return v.date === "開発中"; });
+      expect(devLater.length === 0, "「開発中」の日付は先頭だけ" + (devLater.length ? "（" + devLater.map(function (v) { return v.version; }).join("・") + " も開発中）" : ""));
+
+      return fetch("README.md?n=" + Date.now()).then(function (r) { return r.ok ? r.text() : ""; }).then(function (text) {
+        var m = text.match(/現在のバージョン:\s*([0-9.]+)/);
+        expect(m && m[1] === version, "README の「現在のバージョン」は " + (m ? m[1] : "見つからない"));
+        return { ok: ok, lines: lines };
+      });
+    }
+
+    // --- 表示 ---
+    function render(results) {
+      document.getElementById("loading").style.display = "none";
+      var pass = results.filter(function (r) { return r.result.ok; }).length;
+      var fail = results.length - pass;
+      document.getElementById("summary").innerHTML =
+        "<span class='pill " + (fail ? "err" : "good") + "'><b>" + fail + "</b>崩れている</span>" +
+        "<span class='pill good'><b>" + pass + "</b>だいじょうぶ</span>";
+
+      var html = "";
+      results.forEach(function (r) {
+        var ok = r.result.ok;
+        html += "<details" + (ok ? "" : " open") + "><summary>" +
+          "<span class='tag " + (ok ? "good" : "err") + "'>" + (ok ? "だいじょうぶ" : "崩れている") + "</span>" +
+          "<span>" + esc(r.check.title) + "</span>" +
+          "<span class='since'>" + esc(r.check.since || "") + "</span></summary>" +
+          "<div class='why'>" + esc(r.check.why) + "</div><ul>" +
+          (r.result.lines || []).map(function (line) {
+            var bad = line.indexOf("✗ ") === 0;
+            return "<li" + (bad ? " class='bad'" : "") + ">" + esc(line) + "</li>";
+          }).join("") + "</ul></details>";
+      });
+      document.getElementById("results").innerHTML = html;
+    }
+  })();
+  </script>
+</body>
+</html>

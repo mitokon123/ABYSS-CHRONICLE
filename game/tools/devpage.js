@@ -1,5 +1,5 @@
 /**
- * devpage.js  開発用ページの共通部品（v1.0.2。ゲーム本体では読まない）
+ * devpage.js  開発用ページの共通部品（v1.2.0。ゲーム本体では読まない）
  *
  * data-check.html（データの点検）と sound-list.html（効果音の一覧）が使う。
  *   DevPage.loadGame(done)     … app.html の読み込み一覧どおりにゲームのファイルを読む（js/main.js は除く）

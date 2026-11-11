@@ -238,7 +238,7 @@
       //   textX … 札の左端から言葉の真ん中まで（次の札に隠れない左の2/3に収める）
       //   時間では消えない。次の行動が始まったとき（別の者の技・眠りで動けない番）と、
       //   ターンの演出が終わったときに、出ている札がまとめて fadeOut ミリ秒で薄れて消える（BattleScene._dismissEffectPopups）。
-      //   ただし出てから minShow ミリ秒たつまでは消さない（v1.0.2.1）
+      //   ただし出てから minShow ミリ秒たつまでは消さない（v1.2.1）
       //   maxLife は消し忘れの保険。max 枚を超えたら古い札から消す
       //   ★ 3枚で横幅 630px（画面は800px）。v1.0.0 で 320 → 270 に狭めた（作者の指定）
       //   colors … 左端の色帯と文字の色。buff 強化／debuff 弱体／ability 特性／blessing 加護／equipment 装備
@@ -248,7 +248,7 @@
         // slideIn は 80 → 180（作者の指定。0.08秒では速すぎた）
         slideIn: 180, fadeOut: 140, maxLife: 8000, chainDelay: 70,
         // minShow … 札が出てから、消す合図が来ても出したままにする長さ（ミリ秒）。
-        //   v1.0.2.1 で足した（作者の指定「少なくとも0.8秒は表示」）。次の行動がすぐ始まると読めないうちに消えていたため
+        //   v1.2.1 で足した（作者の指定「少なくとも0.8秒は表示」）。次の行動がすぐ始まると読めないうちに消えていたため
         minShow: 800,
         barWidth: 5,
         font: "14px monospace",
@@ -325,7 +325,7 @@
         quickDelay: 90,         // 決定キーを押している間の待ち時間（ms）
         hpDrainPerSecond: 38,   // HPバーが1秒に動く量。大きいほど速く減る
         hpMinDrainTime: 220,    // 少量のダメージでも最低これだけ時間をかける（ms）
-        // どんなに大きいダメージ・回復でも、これより長くはかけない（ms）。v1.0.2.1（作者の指定「0.25秒以内」）。
+        // どんなに大きいダメージ・回復でも、これより長くはかけない（ms）。v1.2.1（作者の指定「0.25秒以内」）。
         //   1秒に38では、3桁のダメージでバーが何秒も動き続けてテンポが悪かった。
         //   この時間に収まらない量のときだけ、収まる速さに上げる（少しのダメージは今までどおり）
         //   ★ 250 ではなく 240：画面は1コマ約17msずつ進むので、250 だと最後のコマが 0.25秒をわずかに越える
@@ -549,10 +549,10 @@
       narration: { centerY: 280, lineHeight: 36, font: "20px monospace", color: "#e6ecff", moreGap: 40,
                    shadowColor: "rgba(0,0,0,0.9)", shadowBlur: 8 },
       // 選択肢の枠。会話の窓（dialogue.box）の右上、拠点の夜で立つ人物の頭より上に置く。
-      // bottom は枠の下端の y（人物の頭はおよそ y 300。v1.0.2 で人物を 128 にしたので 336 から上げた）
+      // bottom は枠の下端の y（人物の頭はおよそ y 300。v1.2.0 で人物を 128 にしたので 336 から上げた）
       choice: { x: 590, w: 170, bottom: 292, itemHeight: 34, padY: 10, font: "18px monospace" },
 
-      // 人間の登場人物（主人公・data/story.js で person を書いた人）を、部品を重ねた新しい絵で立たせるときの大きさ（v1.0.2）。
+      // 人間の登場人物（主人公・data/story.js で person を書いた人）を、部品を重ねた新しい絵で立たせるときの大きさ（v1.2.0）。
       // 絵は 64×64 なので 128 でちょうど2倍。新しい絵が使えないときは、actors に書いた size の 32×32 の絵になる
       personSize: 128,
 
@@ -688,15 +688,18 @@
        * 確認の窓より小さく、後ろは暗く落とさない
        * （どのファイルを選んでいるかが見えていたほうがよい）。
        */
+      //   v1.3.1 で「ファイルに書き出す」を足して5つにした（box と menu を 28px 伸ばした）
       action: {
         background: "#0d1220",
-        box:   { x: 268, y: 214, w: 264, h: 186 },
-        title: { x: 400, y: 244 },
-        menu:  { x: 310, y: 258, w: 180, h: 128, lineHeight: 28 }
+        box:   { x: 268, y: 200, w: 264, h: 214 },
+        title: { x: 400, y: 230 },
+        menu:  { x: 310, y: 244, w: 180, h: 156, lineHeight: 28 }
       },
 
       // 整理モードへの出入り口。「戻る」の左に置く
       manageButton: { x: 566, y: 552, w: 112, h: 30 },
+      // 書き出したファイルから読み込む（v1.3.1）。「整理する」の左
+      importButton: { x: 410, y: 552, w: 148, h: 30 },
 
       notice: { x: 400, y: 528 },
       hint:   { x: 48, y: 570 }
@@ -1047,7 +1050,7 @@
       // 中身が多い仲間は行間を詰めて収める（PartyScene._detailLineHeight）
       detail: { x: 540, y: 58, w: 228, h: 484 },
       /**
-       * 装備の画面（v1.0.3。画面ぜんぶを使う。js/scenes/PartyScene.js の _renderEquipScreen）
+       * 装備の画面（v1.3.0。画面ぜんぶを使う。js/scenes/PartyScene.js の _renderEquipScreen）
        *   monster … 左上の ◀ 絵・名前 ▶（spriteSize は絵の大きさ）
        *   slots   … 左の枠の一覧と「すべて外す」。labelX は枠の名前、nameX は装備の名前の位置（枠の左端から）
        *   items   … 右の候補。headHeight は見出し（枠の名前・並べ方）の高さ、effectX は主な効果の列（枠の左端から）
@@ -1060,7 +1063,7 @@
         compare: { x: 32, y: 316, w: 736, h: 226, colB: 250, colStats: 520, lineHeight: 20 }
       },
       /**
-       * 預かり所の画面（v1.0.3。js/scenes/PartyScene.js の _renderBoxView）
+       * 預かり所の画面（v1.3.0。js/scenes/PartyScene.js の _renderBoxView）
        *   party  … 左の連れていく仲間の列（rowHeight は1体ぶん、spriteSize は絵）
        *   grid   … 中の箱。cols 列のマス（cell は1マスの大きさ、gap はマスの間）。headHeight は「◀ 箱 1/10 ▶」の高さ
        *   footer … 下の並べ方・絞り込みと、操作の札
@@ -1115,7 +1118,7 @@
         tabs:   { x: 16, y: 24, gap: 20, font: "14px monospace" },
         // モンスター説明のページ。絵と名前の右に、図鑑の説明と愛情度の記録を出す
         notes:  { x: 268, y: 104, lineHeight: 22, font: "14px monospace" },
-        // 技・特性のページ（v1.0.3）。技が多くて入らないときは行の間を minLineHeight まで詰める。
+        // 技・特性のページ（v1.3.0）。技が多くて入らないときは行の間を minLineHeight まで詰める。
         //   elementX / kindX / statsX … 属性・種類・威力などの列（x からのずれ）
         //   abilityGap … 技の一覧と特性の間。abilityLineHeight … 特性の説明の行の高さ
         skills: { x: 268, y: 104, lineHeight: 22, minLineHeight: 16, font: "14px monospace",

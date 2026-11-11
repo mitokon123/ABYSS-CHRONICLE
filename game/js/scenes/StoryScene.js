@@ -556,7 +556,7 @@
   /** 立ち絵の絵・動き・大きさを決める */
   StoryScene.prototype._actorLook = function (actor) {
     var data = this.game.data;
-    // 人間の登場人物は、部品を重ねた新しい絵（v1.0.2）。使えなければ下の 32×32 の絵
+    // 人間の登場人物は、部品を重ねた新しい絵（v1.2.0）。使えなければ下の 32×32 の絵
     if ((actor.player || actor.person) && NS.PlayerLook && NS.PlayerLook.personSpriteIds) {
       var ids = NS.PlayerLook.personSpriteIds(this.game, actor.player ? "player" : actor.person);
       if (ids) return { sprite: ids, person: true };

@@ -194,7 +194,7 @@
 
     _customBuilt: null,
 
-    // --- 部品を重ねて作る絵（v1.0.2。js/systems/CharaRig.js） ---
+    // --- 部品を重ねて作る絵（v1.2.0。js/systems/CharaRig.js） ---
 
     /**
      * 地図で新しい絵を使うか。data/player.js の appearance.rig が書かれていて、
@@ -307,7 +307,7 @@
     _frames: {},
     _frameCount: 0,
 
-    // --- 物語の場面の人物（v1.0.2） ---
+    // --- 物語の場面の人物（v1.2.0） ---
 
     /**
      * 人の見た目（CharaRig.makeLook に渡すもの）。

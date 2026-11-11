@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-devserver.py  開発用のサーバー（v1.0.2。ゲーム本体ではない）
+devserver.py  開発用のサーバー（v1.2.0。ゲーム本体ではない）
 
   python "ABYSS CHRONICLE/game/tools/devserver.py" 8124
 

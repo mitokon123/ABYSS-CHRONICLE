@@ -122,16 +122,11 @@
   /**
    * セーブファイルの選択へ進む。
    *
-   * 「続きから」でどのファイルも空のときだけ、ここで止めて知らせる。
-   * 空の一覧を見せても、選べるものが1つも無いので戻るしかない。
+   * 「続きから」は、どのファイルも空でも開く（v1.3.1）。
+   * 書き出したファイルから読み込めるのが、その一覧だけなので
+   * （別のパソコンへ移したとき・ブラウザのデータを消したとき）。
    */
   TitleScene.prototype._openSlots = function (mode) {
-    if (mode === "continue" && !this.saveManager.hasAnySave()) {
-      var saveTexts = (this.game.data.messages || {}).save || {};
-      this._showNotice(saveTexts.empty || this.texts.noSaveAny || "");
-      this.game.playError();
-      return;
-    }
     this.game.scenes.change(new NS.SaveSlotScene(this.game, this, mode));
   };
 

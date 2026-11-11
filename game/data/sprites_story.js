@@ -123,25 +123,7 @@
   });
 
   /**
-   * 探索者（場面6で知らせを持ってくる人。名前なし）。
-   * 形は主人公と同じで、髪と服の色だけ変える（名前の無い人物なので、描き分けまではしない）
-   */
-  var base = (NS.rawData.sprites || {}).playerWalk1;
-  if (base) {
-    var palette = {};
-    for (var key in base.palette) palette[key] = base.palette[key];
-    palette.Y = "#6a4a2a";   // 髪（茶）
-    palette.D = "#3e5a36";   // 服の影
-    palette.A = "#5a7a4a";   // 服
-    palette.H = "#7a9a64";   // 服の光
-
-    NS.extend("sprites", {
-      npcScout: { pixels: base.pixels, palette: palette }
-    });
-  }
-
-  /**
-   * 人間の登場人物の見た目（v1.0.2）。
+   * 人間の登場人物の見た目（v1.2.0）。
    * 部品を重ねて描く仕組み（js/systems/CharaRig.js）で、主人公と同じ大きさ・描き方にそろえる。
    * ★ これから出る人間の登場人物も、ここに1人ずつ足していく（作者の指定 2026-10-29）。
    *   書き方は CharaRig.makeLook の説明のとおり。色は上の 32×32 の絵の色をそのまま使っている。

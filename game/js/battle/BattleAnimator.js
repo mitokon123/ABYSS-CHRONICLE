@@ -58,7 +58,7 @@
     if (!monster || hp === undefined || hp === null) return;
     monster[TARGET] = hp;
     // ふだんは hpDrainPerSecond の速さ。それだと hpMaxDrainTime より長くかかる量なら、
-    // ちょうど hpMaxDrainTime で動き切る速さに上げる（v1.0.2.1・作者の指定「どんなダメージでも0.25秒以内」）
+    // ちょうど hpMaxDrainTime で動き切る速さに上げる（v1.2.1・作者の指定「どんなダメージでも0.25秒以内」）
     var perSecond = this.params.hpDrainPerSecond || 40;
     var maxTime = this.params.hpMaxDrainTime;
     var distance = Math.abs(hp - this.getHp(monster));

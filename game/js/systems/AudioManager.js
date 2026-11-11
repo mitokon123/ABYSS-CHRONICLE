@@ -390,7 +390,7 @@
     return buffer;
   };
 
-  // --- 戻り先のある BGM（v1.0.3） ---
+  // --- 戻り先のある BGM（v1.3.0） ---
 
   /**
    * 戻り先（data/audio.js の loopStart）を書いた BGM を鳴らす係。

@@ -14,6 +14,12 @@
  *                いま遊んでいるファイルが最初に選ばれ、別の中身入りを選ぶと上書きの文になる
  *   "resume"   … 中断したところから。**中断データのあるスロットしか選べない**
  *
+ * ▼ ファイルへの書き出しと読み込み（v1.3.1）
+ *   書き出し … 整理のメニューの「ファイルに書き出す」。ブラウザのダウンロードとして .json が保存される
+ *   読み込み … 「つづきから」の一覧のボタンか L キー。ファイルを選ぶ → 入れる先を選ぶ → はい／いいえ。
+ *              どのファイルも空でも「つづきから」に入れるのは、このため
+ *   中身の書き読みは SaveManager（exportSlot / parseImport / importToSlot）
+ *
  * ▼ 選んだあとは必ず「はい / いいえ」を挟む
  *   上書きも読み込みも取り返しがつかないため。
  *   既定は「いいえ」に置いてある（誤って決定を連打しても消えない）。
@@ -61,6 +67,10 @@
     this.manageButton = new NS.TextButton(
       this.panel, this.layout.manageButton, this.texts.manageButton || "整理");
 
+    // 書き出したファイルから読み込む（v1.3.1）。「つづきから」の一覧でだけ出す。キーは L
+    this.importButton = new NS.TextButton(
+      this.panel, this.layout.importButton, this.texts.importButton || "読み込む");
+
     /**
      * phase
      *   "list"    … スロットを選ぶ
@@ -87,6 +97,14 @@
   SaveSlotScene.prototype._canManage = function () {
     if (this.mode !== "continue") return false;
 
+    for (var i = 0; i < this.slots.length; i++) {
+      if (this.slots[i].exists) return true;
+    }
+    return false;
+  };
+
+  /** どれか1つでも中身のあるファイルがあるか */
+  SaveSlotScene.prototype._hasAnyFile = function () {
     for (var i = 0; i < this.slots.length; i++) {
       if (this.slots[i].exists) return true;
     }
@@ -162,6 +180,15 @@
       return;
     }
 
+    // ファイルから読み込む。ファイルを選ぶ窓は、押した操作の続きでないと開けないので、ここで開く
+    if (this.phase === "list" && this.mode === "continue") {
+      var importClicked = this.importButton.handleInput(input);
+      if (importClicked || input.isPressed("importSave")) {
+        this._openImportFile();
+        return;
+      }
+    }
+
     if (input.isPressed("up")) this._move(-1);
     if (input.isPressed("down")) this._move(1);
 
@@ -174,8 +201,14 @@
 
   /** 一覧で取り消しを押したとき。段階をひとつ戻す */
   SaveSlotScene.prototype._cancelList = function () {
-    // 行き先を選んでいる途中なら、何をするかの選択へ戻す
+    // 行き先を選んでいる途中なら、何をするかの選択へ戻す（読み込みは一覧へ戻す）
     if (this.phase === "pick") {
+      if (this.pending && this.pending.action === "import") {
+        this.pending = null;
+        this.phase = "list";
+        this.index = this._firstSelectable();
+        return;
+      }
       this.phase = "action";
       return;
     }
@@ -205,6 +238,13 @@
       return;
     }
     if (result.type !== "confirm") return;
+
+    // 書き出しは何も消さないので、確かめずにすぐ行う
+    if (result.value === "export") {
+      this._exportSlot(this.slots[this.index].slot);
+      this.phase = "list";
+      return;
+    }
 
     this.pending = { action: result.value, from: this.slots[this.index].slot };
 
@@ -292,6 +332,7 @@
       { label: this.texts.actionCopy   || "コピーする", value: "copy" },
       { label: this.texts.actionMove   || "移動する",   value: "move" },
       { label: this.texts.actionDelete || "削除する",   value: "delete" },
+      { label: this.texts.actionExport || "ファイルに書き出す", value: "export" },
       { label: this.texts.actionBack   || "やめる",     value: "back" }
     ]);
     this.actionMenu.index = 0;
@@ -363,6 +404,7 @@
     if (p.action === "delete") result = this.saveManager.clear(p.from)
       ? { success: true, reason: "deleted" } : { success: false, reason: "error" };
     else if (p.action === "copy") result = this.saveManager.copySlot(p.from, p.to);
+    else if (p.action === "import") result = this.saveManager.importToSlot(p.file, p.to);
     else result = this.saveManager.moveSlot(p.from, p.to);
 
     this._showNotice(this.texts[result.reason] || result.reason);
@@ -376,7 +418,115 @@
     // 全部空になったら整理モードから出る（何もできることが無いため）
     if (!this._canManage()) this.managing = false;
     this.index = this._firstSelectable();
+
+    // 読み込んだら、そのファイルを選んでおく（すぐ遊べるように）
+    if (p.action === "import" && result.success) {
+      var at = p.to - 1;
+      if (this._canSelect(this.slots[at])) this.index = at;
+    }
   };
+
+  /**
+   * そのスロットをファイルに書き出す（ブラウザのダウンロードとして保存される）。
+   * 何も消さないので、確かめの窓は出さない
+   */
+  SaveSlotScene.prototype._exportSlot = function (slot) {
+    var result = this.saveManager.exportSlot(slot);
+    if (result.success && !downloadText(result.text, result.fileName)) {
+      result = { success: false, reason: "error" };
+    }
+    this._showNotice(this.texts[result.reason] || result.reason);
+    if (!result.success) this.game.playError();
+  };
+
+  /** ファイルを選ぶ窓を開く。選ばれたら中身を調べて、行き先を選ぶ段階へ進む */
+  SaveSlotScene.prototype._openImportFile = function () {
+    var self = this;
+    var ok = pickTextFile(function (text) { self._onImportText(text); });
+    if (!ok) {
+      this._showNotice(this.texts.error || "");
+      this.game.playError();
+    }
+  };
+
+  SaveSlotScene.prototype._onImportText = function (text) {
+    // 窓を開いているあいだに別の段階へ進んでいたら、何もしない
+    if (this.phase !== "list" || this._returnTimer > 0) return;
+
+    var result = (text === null)
+      ? { success: false, reason: "importBroken" }
+      : this.saveManager.parseImport(text);
+    if (!result.success) {
+      this._showNotice(this.texts[result.reason] || result.reason);
+      this.game.playError();
+      return;
+    }
+
+    this.pending = { action: "import", file: result.file, summary: result.summary };
+    this.phase = "pick";
+    // 空きがあれば、そこを先に選んでおく（上書きしてしまわないように）
+    this.index = 0;
+    for (var i = 0; i < this.slots.length; i++) {
+      if (!this.slots[i].exists) { this.index = i; break; }
+    }
+  };
+
+  /**
+   * 文字をファイルとして保存させる（ダウンロード）。file:// でも http でも動く。
+   * @returns {boolean} 保存を始められたか
+   */
+  function downloadText(text, fileName) {
+    try {
+      var blob = new Blob([text], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * ファイルを選ぶ窓を開き、選ばれたファイルの中身（文字）を渡す。読めなければ null を渡す。
+   * 取り消されたときは何も呼ばない
+   * @returns {boolean} 窓を開けたか
+   */
+  function pickTextFile(onText) {
+    try {
+      var input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json,application/json";
+      input.style.display = "none";
+      input.addEventListener("change", function () {
+        var file = input.files && input.files[0];
+        if (input.parentNode) input.parentNode.removeChild(input);
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function () { onText(String(reader.result || "")); };
+        reader.onerror = function () { onText(null); };
+        reader.readAsText(file);
+      });
+      // 取り消したときも片づける（cancel を知らせないブラウザでは、次に開くときまで残るだけ）
+      input.addEventListener("cancel", function () {
+        if (input.parentNode) input.parentNode.removeChild(input);
+      });
+      var old = document.querySelectorAll("input[data-save-import]");
+      for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
+      input.setAttribute("data-save-import", "1");
+      document.body.appendChild(input);
+      input.click();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 
   /**
    * そのスロットで新しく始める。
@@ -482,7 +632,13 @@
     var title = L.title || {};
     var subtitle = L.subtitle || {};
     var heading, lead;
-    if (this.phase === "pick") {
+    if (this.phase === "pick" && this.pending.action === "import") {
+      // 読み込むファイルの中身（先頭の仲間）を見せて、入れる先を選んでもらう
+      var sum = this.pending.summary || {};
+      heading = this.texts.titleImportTo;
+      lead = (this.texts.subtitleImport || "")
+        .replace("{name}", sum.leadName || "").replace("{level}", sum.level || "");
+    } else if (this.phase === "pick") {
       // 行き先を選んでいる最中は、何をしているかを見出しに出す
       heading = (this.pending.action === "copy")
         ? this.texts.titleCopyTo : this.texts.titleMoveTo;
@@ -501,7 +657,9 @@
       lead = this.texts.subtitleResume;
     } else {
       heading = this.texts.titleContinue;
-      lead = this.texts.subtitleContinue;
+      // どのファイルも空なら、書き出したファイルから読み込めることを案内する
+      lead = this._hasAnyFile() ? this.texts.subtitleContinue
+        : (this.texts.subtitleContinueEmpty || this.texts.subtitleContinue);
     }
 
     this.panel.drawText(heading || "", title.x, title.y,
@@ -522,6 +680,7 @@
         : (this.texts.manageButton || "整理");
       this.manageButton.render();
     }
+    if (this.phase === "list" && this.mode === "continue") this.importButton.render();
 
     if (this.phase === "action") this._renderActionMenu(ctx);
     if (this.phase === "confirm") this._renderConfirm(ctx);
@@ -728,6 +887,7 @@
 
     var headline = (p.action === "delete") ? this.texts.confirmDelete
                  : (p.action === "copy") ? this.texts.confirmCopy
+                 : (p.action === "import") ? this.texts.confirmImport
                  : this.texts.confirmMove;
 
     var body = (p.action === "delete")
@@ -814,6 +974,7 @@
     else if (this.phase === "pick") text = this.texts.hintPick;
     else if (this.managing) text = this.texts.hintManaging;
     else if (this._canManage()) text = this.texts.hintWithManage;
+    else if (this.mode === "continue") text = this.texts.hintImportOnly || this.texts.hint;
     else if (this.mode === "save") text = this.texts.hintSave;
     else text = this.texts.hint;
 
