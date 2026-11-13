@@ -32,6 +32,9 @@
  *     bondReward: { effects: [ { type: "resistBonus", element: "fire", value: 3 } ] } … 耐性が上がる
  *     skill と effects は両方書いてもよい。effects の書き方は特性・装備と同じ
  *
+ * max : 愛情度はここで止まる（v1.4.2・2026-11-13 作者の指定。絆の 180）。勝ってもそれより上がらない。
+ *   古いセーブで超えている仲間は、読み込んだときに max へそろえる（段階も報酬も変わらない）
+ *
  * ★ 下がることはない。預かり所に預けても、そのまま残る。
  */
 (function (NS) {
@@ -39,6 +42,7 @@
 
   NS.rawData.affection = {
     gainPerWin: 1,
+    max: 180,
     stats: ["hp", "attack", "defense", "speed", "pp"],
     hideBondRewardUntilReached: true,
     stages: [

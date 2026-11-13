@@ -1984,8 +1984,9 @@
                       blind: 0, curse: 0, instantDeath: 0 },
       maxLevel: 70,
       // 成長率の段階（作者が決めたもの。2026-10-28 上限70に合わせて Lv25 から先を作り直した。早見表/成長率の段階.txt）。Lv24 までは前と同じ
+      // v1.4.2（2026-11-13 作者の指定「全体的に HP を上げる」）：HP の成長率を Lv1 からぜんぶ 1.2 倍（Lv30 130→153・Lv50 251→298・Lv70 389→463）
       growthRate: {
-        hp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.47 }, { from: 31, rate: 0.34 }, { from: 41, rate: 0.33 }, { from: 51, rate: 0.385 }, { from: 61, rate: 0.38 }],
+        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.564 }, { from: 31, rate: 0.408 }, { from: 41, rate: 0.396 }, { from: 51, rate: 0.462 }, { from: 61, rate: 0.456 }],
         attack:  [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.36 }, { from: 31, rate: 0.58 }, { from: 41, rate: 0.66 }, { from: 51, rate: 1.12 }, { from: 61, rate: 1.10 }],
         defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.42 }, { from: 41, rate: 0.48 }, { from: 51, rate: 0.60 }, { from: 61, rate: 0.62 }],
         speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.49 }, { from: 31, rate: 0.72 }, { from: 41, rate: 0.48 }, { from: 51, rate: 0.52 }, { from: 61, rate: 0.50 }],
@@ -2060,13 +2061,15 @@
       statusResist: { poison: 0, paralysis: 0, sleep: 0, seal: 0,
                       blind: 0, curse: 5, instantDeath: 0 },
       maxLevel: 70,
+      // v1.4.2（2026-11-13 作者の表）：個体値0・素直で Lv25 52/42/22/42/20・Lv30 74/58/29/57/29・Lv40 138/104/45/108/48・Lv50 192/151/99/169/96・Lv60 265/241/140/222/150・Lv70 343/320/204/278/194（HP/攻/防/速/PP）に
+      //   ちょうどなるよう、5つとも成長率を逆算した。Lv25 で違う HP は Lv22 から変えた
       growthRate: {
-        hp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.27 }, { from: 31, rate: 0.29 }, { from: 41, rate: 0.30 }, { from: 51, rate: 0.44 }, { from: 61, rate: 0.25 }],
+        hp:      [{ from: 1, rate: 0.12 }, { from: 22, rate: 0.24 }, { from: 26, rate: 0.37 }, { from: 31, rate: 0.53 }, { from: 41, rate: 0.45 }, { from: 51, rate: 0.61 }, { from: 61, rate: 0.65 }],
         // Lv51 から +0.26（2026-10-20 作者の判断。上限で攻撃320。前は 51:0.86・61:0.73 で278）
-        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.37 }, { from: 31, rate: 0.54 }, { from: 41, rate: 0.64 }, { from: 51, rate: 1.12 }, { from: 61, rate: 0.99 }],
-        defense: [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.14 }, { from: 31, rate: 0.15 }, { from: 41, rate: 0.18 }, { from: 51, rate: 0.24 }, { from: 61, rate: 0.11 }],
-        speed:   [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.37 }, { from: 31, rate: 0.59 }, { from: 41, rate: 0.70 }, { from: 51, rate: 0.65 }, { from: 61, rate: 0.58 }],
-        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.34 }, { from: 31, rate: 0.38 }, { from: 41, rate: 0.96 }, { from: 51, rate: 1.08 }, { from: 61, rate: 0.68 }]
+        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.40 }, { from: 31, rate: 0.58 }, { from: 51, rate: 1.13 }, { from: 61, rate: 0.99 }],
+        defense: [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.23 }, { from: 31, rate: 0.27 }, { from: 41, rate: 0.90 }, { from: 51, rate: 0.68 }, { from: 61, rate: 1.07 }],
+        speed:   [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.37 }, { from: 31, rate: 0.64 }, { from: 41, rate: 0.77 }, { from: 51, rate: 0.66 }, { from: 61, rate: 0.70 }],
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.34 }, { from: 31, rate: 0.38 }, { from: 41, rate: 0.96 }, { from: 51, rate: 1.08 }, { from: 61, rate: 0.89 }]
       },
       // 図鑑の説明・記録・絆の報酬は、私の案を作者が直して決めたもの（2026-10-13。若葉の洞_図鑑と絆.md）
       description: "風属性。若葉色の羽を持つ小鳥。追い風に乗って飛び、気づいたときには先に嘴を当てられている。起こした風は群れごとなぎ払う。体は軽く脆い。地に弱い。",
@@ -2479,14 +2482,15 @@
       statusResist: { poison: 0, paralysis: 0, sleep: 0, seal: 3,
                       blind: 0, curse: 3, instantDeath: 0 },
       maxLevel: 70,
-      // キノコンと同じ成長率（亜種なので伸び方をそろえた。作者が了承）。上限 Lv70 で攻撃はおよそ210。
-      // 防御だけ Lv51 から +0.19（作者の指定 2026-10-21。Lv70 で 192 → 223。Lv50 までは変えていないので回廊の敵は同じ）
+      // もとはキノコンと同じ成長率（亜種なので伸び方をそろえた。作者が了承）。防御だけ Lv51 から +0.19（作者の指定 2026-10-21）。
+      // v1.4.2（2026-11-13 作者の指定「全ステータス少しだけ上げる」）：5つとも成長率を Lv1 からぜんぶ 1.08 倍。Lv70 で 484/207/223/120/246 → 521/223/240/129/265。
+      //   回廊の敵のコケキノコも少し（Lv30 で 5% ほど）強くなる
       growthRate: {
-        hp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.30 }, { from: 50, rate: 0.45 }, { from: 61, rate: 0.88 }],
-        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.40 }, { from: 50, rate: 0.60 }, { from: 51, rate: 0.83 }],
-        defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.65 }, { from: 51, rate: 0.84 }, { from: 61, rate: 0.64 }],
-        speed:   [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.21 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.51 }, { from: 61, rate: 0.41 }],
-        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.41 }, { from: 40, rate: 1.36 }, { from: 50, rate: 1.98 }, { from: 61, rate: 1.58 }]
+        hp:      [{ from: 1, rate: 0.162 }, { from: 25, rate: 0.216 }, { from: 40, rate: 0.324 }, { from: 50, rate: 0.486 }, { from: 61, rate: 0.95 }],
+        attack:  [{ from: 1, rate: 0.173 }, { from: 25, rate: 0.27 }, { from: 40, rate: 0.432 }, { from: 50, rate: 0.648 }, { from: 51, rate: 0.896 }],
+        defense: [{ from: 1, rate: 0.151 }, { from: 25, rate: 0.27 }, { from: 40, rate: 0.486 }, { from: 50, rate: 0.702 }, { from: 51, rate: 0.907 }, { from: 61, rate: 0.691 }],
+        speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.227 }, { from: 40, rate: 0.378 }, { from: 50, rate: 0.551 }, { from: 61, rate: 0.443 }],
+        pp:      [{ from: 1, rate: 0.151 }, { from: 25, rate: 0.443 }, { from: 40, rate: 1.469 }, { from: 50, rate: 2.138 }, { from: 61, rate: 1.706 }]
       },
       // 説明は私の案を作者が確定（2026-10-28）。
       // 図鑑の決まり：属性 → 見た目・生態 → 注意書き → 弱い属性（1つ）

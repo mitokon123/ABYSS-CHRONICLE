@@ -441,6 +441,7 @@
 
   function setAffection(m, value) {
     m.affection = Math.max(0, Math.floor(Number(value)) || 0);
+    if (m.getAffectionMax) m.affection = Math.min(m.getAffectionMax(), m.affection);   // ゲームと同じく上限（180）で止める
     m._learnBondSkill();
     m.currentHp = Math.min(m.getMaxHp(), m.currentHp);
     m.currentPp = Math.min(m.getMaxPp(), m.currentPp);

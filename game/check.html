@@ -192,6 +192,12 @@
         run: checkSkillReview141
       },
       {
+        title: "愛情度は 180 で止まる",
+        since: "v1.4.2",
+        why: "1.4.2 で愛情度に上限（data/affection.js の max＝180。絆）を付けた。勝って足しても、上限を超えた古いセーブを読んでも 180 で止まり、絆の段階と報酬はそのまま。",
+        run: checkAffectionCap
+      },
+      {
         title: "版の名前がそろっている",
         since: "v1.3.1",
         why: "data/config.js の version・パッチノートの先頭・README の「現在のバージョン」が同じ。「開発中」の日付は先頭の版だけ。",
@@ -1819,6 +1825,31 @@
       var want = { glowBug: 3, kodama: 3, gearWarden: 3, magmaBeast: 6, sporin: 0, mossShroom: 0, weaponBot: 0, sapSlime: 0, shinigami: 10, slime: 5, batty: 5, flamin: 5 };
       var wrong = Object.keys(want).filter(function (id) { return !gd.monsters[id] || gd.monsters[id].statusResist.instantDeath !== want[id]; });
       expect(wrong.length === 0 && gd.monsters.sporin.statusResist.curse === 2, "種族の即死の耐性（作者の表）とキノコンの呪い 2" + (wrong.length ? "（違う：" + wrong.join("・") + "）" : ""));
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 愛情度の上限（v1.4.2） ---
+    function checkAffectionCap(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var max = (gd.affection || {}).max;
+      var m = new NS.MonsterInstance("slime", 20, gd, {});
+      expect(max === 180 && m.getAffectionMax() === 180, "上限は 180（data/affection.js の max）：" + max);
+
+      m.affection = 179;
+      var r1 = m.gainAffection(1);
+      var bond = m.getAffectionStage();
+      expect(m.affection === 180 && r1.to > r1.from && bond && bond.id === "bond", "179 から勝つと 180 で絆になる");
+      var hpAt = m.getMaxHp();
+      var r2 = m.gainAffection(1);
+      m.gainAffection(50);
+      expect(m.affection === 180 && r2.to === r2.from && m.getMaxHp() === hpAt, "180 から先は勝っても 180 のまま（段階も能力も変わらない）");
+
+      var saved = m.toSaveData();
+      saved.affection = 999;
+      var back = NS.MonsterInstance.fromSaveData(saved, gd);
+      expect(back.affection === 180 && back.hasReachedBondReward(), "上限を超えた古いセーブ（999）は読み込みで 180 になり、絆の報酬は残る：" + back.affection);
       return { ok: ok, lines: lines };
     }
 

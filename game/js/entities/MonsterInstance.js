@@ -1092,6 +1092,12 @@
     return ((this._data && this._data.affection) || {}).stages || [];
   };
 
+  /** 愛情度の上限（data/affection.js の max。書いていなければ上限なし。v1.4.2） */
+  MonsterInstance.prototype.getAffectionMax = function () {
+    var max = ((this._data && this._data.affection) || {}).max;
+    return (typeof max === "number" && max >= 0) ? max : Infinity;
+  };
+
   /** 愛情度から段階の番号を求める（0 = 出会い） */
   MonsterInstance.prototype._stageIndexOf = function (value) {
     var stages = this._affectionStages();
@@ -1179,7 +1185,8 @@
     var maxHpBefore = this.getMaxHp();
     var maxPpBefore = this.getMaxPp();
 
-    this.affection = (this.affection || 0) + (amount || 0);
+    // 上限（180）で止まる（v1.4.2）
+    this.affection = Math.min(this.getAffectionMax(), (this.affection || 0) + (amount || 0));
     var to = this.getAffectionStageIndex();
     var learned = [];
 
@@ -1313,7 +1320,7 @@
     instance.partner = !!saved.partner;
     // 愛情度。古いセーブには無いので 0 から。
     // HP・PP を戻すより先に入れる（最大値が愛情度で上がっているため）
-    instance.affection = saved.affection || 0;
+    instance.affection = Math.min(instance.getAffectionMax(), saved.affection || 0);   // 上限を超えた古いセーブは上限へ（v1.4.2）
     // 作戦。古いセーブには無い・定義が消えた作戦は既定（命令する）に戻す
     instance.setTactic(saved.tactic);
     // 絆の報酬の技があとから決まった場合も、もう絆に届いている仲間には覚えさせる
