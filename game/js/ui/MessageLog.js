@@ -20,7 +20,23 @@
     this.linesPerPage = linesPerPage || 3;
     this.queue = [];    // これから表示する行
     this.current = [];  // いま表示している行
+    // 見せた行の控え（戦闘のログを見返すため。v1.4.0）。{ text } か { heading }。古いものから捨てる
+    this.history = [];
+    this.historyMax = 400;
+    // true の間に見せた行は控えない（「PPが足りない!」のような、その場の知らせ）
+    this.quiet = false;
   }
+
+  MessageLog.prototype._remember = function (entry) {
+    if (this.quiet) return;
+    this.history.push(entry);
+    if (this.history.length > this.historyMax) this.history.splice(0, this.history.length - this.historyMax);
+  };
+
+  /** ログに区切りの見出しを入れる（「― 3ターン目 ―」） */
+  MessageLog.prototype.mark = function (heading) {
+    if (heading) this._remember({ heading: heading });
+  };
 
   /** メッセージを1行追加する */
   MessageLog.prototype.push = function (line) {
@@ -39,6 +55,7 @@
       return;
     }
     this.current = this.queue.splice(0, this.linesPerPage);
+    for (var i = 0; i < this.current.length; i++) this._remember({ text: this.current[i] });
   };
 
   /**
@@ -49,6 +66,7 @@
   MessageLog.prototype.stream = function (line) {
     if (!line) return;
     this.current.push(line);
+    this._remember({ text: line });
   };
 
   /** 表示欄がいっぱいで、これ以上行を足せないか */

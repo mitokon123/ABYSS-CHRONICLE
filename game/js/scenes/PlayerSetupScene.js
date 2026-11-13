@@ -38,6 +38,12 @@
  * ▼ 性別と一人称は、ゲームの進み方には何も影響しない（data/player.js）
  *   一人称だけは、物語の台詞の {me} に差し込まれる。性別は新しい絵の体つきになる。
  *
+ * ▼ v1.4.0（2026-11-13）
+ *   左の姿は光の当たる台の上を歩く。下に向きの札（↓ ← ↑ → 自動。Q/E かクリック）・名前と
+ *   「男性・一人称「私」」・冒険中の大きさ（地図と同じ 36px）。右の欄は「あなた」「見た目」の見出しで分け、
+ *   色の欄は選んでいる色の名前を右端に出す。下に選んでいる欄のひと言。R で見た目のおまかせ。
+ *   絵は CharaRig のまま（描き直していない）。
+ *
  * 配置は data/ui.js の playerSetup、文言は data/messages.js の playerSetup。
  * 選択肢は data/player.js。
  */
@@ -51,6 +57,7 @@
   // 見た目を歩かせて見せるときの向きの順と、1つの向きを見せる時間
   var PREVIEW_DIRS = ["down", "left", "up", "right"];
   var PREVIEW_TURN_MS = 1500;
+  var AUTO_FACING = PREVIEW_DIRS.length;   // 向きの札のいちばん右「自動」
 
   function PlayerSetupScene(game, returnScene, mode) {
     this.game = game;
@@ -118,6 +125,10 @@
         return acc ? self.accPalettes[acc.id] : null;
       }
     });
+
+    // 左の姿の向き。0〜3 は PREVIEW_DIRS の向きで止める、4（AUTO）は今までどおり順に回る（v1.4.0。Q/E で送る）
+    this.facing = AUTO_FACING;
+    this._facingRects = [];
 
     this.editor = null;   // 色を作る窓を開いているあいだの値（_openColorEditor）
     this._repeatAt = 0;   // 左右を押し続けたときに、次に動かす時刻
@@ -292,9 +303,47 @@
       if (input.isPressed("right")) choice.set((choice.get() + 1) % choice.count);
     }
 
+    // 左の姿の向き（Q/E）と、見た目のおまかせ（R）。どの欄にいても効く
+    if (input.isPressed("prevTab")) this._turn(-1);
+    if (input.isPressed("nextTab")) this._turn(1);
+    if (this.useRig && input.isPressed("sort")) this._randomize();
+
     this._handleMouse(input);
 
     if (input.isPressed("confirm")) this._activateRow();
+  };
+
+  /** 左の姿の向きを1つ送る（↓ ← ↑ → 自動 の順で回る） */
+  PlayerSetupScene.prototype._turn = function (direction) {
+    var n = AUTO_FACING + 1;
+    this.facing = (this.facing + direction + n) % n;
+  };
+
+  /** いま左の姿が向いている向き */
+  PlayerSetupScene.prototype._facingDir = function () {
+    if (this.facing < AUTO_FACING) return PREVIEW_DIRS[this.facing];
+    var clock = this.game.clock || 0;
+    return PREVIEW_DIRS[Math.floor(clock / PREVIEW_TURN_MS) % PREVIEW_DIRS.length];
+  };
+
+  /**
+   * 見た目のおまかせ（R）。髪型・髪の色・ふく・ズボンを用意した中から選び、飾りは半分の確率で1つ着ける。
+   * 名前・性別・一人称は変えない（見た目ではないので）。自分で作った色は残っているので、「じぶんで」を選べば戻せる
+   */
+  PlayerSetupScene.prototype._randomize = function () {
+    function pick(n) { return Math.floor(Math.random() * n); }
+    if (this.hairStyles.length) this.hairIndex = pick(this.hairStyles.length);
+    var kinds = ["hairColor", "color", "pants"];
+    for (var i = 0; i < kinds.length; i++) {
+      var p = this.palettes[kinds[i]];
+      if (p && p.list.length) p.index = pick(p.list.length);
+    }
+    this.accOn = {};
+    for (var id in this.accPalettes) this.accPalettes[id].index = 0;   // もとの色
+    if (this.accessories.length && Math.random() < 0.5) {
+      this.accCursor = pick(this.accessories.length);
+      this.accOn[this.accessories[this.accCursor].id] = true;
+    }
   };
 
   /** 色見本・札・名前の欄・決定のボタンを直接押せるようにする */
@@ -303,6 +352,11 @@
 
     var pointer = input.getPointer();
     if (!pointer.inside) return;
+
+    // 左の姿の下の向きの札
+    for (var f = 0; f < this._facingRects.length; f++) {
+      if (pointer.clicked && NS.Panel.containsPoint(this._facingRects[f], pointer)) { this.facing = f; return; }
+    }
 
     for (var r = 0; r < this.rows.length; r++) {
       var kind = this.rows[r];
@@ -527,9 +581,26 @@
 
   // --- 位置 ---
 
+  /**
+   * 欄の四角。新しい絵のときは「あなた」「見た目」の見出しを挟むので、見出しの数だけ下へずらす
+   * （見出しの高さは layout.sections.h）
+   */
   PlayerSetupScene.prototype._rowRect = function (index) {
     var r = this.layout.rows || { x: 264, y: 100, w: 504, h: 40, gap: 6 };
-    return { x: r.x, y: r.y + (r.h + (r.gap || 0)) * index, w: r.w, h: r.h };
+    var heads = this._sections(), S = this.layout.sections || {}, shift = 0;
+    for (var i = 0; i < heads.length; i++) if (heads[i].index <= index) shift += S.h || 0;
+    return { x: r.x, y: r.y + shift + (r.h + (r.gap || 0)) * index, w: r.w, h: r.h };
+  };
+
+  /** 見出しの並び（{ index: その見出しの下の最初の欄, label }）。古い絵のときは出さない */
+  PlayerSetupScene.prototype._sections = function () {
+    if (!this.useRig) return [];
+    var out = [], defs = [["name", this.texts.sectionYou], ["hair", this.texts.sectionLook]];
+    for (var i = 0; i < defs.length; i++) {
+      var index = this.rows.indexOf(defs[i][0]);
+      if (index >= 0 && defs[i][1]) out.push({ index: index, label: defs[i][1] });
+    }
+    return out;
   };
 
   /**
@@ -604,6 +675,8 @@
       else if (this.palettes[kind]) this._renderPaletteRow(kind, labels[kind]);
       else this._renderChipRow(kind, labels[kind]);
     }
+    this._renderSections();
+    this._renderDescription();
     this._renderHint();
 
     if (this.mode === "edit") this.backButton.render();
@@ -626,31 +699,156 @@
     else this._renderSpritePreview(p);
   };
 
-  /** 新しい絵：上下左右へ向きを変えながら歩かせる（どの向きの姿も見られるように） */
+  /**
+   * 新しい絵：光の当たる台の上で歩かせる（v1.4.0）。
+   *   上から：台と姿 → 向きの札（↓ ← ↑ → 自動。Q/E・クリック）→ 名前と性別・一人称 → 冒険中の大きさ（地図と同じ 36px）
+   * 絵そのものは描き直さない（CharaRig が描いたものを、台の上に置くだけ）
+   */
   PlayerSetupScene.prototype._renderRigPreview = function (p) {
     var R = NS.CharaRig;
+    var t = this.theme;
     var opts = NS.PlayerLook.rigOptions(this.game.data, this._selection());
-    var frames = NS.PlayerLook.framesFor(opts, 64);
+    var rig = NS.PlayerLook.appearanceOf(this.game.data).rig || {};
     var clock = this.game.clock || 0;
-    var dir = PREVIEW_DIRS[Math.floor(clock / PREVIEW_TURN_MS) % PREVIEW_DIRS.length];
-    var img = frames.walk[dir][R.walkFrame(clock)];
-    var scale = (NS.PlayerLook.appearanceOf(this.game.data).rig || {}).previewScale || 3;
+    var dir = this._facingDir();
+    var frame = R.walkFrame(clock);
+    var img = NS.PlayerLook.framesFor(opts, 64).walk[dir][frame];
+    var scale = rig.previewScale || 3;
     var size = 64 * scale;
-    var x = Math.round(p.x - size / 2), y = Math.round(p.y - size / 2);
+    var floorY = p.floorY || (p.y + 26 * scale);
+    // 絵の足はおよそ 64 の 60 段目。足が台の真ん中に乗るように置く
+    var x = Math.round(p.x - size / 2), y = Math.round(floorY - 60 * scale);
     var ctx = this.panel.ctx;
+    var st = p.stage || {};
 
     ctx.save();
-    // 足もとの影（絵の足はおよそ 64 の 61 段目）
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    // 後ろの光（台の上だけ明るい）
+    var glow = ctx.createRadialGradient(p.x, floorY - 80, 10, p.x, floorY - 80, st.glowRadius || 120);
+    glow.addColorStop(0, st.glowColor || "rgba(90,130,220,0.22)");
+    glow.addColorStop(1, "rgba(90,130,220,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(p.boxX + 2, p.boxY + 2, p.boxW - 4, floorY + 30 - p.boxY);
+    // 台（だ円の床と、ふちの線）
+    var rx = st.rx || 74, ry = st.ry || 15;
+    var floor = ctx.createRadialGradient(p.x, floorY, 4, p.x, floorY, rx);
+    floor.addColorStop(0, st.floorColor || "rgba(74,107,168,0.42)");
+    floor.addColorStop(1, "rgba(74,107,168,0.04)");
+    ctx.fillStyle = floor;
     ctx.beginPath();
-    ctx.ellipse(p.x, y + 60 * scale, 15 * scale, 3 * scale, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x, floorY, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = st.rimColor || "rgba(140,170,240,0.35)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // 足もとの影
+    ctx.fillStyle = "rgba(0,0,0,0.38)";
+    ctx.beginPath();
+    ctx.ellipse(p.x, floorY, 15 * scale, 3 * scale, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, x, y, size, size);
     ctx.restore();
 
-    this.panel.drawText(this.name || "", p.x, p.labelY,
-      { align: "center", color: this.theme.subTextColor });
+    this._renderFacingChips(p);
+
+    // 名前と、性別・一人称
+    var gender = this.genders[this.genderIndex];
+    this.panel.drawText(this.name || "", p.x, p.nameY || p.labelY,
+      { align: "center", font: p.nameFont || t.largeFont, color: t.textColor });
+    var profile = (this.texts.profile || "{gender}・一人称「{me}」")
+      .replace("{gender}", gender ? gender.name : "")
+      .replace("{me}", this.firstPersons[this.firstPersonIndex] || "");
+    this.panel.drawText(profile, p.x, p.profileY || (p.labelY + 20),
+      { align: "center", font: t.smallFont, color: t.subTextColor });
+
+    // 冒険中の大きさ（地図の上と同じ大きさで、同じ向きに歩く）
+    var M = p.map;
+    if (!M) return;
+    var mapSize = rig.mapSize || 36;
+    var small = NS.PlayerLook.framesFor(opts, mapSize).walk[dir][frame];
+    var sx = p.boxX + p.boxW - 20 - mapSize, sy = M.y;
+    ctx.save();
+    ctx.strokeStyle = t.panelBorder || "#3a4560";
+    ctx.beginPath();
+    ctx.moveTo(p.boxX + 14, M.y - 10.5);
+    ctx.lineTo(p.boxX + p.boxW - 14, M.y - 10.5);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(sx + mapSize / 2, sy + mapSize - 3, 8, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(small, sx, sy, mapSize, mapSize);
+    ctx.restore();
+    this.panel.drawText(this.texts.mapSizeLabel || "", p.boxX + 16, sy + mapSize / 2 + 5,
+      { font: t.smallFont, color: t.hintColor });
+  };
+
+  /** 向きの札（↓ ← ↑ → 自動）。いまの向きを光らせる。自動のときは回っている向きも薄く光らせる */
+  PlayerSetupScene.prototype._renderFacingChips = function (p) {
+    var F = p.facing;
+    this._facingRects = [];
+    if (!F) return;
+    var t = this.theme, ctx = this.panel.ctx;
+    var labels = this.texts.facingLabels || ["↓", "←", "↑", "→", "自動"];
+    var widths = [], total = 0, i;
+    for (i = 0; i < labels.length; i++) {
+      widths.push(i === AUTO_FACING ? (F.autoW || 40) : (F.w || 26));
+      total += widths[i] + (i ? (F.gap || 4) : 0);
+    }
+    var x = Math.round(p.x - total / 2);
+    var spinning = PREVIEW_DIRS.indexOf(this._facingDir());
+    for (i = 0; i < labels.length; i++) {
+      var r = { x: x, y: F.y, w: widths[i], h: F.h || 20 };
+      this._facingRects.push(r);
+      x += widths[i] + (F.gap || 4);
+      var on = (i === this.facing);
+      var dim = (this.facing === AUTO_FACING && i === spinning);
+      ctx.save();
+      if (on || dim) {
+        ctx.fillStyle = on ? "rgba(255,215,94,0.16)" : "rgba(255,215,94,0.07)";
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+      }
+      ctx.strokeStyle = on ? (t.cursorColor || "#ffd75e") : (t.panelBorder || "#3a4560");
+      ctx.lineWidth = 1;
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+      ctx.restore();
+      this.panel.drawText(labels[i], r.x + r.w / 2, r.y + r.h / 2 + 4,
+        { align: "center", font: t.smallFont, color: on ? t.cursorColor : (dim ? t.textColor : t.hintColor) });
+    }
+  };
+
+  /** 右の欄の見出し（「あなた」「見た目」）。文字の右へ細い線をのばす */
+  PlayerSetupScene.prototype._renderSections = function () {
+    var heads = this._sections();
+    var S = this.layout.sections || {};
+    var t = this.theme, ctx = this.panel.ctx;
+    for (var i = 0; i < heads.length; i++) {
+      var row = this._rowRect(heads[i].index);
+      var y = row.y - (S.baseline || 6);
+      this.panel.drawText(heads[i].label, row.x + 2, y,
+        { font: t.smallFont, color: S.color || t.subTextColor });
+      ctx.save();
+      ctx.font = t.smallFont || "12px monospace";
+      var lx = row.x + 10 + ctx.measureText(heads[i].label).width;
+      ctx.strokeStyle = t.panelBorder || "#3a4560";
+      ctx.beginPath();
+      ctx.moveTo(lx, y - 3.5);
+      ctx.lineTo(row.x + row.w, y - 3.5);
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  /** 下の、選んでいる欄のひと言（何が変わるのか）。拠点のメニューの下と同じ形 */
+  PlayerSetupScene.prototype._renderDescription = function () {
+    var D = this.layout.description;
+    var texts = this.texts.descriptions;
+    if (!D || !texts || this.phase !== "main") return;
+    var kind = this._rowKind();
+    if (kind === "done") kind = (this.mode === "new") ? "doneNew" : "doneEdit";
+    this.panel.drawText(texts[kind] || "", D.x, D.y,
+      { font: D.font || this.theme.smallFont, color: D.color || this.theme.subTextColor });
   };
 
   /** 今までの 32×32 の絵（新しい絵が使えないとき）。ふくの色の名前を下に出す */
@@ -710,6 +908,11 @@
       var acc = this.accessories[this.accCursor];
       this.panel.drawText(acc ? acc.name : "", frame.rect.x + frame.rect.w - 12, frame.rect.y + frame.rect.h / 2 + 5,
         { align: "right", font: t.smallFont, color: this.accOn[acc.id] ? t.cursorColor : t.subTextColor });
+    } else {
+      // ほかの色の欄は、選んでいる色の名前を右端に出す（自分で作った色は色コード）
+      var picked = (p.index === p.customIndex) ? p.customHex.toUpperCase() : ((p.list[p.index] || {}).name || "");
+      this.panel.drawText(picked, frame.rect.x + frame.rect.w - 12, frame.rect.y + frame.rect.h / 2 + 5,
+        { align: "right", font: t.smallFont, color: frame.selected ? t.cursorColor : t.subTextColor });
     }
 
     var ctx = this.panel.ctx;

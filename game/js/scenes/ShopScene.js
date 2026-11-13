@@ -11,6 +11,12 @@
  *   決定   … 買う場合は「個数を決める → はい／いいえ」の2段階に進む
  *   Esc    … 1つ前へ戻る（一覧なら拠点へ）
  *
+ * ▼ 右の説明（v1.4.0）
+ *   共通の部品 NS.DetailPane（js/ui/Panel.js）。上の欄（絵・名前・分類・所持数）は動かさず、
+ *   その下の行を右のバー・ホイールで送る（Q/E は店の切り替えなので使わない）。
+ *   装備は「仲間がつけると」：連れている仲間ごとに、着けたときの能力の変わり方（いまの装備と入れ替えるならその名前）。
+ *   素材などは「使い道（工房）」：いま並んでいるレシピのうち、それを使うもの（DexScene.itemUses）。
+ *
  * ▼ 状態（this.phase）
  *   "list"     … 品物を選ぶ
  *   "quantity" … 何個買うかを決める（合計金額をその場に出す）
@@ -42,6 +48,10 @@
     this.shop = new NS.ShopSystem(game.data);
 
     this.confirmMenu = new NS.CommandMenu(this.panel, this.layout.confirmMenu);
+    // 右の説明欄（v1.4.0）。中身は _detailContent が作る
+    this.pane = new NS.DetailPane(this.panel, this.sprites, this.layout.detail || { x: 0, y: 0, w: 0, h: 0 });
+    this._detailKey = null;
+    this._detailCache = null;
     this.backButton = new NS.BackButton(this.panel, game.data);
 
     this.shops = this.shop.getShops(game.clearedDungeons);
@@ -135,12 +145,125 @@
   };
 
   ShopScene.prototype._rebuildList = function () {
+    // 買う・売るで持ち物の数が変わるので、右の説明も作り直す
+    this._detailCache = null;
     // 加護は売れないので、この店では常に「買う」一覧を出す
     if (this._isBlessingShop()) {
+      this.filters = null;
       this.list.setRows(this._buildBlessingRows());
       return;
     }
+    // 絞り込みの候補は、いまの一覧に1つでも当てはまるものだけ（v1.4.0）
+    this.filters = this._availableFilters();
     this.list.setRows(this.getTab() === "buy" ? this._buildBuyRows() : this._buildSellRows());
+  };
+
+  // --- 絞り込み（v1.4.0・2026-11-12 作者「ショップで絞り込みができるように（手に入る場所など）」） ---
+
+  /**
+   * 絞り込みの並び。F か、一覧の右上の札を押すと次へ。
+   *   all … すべて  use … 回復・道具  weapon / armor / accessory … 装備の枠
+   *   material … 素材すべて  from:〇〇 … その場所の素材だけ（data/items.js の from。恒常素材も）
+   * 選んだものは店を閉じても覚えておく（game.shopFilter。セーブはしない。工房と同じ）
+   */
+  var BASE_FILTERS = ["all", "use", "weapon", "armor", "accessory", "material"];
+
+  function filterMatches(filter, item, from) {
+    if (!filter || filter === "all") return true;
+    if (filter === "use") return !item.equip && item.category !== "material";
+    if (filter === "material") return item.category === "material";
+    if (filter.indexOf("from:") === 0) return item.category === "material" && from === filter.slice(5);
+    return !!item.equip && NS.EffectSystem.slotOf(item) === filter;
+  }
+
+  /** いまのタブ（買う／売る）に並ぶ品と、その手に入る場所 [{ item, from }]（絞り込む前） */
+  ShopScene.prototype._tabEntries = function () {
+    var result = [];
+    if (this.getTab() === "buy") {
+      var stock = this.shop.getStock(this.game.clearedDungeons, this.getShop());
+      for (var i = 0; i < stock.length; i++) result.push({ item: stock[i].item, from: stock[i].from });
+      return result;
+    }
+    var inventory = this.game.inventory;
+    var groups = inventory ? inventory.groupByCategory() : [];
+    for (var g = 0; g < groups.length; g++) {
+      for (var s = 0; s < groups[g].slots.length; s++) {
+        var item = this.game.data.getItem(groups[g].slots[s].itemId);
+        if (item && this.shop.canSell(item)) result.push({ item: item, from: item.from || null });
+      }
+    }
+    return result;
+  };
+
+  ShopScene.prototype._availableFilters = function () {
+    var entries = this._tabEntries();
+    var shop = this.shop;
+    var sources = [];
+    for (var i = 0; i < entries.length; i++) {
+      var from = entries[i].from;
+      if (entries[i].item.category === "material" && from && sources.indexOf(from) < 0) sources.push(from);
+    }
+    sources.sort(function (a, b) { return shop._fromOrder(a) - shop._fromOrder(b); });
+    var candidates = BASE_FILTERS.concat(sources.map(function (f) { return "from:" + f; }));
+    return candidates.filter(function (filter) {
+      if (filter === "all") return true;
+      for (var k = 0; k < entries.length; k++) {
+        if (filterMatches(filter, entries[k].item, entries[k].from)) return true;
+      }
+      return false;
+    });
+  };
+
+  ShopScene.prototype._currentFilter = function () {
+    var filters = this.filters || ["all"];
+    return filters.indexOf(this.game.shopFilter) >= 0 ? this.game.shopFilter : "all";
+  };
+
+  ShopScene.prototype._changeFilter = function (direction) {
+    if (!this.filters || this.filters.length <= 1) return;
+    var index = this.filters.indexOf(this._currentFilter());
+    this.game.shopFilter = this.filters[(index + direction + this.filters.length) % this.filters.length];
+    this.notice.clear();
+    this._rebuildList();
+  };
+
+  /** 絞り込みの名前（札に出す） */
+  ShopScene.prototype._filterName = function (filter) {
+    var names = this.texts.filters || {};
+    if (filter.indexOf("from:") === 0) {
+      return fill(this.texts.filterSource || "{name}", { name: this.shop.getFromName(filter.slice(5)) });
+    }
+    return names[filter] || filter;
+  };
+
+  ShopScene.prototype._clickedFilterLabel = function (input) {
+    var pointer = input.getPointer ? input.getPointer() : null;
+    return !!(pointer && pointer.clicked && this._filterRect && NS.Panel.containsPoint(this._filterRect, pointer));
+  };
+
+  /** 一覧の右上の絞り込みの札（「≡ 素材・苔むす坑道」）。右端を一覧の右端にそろえる。押すと次に変わる */
+  ShopScene.prototype._renderFilterLabel = function () {
+    this._filterRect = null;
+    var pos = this.layout.filter;
+    if (!pos || !this.filters || this.phase !== "list") return;
+    var t = this.theme;
+    var filter = this._currentFilter();
+    var text = fill(this.texts.filterLabel || "{name}", { name: this._filterName(filter) });
+    var ctx = this.panel.ctx;
+    ctx.save();
+    ctx.font = t.smallFont || "12px monospace";
+    var w = ctx.measureText(text).width;
+    ctx.restore();
+    var x = pos.right - w;
+    this._filterRect = { x: x - 8, y: pos.y - 17, w: w + 16, h: 24 };
+    ctx.save();
+    ctx.fillStyle = filter === "all" ? "rgba(74,107,168,0.18)" : "rgba(74,107,168,0.4)";
+    ctx.fillRect(this._filterRect.x, this._filterRect.y, this._filterRect.w, this._filterRect.h);
+    ctx.strokeStyle = filter === "all" ? (t.panelBorder || "#3a4266") : (t.cursorColor || "#ffd75e");
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this._filterRect.x + 0.5, this._filterRect.y + 0.5, this._filterRect.w - 1, this._filterRect.h - 1);
+    ctx.restore();
+    this.panel.drawText(text, x, pos.y, { font: t.smallFont, color: filter === "all" ? t.subTextColor : t.cursorColor });
   };
 
   /**
@@ -193,9 +316,11 @@
     var rows = [];
     var lastCategory = null;
     var lastFrom = null;
+    var filter = this._currentFilter();
 
     for (var i = 0; i < stock.length; i++) {
       var item = stock[i].item;
+      if (!filterMatches(filter, item, stock[i].from)) continue;
 
       // 分類が変わったら見出しを挟む（持ち物の画面と同じ見せ方にそろえる）
       var category = this.shop.getCategory(item);
@@ -249,6 +374,7 @@
     if (!inventory) return rows;
 
     var groups = inventory.groupByCategory();
+    var filter = this._currentFilter();
 
     for (var g = 0; g < groups.length; g++) {
       var group = groups[g];
@@ -258,6 +384,7 @@
         var slot = group.slots[s];
         var item = this.game.data.getItem(slot.itemId);
         if (!item || !this.shop.canSell(item)) continue;
+        if (!filterMatches(filter, item, item.from || null)) continue;
 
         var price = this.shop.getSellPrice(item);
         entries.push({
@@ -303,6 +430,13 @@
     if (this._clickedShopTab(input)) return;
     if (this._clickedTab(input)) return;
     if (this._clickedKeeper(input)) { this._say("idle"); return; }
+    // 絞り込み（F・札を押す。v1.4.0）
+    if (input.isPressed("filter") || this._clickedFilterLabel(input)) { this._changeFilter(1); return; }
+
+    // 右の説明欄（バー・ホイール）。バーを触っている間はほかの操作を見ない
+    this._detailContent();
+    var paneResult = this.pane.handleInput(input);
+    if (paneResult && paneResult.bar) return;
 
     // ScrollList が扱うのは上下移動だけ。決定・取消はここで見る
     this.list.handleInput(input);
@@ -605,6 +739,7 @@
     this._renderHeading();
     this._renderShopTabs();
     this._renderTabs();
+    this._renderFilterLabel();
     this._renderKeeper();
     this._renderGold();
     this.list.render(this.game.clock);
@@ -825,122 +960,221 @@
         color: pos.color || this.theme.cursorColor });
   };
 
-  /** 右側：選んでいる品物の説明 */
+  // --- 右の説明（v1.4.0） ---
+
+  /** 右側：選んでいる品物（加護）の説明。枠・バーは DetailPane が描く */
   ShopScene.prototype._renderDetail = function () {
-    var rect = this.layout.detail;
-    if (!rect) return;
+    if (!this.layout.detail) return;
+    this._detailContent();
+    var empty = (this.getTab() === "buy") ? this.texts.noStock : this.texts.nothingToSell;
+    this.pane.render(empty || "");
+  };
 
-    this.panel.drawBox(rect);
-
+  /** 選んでいる行の説明 { head, lines }。選ぶもの・一覧が変わったら作り直す */
+  ShopScene.prototype._detailContent = function () {
     var selected = this.list.getSelected();
-    if (!selected) {
-      var empty = (this.getTab() === "buy") ? this.texts.noStock : this.texts.nothingToSell;
-      this.panel.drawText(empty || "", rect.x + (this.theme.padding || 8), rect.y + 30,
-        { font: this.theme.smallFont, color: this.theme.hintColor });
-      return;
+    var key = null;
+    if (selected) {
+      key = selected.blessingId ? ("blessing:" + selected.blessingId)
+          : (selected.value ? (this.getTab() + ":" + selected.value.itemId) : null);
     }
-
-    // 謎の商人が並べているのはアイテムではないので、別に描く
-    if (selected.blessingId) {
-      this._renderBlessingDetail(rect, selected.blessingId);
-      return;
+    if (key !== this._detailKey) {
+      this._detailKey = key;
+      this._detailCache = null;
     }
+    if (key && !this._detailCache) {
+      this._detailCache = selected.blessingId
+        ? this._buildBlessingDetail(selected.blessingId)
+        : this._buildItemDetail(selected.value);
+    }
+    var content = key ? this._detailCache : null;
+    this.pane.setContent(content, key);
+    return content;
+  };
 
-    // 選べるが買えない行（もう持っている加護など）は value を持たない
-    if (!selected.value) return;
+  ShopScene.prototype._buildItemDetail = function (choice) {
+    var data = this.game.data;
+    var item = data.getItem(choice.itemId);
+    if (!item) return null;
 
-    var item = this.game.data.getItem(selected.value.itemId);
-    if (!item) return;
-
+    var texts = this.texts;
     var t = this.theme;
-    var origin = this.panel.innerOrigin(rect);
-    var lh = t.lineHeight || 18;
-    var y = origin.y + 20;
+    var rect = this.layout.detail || {};
+    var lines = [];
+    var i;
 
-    // 左上に絵を大きく出し、名前と分類はその右に並べる
-    var indent = NS.StatusMarks.drawItemIcon(this.sprites, item, origin.x, origin.y + 4, t);
-    this.panel.drawText(item.name, origin.x + indent, y);
-    y += lh + 4;
+    var category = ((data.categories || {}).item || {})[item.category] || { name: item.category || "" };
+    var chipLabel = category.name + (item.equip ? "・" + NS.EffectSystem.slotName(item, data) : "");
+    var count = this.game.inventory ? this.game.inventory.getCount(item.id) : 0;
+    var sub = (this.getTab() === "sell")
+      ? fill(texts.ownedSell, { count: count, price: choice.price })
+      : fill(texts.owned, { count: count });
 
-    var category = ((this.game.data.categories || {}).item || {})[item.category];
-    if (category) {
-      this.panel.drawText(category.name, origin.x + indent, y,
-        { font: t.smallFont, color: category.color });
-      y += lh;
+    var desc = wrapText(item.description || "", rect.charsPerLine || 26);
+    for (i = 0; i < desc.length; i++) lines.push({ text: desc[i] });
+
+    if (item.equip) {
+      lines.push({});
+      lines.push({ text: texts.effectLabel || "", heading: true });
+      var effects = item.equip.effects || [];
+      for (i = 0; i < effects.length; i++) lines.push({ text: "・" + this._describeEffect(effects[i]) });
+
+      // 仲間がつけると（連れている仲間だけ）
+      var members = (this.game.party && this.game.party.getMembers) ? this.game.party.getMembers() : [];
+      if (members.length > 0) {
+        lines.push({});
+        lines.push({ text: texts.compareLabel || "", heading: true });
+        for (i = 0; i < members.length; i++) this._pushCompare(lines, members[i], item);
+      }
+    } else if (NS.DexScene && NS.DexScene.itemUses) {
+      // 素材など：工房での使い道（売る前に、まだ使うものか分かるように）
+      var uses = NS.DexScene.itemUses(this.game, item.id, { reveal: true });
+      if (uses.length > 0) {
+        lines.push({});
+        lines.push({ text: texts.usedInLabel || "", heading: true });
+        for (i = 0; i < uses.length; i++) lines.push(uses[i]);
+      }
     }
-    if (indent > 0) y = Math.max(y, origin.y + 4 + NS.StatusMarks.itemIconSize(t) + 16);
 
-    this.panel.drawText(
-      fill(this.texts.owned, { count: this.game.inventory.getCount(item.id) }),
-      origin.x, y, { font: t.smallFont, color: t.subTextColor });
-    y += lh + 6;
+    return {
+      head: { icon: item.icon, name: item.name, chips: chipLabel ? [{ label: chipLabel, color: category.color }] : [], sub: sub },
+      lines: lines
+    };
+  };
 
-    var lines = wrapText(item.description || "", rect.charsPerLine || 18);
-    for (var i = 0; i < lines.length; i++) {
-      this.panel.drawText(lines[i], origin.x, y, { font: t.smallFont, color: t.subTextColor });
-      y += lh;
+  /**
+   * 仲間1体が、その装備を着けたらどう変わるか。
+   * 枠が埋まっていれば、いちばん古いものと入れ替える（Game.equipItem と同じ決まり）。
+   * 能力の行：「攻撃+4 防御-1」。上がるだけなら緑・下がるだけなら赤・両方なら黄。
+   */
+  ShopScene.prototype._pushCompare = function (lines, member, item) {
+    var data = this.game.data;
+    var texts = this.texts;
+    var t = this.theme;
+    var species = member.getSpecies ? member.getSpecies() : null;
+    var row = { sprite: species ? species.sprite : null, text: member.getName() + "  Lv" + member.level };
+    var worn = (member.equipment || []).slice();
+
+    if (worn.indexOf(item.id) >= 0) {
+      row.right = texts.compareWorn || "";
+      row.rightColor = t.hintColor;
+      lines.push(row);
+      return;
     }
 
-    // 装備なら枠と効果も出す
-    if (!item.equip) return;
+    var slot = NS.EffectSystem.slotOf(item);
+    var capacity = NS.EffectSystem.slotCapacity(data, slot);
+    if (capacity <= 0) {
+      row.right = texts.compareNoSlot || "";
+      row.rightColor = t.hintColor;
+      lines.push(row);
+      return;
+    }
 
-    y += 6;
-    this.panel.drawText((this.texts.effectLabel || "")
-        + "（" + NS.EffectSystem.slotName(item, this.game.data) + "）",
-      origin.x, y, { font: t.smallFont, color: t.cursorColor });
-    y += lh;
+    var replaced = null;
+    var inSlot = worn.filter(function (id) {
+      var it = data.getItem(id);
+      return it && it.equip && NS.EffectSystem.slotOf(it) === slot;
+    });
+    if (inSlot.length >= capacity) {
+      replaced = inSlot[0];
+      worn.splice(worn.indexOf(replaced), 1);
+    }
+    worn.push(item.id);
 
-    var effects = item.equip.effects || [];
-    for (var k = 0; k < effects.length; k++) {
-      this.panel.drawText("・" + this._describeEffect(effects[k]), origin.x, y,
-        { font: t.smallFont, color: t.subTextColor });
-      y += lh;
+    var changes = this._statChanges(member, worn).filter(function (c) { return c.after !== c.before; });
+    if (changes.length === 0) {
+      row.right = texts.compareNone || "";
+      row.rightColor = t.hintColor;
+    } else {
+      // 上がる能力は緑、下がる能力は赤。1つずつ色を分ける
+      // （2026-11-12 作者「＋とーの色表記の間違い。どちらかに依存してしまっている」。前は行ごと1色だった）
+      var upColor = t.hpBarHigh || "#5fd18c";
+      var downColor = t.hpBarLow || "#e8542a";
+      row.rightParts = changes.map(function (c) {
+        var d = c.after - c.before;
+        return { text: c.label + (d > 0 ? "+" : "") + d, color: d > 0 ? upColor : downColor };
+      });
+      row.right = row.rightParts.map(function (p) { return p.text; }).join(" ");
+    }
+    lines.push(row);
+
+    if (replaced) {
+      var old = data.getItem(replaced) || {};
+      lines.push({ indent: 24, icon: old.icon, text: fill(texts.compareSwap, { name: old.name || replaced }), dim: true });
     }
   };
 
   /**
-   * 謎の商人の説明欄。並んでいるのは加護なので、アイテムとは中身が違う。
-   *
-   * 買う前は値段、買ったあとは「所持」を出す。
-   * 買ったあとも説明が読めるようにしてあるのは、
-   * 「何を買ったのか」をこの画面で確かめられるようにするため。
+   * 装備を一時的に差し替えて、能力の前と後を比べる（仲間の画面の _statChanges と同じやり方）。
+   * 必ず元へ戻す。能力は呼ぶたびに計算されるので、持ち主の状態は変わらない
    */
-  ShopScene.prototype._renderBlessingDetail = function (rect, blessingId) {
+  ShopScene.prototype._statChanges = function (monster, equipment) {
+    var party = (this.game.data.messages || {}).party || {};
+    var stats = [
+      { label: "HP", read: function (m) { return m.getMaxHp(); } },
+      { label: party.attackLabel || "攻撃",  read: function (m) { return m.getAttack(); } },
+      { label: party.defenseLabel || "防御", read: function (m) { return m.getDefense(); } },
+      { label: party.speedLabel || "素早さ", read: function (m) { return m.getSpeed(); } },
+      { label: "PP", read: function (m) { return m.getMaxPp(); } }
+    ];
+    var before = stats.map(function (st) { return st.read(monster); });
+    var original = monster.equipment;
+    monster.equipment = equipment;
+    var result = [];
+    try {
+      for (var i = 0; i < stats.length; i++) {
+        result.push({ label: stats[i].label, before: before[i], after: stats[i].read(monster) });
+      }
+    } finally {
+      monster.equipment = original;
+    }
+    return result;
+  };
+
+  /**
+   * 謎の商人の加護。買う前は値段、買ったあとは「所持」と、いま選択肢に入っているか
+   * （上限があるので、買ったのに出てこない加護がありうる）。
+   */
+  ShopScene.prototype._buildBlessingDetail = function (blessingId) {
     var blessing = (this.game.data.blessings || {})[blessingId];
-    if (!blessing) return;
+    if (!blessing) return null;
 
+    var texts = this.texts;
     var t = this.theme;
-    var origin = this.panel.innerOrigin(rect);
-    var lh = t.lineHeight || 18;
-    var y = origin.y + 20;
+    var rect = this.layout.detail || {};
     var owned = this.game.hasBoughtBlessing(blessingId);
-
-    this.panel.drawText(blessing.name, origin.x, y);
-    y += lh + 4;
-
-    this.panel.drawText(
-      owned ? (this.texts.blessingOwned || "")
-            : fill(this.texts.blessingPrice, { price: blessing.price || 0 }),
-      origin.x, y,
-      { font: t.smallFont, color: owned ? t.subTextColor : t.cursorColor });
-    y += lh + 6;
-
-    var lines = wrapText(blessing.description || "", rect.charsPerLine || 18);
-    for (var i = 0; i < lines.length; i++) {
-      this.panel.drawText(lines[i], origin.x, y, { font: t.smallFont, color: t.subTextColor });
-      y += lh - 2;
+    var chips = [];
+    if (NS.BlessingSystem && NS.BlessingSystem.getRarity) {
+      var rarity = NS.BlessingSystem.getRarity(this.game.data, blessing);
+      if (rarity) chips.push({ label: (((this.game.data.messages || {}).dex || {}).rarityLabel || "") + rarity.label, color: rarity.color || t.subTextColor });
     }
 
-    // 買ってあるものは、いま選択肢に入っているかどうかまで出す
-    // （上限があるので、買ったのに出てこない加護がありうる）
-    if (!owned) return;
+    var lines = [];
+    var desc = wrapText(blessing.description || "", rect.charsPerLine || 26);
+    for (var i = 0; i < desc.length; i++) lines.push({ text: desc[i] });
+    var effects = blessing.effects || [];
+    if (effects.length > 0) {
+      lines.push({});
+      lines.push({ text: texts.effectLabel || "", heading: true });
+      for (var k = 0; k < effects.length; k++) {
+        var text = NS.EffectSystem.describeEffect(effects[k], this.game.data);
+        if (text) lines.push({ text: "・" + text });
+      }
+    }
+    if (owned) {
+      lines.push({});
+      lines.push({ text: this.game.isBlessingActive(blessingId) ? (texts.blessingActive || "") : (texts.blessingInactive || ""), dim: true });
+    }
 
-    y += 8;
-    this.panel.drawText(
-      this.game.isBlessingActive(blessingId)
-        ? (this.texts.blessingActive || "")
-        : (this.texts.blessingInactive || ""),
-      origin.x, y, { font: t.smallFont, color: t.hintColor });
+    return {
+      head: {
+        icon: "iconBlessing", name: blessing.name, chips: chips,
+        sub: owned ? (texts.blessingOwned || "") : fill(texts.blessingPrice, { price: blessing.price || 0 }),
+        subColor: owned ? t.subTextColor : t.cursorColor
+      },
+      lines: lines
+    };
   };
 
   /** 装備の効果1つを文章にする（組み立ては EffectSystem に任せる） */
@@ -969,6 +1203,9 @@
     // 店が1軒しか開いていないときに「店を変える」と書いても混乱するだけ
     else if (this.shops.length > 1) hint = this.texts.hintShops || this.texts.hint;
     else hint = this.texts.hint;
+    if (this.phase === "list") {
+      hint = fill(hint || "", { extra: (this.filters && this.filters.length > 1) ? (this.texts.hintFilter || "") : "" });
+    }
 
     this.panel.drawText(hint || "", pos.x, pos.y,
       { font: this.theme.smallFont, color: this.theme.hintColor });
@@ -987,6 +1224,21 @@
   function wrapText(text, charsPerLine) {
     return NS.wrapText(text, charsPerLine);
   }
+
+  /**
+   * 連れている仲間ごとの「その装備をつけたら」の行（お店と同じもの）。持ち物の画面でも使う
+   * @returns {object[]} DetailPane の行
+   */
+  ShopScene.compareLines = function (game, item) {
+    var view = Object.create(ShopScene.prototype);
+    view.game = game;
+    view.texts = (game.data.messages || {}).shop || {};
+    view.theme = (game.data.ui || {}).theme || {};
+    var members = (game.party && game.party.getMembers) ? game.party.getMembers() : [];
+    var lines = [];
+    for (var i = 0; i < members.length; i++) view._pushCompare(lines, members[i], item);
+    return lines;
+  };
 
   NS.ShopScene = ShopScene;
 })(window.MyGame);

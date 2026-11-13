@@ -557,6 +557,8 @@
       leadName: lead ? (lead.nickname || (species ? species.name : lead.speciesId)) : "",
       level: lead ? (lead.level || 1) : 0,
       partyCount: party.length,
+      // 連れている仲間（絵を並べるため。v1.4.0）
+      members: party.map(function (m) { return { speciesId: m.speciesId, level: m.level || 1 }; }),
       gold: payload.gold || 0,
       cleared: Object.keys(payload.clearedDungeons || {}).length,
       // 合計プレイ時間（ミリ秒）。古いセーブには無いので0

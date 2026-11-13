@@ -108,6 +108,84 @@
         run: checkBattleFuzz
       },
       {
+        title: "図鑑をぜんぶめくっても止まらない",
+        since: "v1.4.0",
+        why: "図鑑を見開きの本に作り直した。何も分かっていない・出会っただけ・ぜんぶ分かった、の3つの進み具合で、モンスターを全部めくり、ほかの表も下まで送る。止まる・文に undefined が出る・まだ出会っていない相手の名前や説明が見えてしまう・文がページからはみ出す、が起きないかを見る。",
+        run: checkDex
+      },
+      {
+        title: "工房の説明が崩れない",
+        since: "v1.4.0",
+        why: "工房の右に、足りない素材の手に入る場所を開けるようにした（図鑑と同じ中身。はじめは閉じている）。何も分かっていない・ぜんぶ分かった・素材をたくさん持っている、の3つで、レシピを全部選び、C で開いて、説明をバーの端まで送る。開く前から手に入る場所が出る・C で開かない・文に undefined が出る・まだ出会っていない相手の名前が見える・足りているのに手に入る場所が出る・文が枠からはみ出す、が起きないかを見る。",
+        run: checkCraft
+      },
+      {
+        title: "お店の説明が崩れない",
+        since: "v1.4.0",
+        why: "お店の右に、装備の「仲間がつけると」（連れている仲間ごとの能力の変わり方）と素材の使い道を出すようにした。すべての店の買う・売るを全部選び、文に undefined が出る・見比べで仲間の装備や能力が変わってしまう・文が枠からはみ出す、が起きないかを見る。",
+        run: checkShop
+      },
+      {
+        title: "持ち物の説明が崩れない",
+        since: "v1.4.0",
+        why: "使う道具の効果・装備の見比べ・素材の使い道・手に入る場所の開け閉めが、どの品でも崩れない",
+        run: checkItems
+      },
+      {
+        title: "仲間の画面の説明が崩れない",
+        since: "v1.4.0",
+        why: "全種族で一覧・預かり所の右の欄と、様子を見るの3ページを描き、文がはみ出さない・最後まで送れる・装備が変わらないことを見る",
+        run: checkParty
+      },
+      {
+        title: "設定の画面が崩れない",
+        since: "v1.4.0",
+        why: "項目名と横棒・すべての値と ▶・説明・操作キーの名前と札が、枠に収まって重ならない",
+        run: checkSettings
+      },
+      {
+        title: "お店の絞り込み",
+        since: "v1.4.0",
+        why: "F で分類・素材の手に入る場所に絞れる。空の絞り込みが札に出たり、数が合わなかったりしないか",
+        run: checkShopFilter
+      },
+      {
+        title: "加護を選ぶ",
+        since: "v1.4.0",
+        why: "等級・入れている・外しているで絞れる。違う加護が混ざらないか、入れ外しで選択が飛ばないか",
+        run: checkBlessingSelect
+      },
+      {
+        title: "ダンジョンを選ぶ",
+        since: "v1.4.0",
+        why: "右の説明を共通の部品にした。クリアの進みごとに、文がはみ出さず、モンスターと品が漏れなく並ぶか",
+        run: checkDungeonSelect
+      },
+      {
+        title: "加護の選択・挑戦の結果・セーブの画面が崩れない",
+        since: "v1.4.0",
+        why: "v1.4.0 で絵と札を足した。どの加護でも文が枠に収まるか、結果に仲間のレベルの伸びが出るか、セーブの行で文が重ならないか",
+        run: checkRunScreens
+      },
+      {
+        title: "遊び方・拠点のひと言・折り返し",
+        since: "v1.4.0",
+        why: "v1.4.0 で遊び方の右を共通の部品にし、拠点に選んでいる項目のひと言を足した。「Q / E」が2行に割れていたのも直した",
+        run: checkHelpHome
+      },
+      {
+        title: "名前と見た目を決める画面が崩れない",
+        since: "v1.4.0",
+        why: "v1.4.0 で左の姿に台・向きの札・冒険中の大きさ、右に見出し、下にひと言を足した。名前が8文字でも、どの欄でも文が枠や戻るボタンにかからないか。Q/E の向きと R のおまかせも",
+        run: checkPlayerSetup
+      },
+      {
+        title: "戦闘の効き目・範囲・ログ",
+        since: "v1.4.0",
+        why: "v1.4.0 で、スカウトした相手にだけ技の効き目の印、技の説明に範囲の札、ターンの頭にログを足した。知らない相手に印が出ないか・札が重ならないか・ログが開け閉めできるか",
+        run: checkBattleMarks
+      },
+      {
         title: "版の名前がそろっている",
         since: "v1.3.1",
         why: "data/config.js の version・パッチノートの先頭・README の「現在のバージョン」が同じ。「開発中」の日付は先頭の版だけ。",
@@ -435,7 +513,1216 @@
       return { ok: keys.length === 0, lines: lines };
     }
 
-    // --- 4. 版の名前 ---
+    // --- 図鑑（見開きの本） ---
+    function checkDex(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var canvas = document.createElement("canvas");
+      canvas.width = 800; canvas.height = 600;
+      var g2 = canvas.getContext("2d");
+
+      // 画面に書いた文字をぜんぶ拾う
+      var drawn = [], badTexts = [];
+      var fill = g2.fillText;
+      g2.fillText = function (s) {
+        s = String(s);
+        drawn.push(s);
+        if (/undefined|NaN|null|\[object/.test(s) && badTexts.length < 8) badTexts.push(s);
+        return fill.apply(g2, arguments);
+      };
+
+      var ids = Object.keys(gd.monsters);
+      var pressed = {};
+      var input = {
+        isPressed: function (a) { return !!pressed[a]; },
+        isDown: function () { return false; },
+        getPointer: function () { return { x: -1, y: -1, inside: false, clicked: false, wheel: 0, moved: false, down: false }; }
+      };
+      var cleared = {};
+      Object.keys(gd.dungeons || {}).forEach(function (k) { cleared[k] = true; });
+
+      function makeScene(mode) {
+        var d = new NS.Discovery();
+        ids.forEach(function (id) {
+          if (mode === "seen") d.markMonsterSeen(id);
+          if (mode === "all") { d.markMonsterCaught(id); d.markAffectionStage(id, 3); }
+        });
+        if (mode === "all") {
+          Object.keys(gd.items).forEach(function (id) { d.markItemObtained(id); });
+          Object.keys(gd.skills).forEach(function (id) { d.markSkillLearned(id); });
+        }
+        var game = {
+          ctx: g2, canvas: canvas, data: gd, assets: null, clock: 0, input: input, discovery: d,
+          inventory: { getCount: function () { return 0; } }, clearedDungeons: cleared,
+          scenes: { change: function () {} },
+          hasBoughtBlessing: function () { return mode === "all"; }
+        };
+        return new NS.DexScene(game, null);
+      }
+      function step(scene, action) {
+        pressed = {};
+        if (action) pressed[action] = true;
+        scene.game.clock += 16;
+        scene.update();
+        pressed = {};
+        scene.render(g2);
+      }
+
+      var lines = [], ok = true, pages = 0;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var tabCount = 6;
+      var leaks = { none: [], seen: [], other: [] }, wide = [], manyDrops = [];
+
+      ["none", "seen", "all"].forEach(function (mode) {
+        var scene = makeScene(mode);
+        var view = scene._pageView(), geo = scene._geo();
+        var widthLimit = view.x + view.w - geo.lx;
+
+        // モンスターの表：ぜんぶめくる。1体ごとに、落とすものの続きと文の送りも押す
+        for (var i = 0; i < ids.length; i++) {
+          drawn = [];
+          step(scene, null);
+          step(scene, "confirm");
+          step(scene, "down");
+          var id = scene.monsterId, m = gd.monsters[id];
+          var all = drawn.join("\n");
+          if (mode === "none" && all.indexOf(m.name) >= 0) leaks.none.push(m.name);
+          if (mode === "seen") {
+            var head = (m.description || "").slice(0, 8);
+            if (head && all.indexOf(head) >= 0) leaks.seen.push(m.name);
+          }
+          if (mode === "all") {
+            g2.font = (gd.ui.theme || {}).smallFont || "12px monospace";
+            scene._pageLines().forEach(function (line) {
+              if (line.text && g2.measureText(line.text).width > widthLimit) wide.push(m.name + "「" + line.text + "」");
+            });
+            scene._dropPages(id).forEach(function (p) { if (p.drops.length > 3) manyDrops.push(m.name); });
+          }
+          pages++;
+          step(scene, "right");
+        }
+        expect(scene.monsterId === scene.monsterIds[0], modeName(mode) + "：モンスター " + ids.length + " 体をめくって、最初のページに戻った");
+
+        // 並べ替えをひと回り
+        for (var s = 0; s < 4; s++) step(scene, "sort");
+
+        // ほかの表：栞を送り、一覧を下まで送る。説明が長ければ読むところへ入って出る
+        drawn = [];
+        for (var t = 1; t < tabCount; t++) {
+          step(scene, "nextTab");
+          var rows = scene.list.rows.length;
+          for (var r = 0; r < rows; r++) {
+            step(scene, "down");
+            if (r % 7 === 0) { step(scene, "confirm"); step(scene, "down"); step(scene, "cancel"); }
+            pages++;
+          }
+          if (scene._hasSort()) step(scene, "sort");
+        }
+        if (mode === "none") {
+          var otherText = drawn.join("\n");
+          ids.forEach(function (id) {
+            var name = gd.monsters[id].name;
+            if (name && otherText.indexOf(name) >= 0 && leaks.other.indexOf(name) < 0) leaks.other.push(name);
+          });
+        }
+        step(scene, "nextTab");
+        expect(scene.getTab() === "monsters", modeName(mode) + "：栞を6つ送って、モンスターの表に戻った");
+      });
+
+      expect(badTexts.length === 0, "文に undefined や NaN が出ない" + (badTexts.length ? "（出た：" + badTexts.join(" / ") + "）" : ""));
+      expect(leaks.none.length === 0, "まだ出会っていない相手の名前は出ない" + (leaks.none.length ? "（出た：" + leaks.none.slice(0, 5).join("・") + "）" : ""));
+      expect(leaks.other.length === 0, "何も分かっていないとき、アイテム・特性・技などの説明にもモンスターの名前は出ない" + (leaks.other.length ? "（出た：" + leaks.other.slice(0, 5).join("・") + "）" : ""));
+      expect(leaks.seen.length === 0, "出会っただけの相手の説明は出ない" + (leaks.seen.length ? "（出た：" + leaks.seen.slice(0, 5).join("・") + "）" : ""));
+      expect(wide.length === 0, "左のページの文がページの幅に収まる" + (wide.length ? "（はみ出す：" + wide.slice(0, 3).join(" ") + "）" : ""));
+      expect(manyDrops.length === 0, "落とすものは1度に3つまで" + (manyDrops.length ? "（多い：" + manyDrops.join("・") + "）" : ""));
+      lines.unshift("何も分かっていない・出会っただけ・ぜんぶ分かった、の3つの進み具合で " + pages + " ページを描いた");
+      return { ok: ok, lines: lines };
+
+      function modeName(mode) { return mode === "none" ? "何も分かっていない" : mode === "seen" ? "出会っただけ" : "ぜんぶ分かった"; }
+    }
+
+    // --- 工房の右の説明（v1.4.0） ---
+    function checkCraft(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var canvas = document.createElement("canvas");
+      canvas.width = 800; canvas.height = 600;
+      var g2 = canvas.getContext("2d");
+
+      var drawn = [], badTexts = [];
+      var fill = g2.fillText;
+      g2.fillText = function (s) {
+        s = String(s);
+        drawn.push(s);
+        if (/undefined|NaN|null|\[object/.test(s) && badTexts.length < 8) badTexts.push(s);
+        return fill.apply(g2, arguments);
+      };
+
+      var pressed = {};
+      var IDLE = { x: -1, y: -1, inside: false, clicked: false, wheel: 0, moved: false, down: false };
+      var pointer = IDLE;
+      var input = {
+        isPressed: function (a) { return !!pressed[a]; },
+        isDown: function () { return false; },
+        getPointer: function () { return pointer; }
+      };
+      var cleared = {};
+      Object.keys(gd.dungeons || {}).forEach(function (k) { cleared[k] = true; });
+      var ids = Object.keys(gd.monsters);
+
+      function makeScene(mode) {
+        var d = new NS.Discovery();
+        if (mode === "all") {
+          ids.forEach(function (id) { d.markMonsterCaught(id); });
+          Object.keys(gd.items).forEach(function (id) { d.markItemObtained(id); });
+        }
+        // 素材は「何も持っていない」（どの素材の下にも手に入る場所が出る）か「たくさん持っている」
+        var many = (mode === "rich");
+        var game = {
+          ctx: g2, canvas: canvas, data: gd, assets: null, clock: 0, input: input, discovery: d,
+          inventory: { getCount: function () { return many ? 99 : 0; } },
+          clearedDungeons: cleared, gold: many ? 99999 : 0,
+          canAfford: function (n) { return many || n <= 0; },
+          audio: { playBgm: function () {}, playSe: function () {} },
+          playError: function () {},
+          scenes: { change: function () {} }
+        };
+        return new NS.CraftScene(game, null);
+      }
+      function step(scene, action) {
+        pressed = {};
+        if (action) pressed[action] = true;
+        scene.game.clock += 16;
+        scene.update(16);
+        pressed = {};
+        scene.render(g2);
+      }
+
+      var lines = [], ok = true, pages = 0, leaks = [], wide = [], noSources = 0, openedEarly = 0, notOpened = 0;
+      function sourceRows(content) {
+        return content.lines.filter(function (l) { return l.sprite || l.unknownSprite || l.icon === "iconShop" || l.icon === "iconCraft"; }).length;
+      }
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+
+      ["none", "all", "rich"].forEach(function (mode) {
+        var scene = makeScene(mode);
+        var rect = scene.layout.detail;
+        var origin = scene.panel.innerOrigin(rect);
+        var rows = scene.list.rows.length;
+        for (var r = 0; r < rows; r++) {
+          drawn = [];
+          step(scene, null);
+          var content = scene._detailContent();
+          if (content) {
+            // はじめは閉じている。C で開く（開いたかは「▼」の行で見る）
+            scene.game.craftOpenSources = {};
+            scene._detailCache = null;
+            content = scene._detailContent();
+            if (sourceRows(content) > 0) openedEarly++;
+            var missing = scene._hasMissing();
+            step(scene, "menu");
+            content = scene._detailContent();
+            if (missing && !content.lines.some(function (l) { return l.toggle && /^▼/.test(l.text || ""); })) notOpened++;
+            // 説明をバーの端まで送って戻す
+            var m = scene.pane.measure();
+            if (m.total > m.visible) {
+              scene.pane.scroll = m.total - m.visible;
+              step(scene, null);
+              scene.pane.scroll = 0;
+            }
+            for (var k = 0; k < 3; k++) step(scene, "nextTab");
+            step(scene, "prevTab");
+            // 手に入る場所の「相手」の行（説明の文に名前が出るのは作者の文なので数えない）
+            if (mode === "none") {
+              content.lines.forEach(function (line) {
+                if (!line.sprite && !line.unknownSprite) return;
+                ids.forEach(function (id) {
+                  var name = gd.monsters[id].name;
+                  if (name && (line.text || "").indexOf(name) >= 0 && leaks.indexOf(name) < 0) leaks.push(name);
+                });
+                if (line.sprite && leaks.indexOf("絵") < 0) leaks.push("絵");
+              });
+            }
+            if (mode === "rich" && content.lines.some(function (l) { return l.toggle; })) noSources++;
+            g2.font = (gd.ui.theme || {}).smallFont || "12px monospace";
+            content.lines.forEach(function (line) {
+              var x = origin.x + (line.indent || 0) + ((line.sprite || line.unknownSprite) ? 24 : line.icon ? 22 : 0);
+              var w = line.text ? g2.measureText(line.text).width : 0;
+              var limit = rect.x + rect.w - 24 - (line.right ? g2.measureText(line.right).width + 8 : 0);
+              if (x + w > limit && wide.length < 5) wide.push("「" + line.text + "」");
+            });
+            pages++;
+          }
+          step(scene, "down");
+        }
+        step(scene, "filter");
+      });
+
+      // マウス：「▶ 手に入る場所」を押すと開く／バーのつまみを下までずらすと最後まで送れる
+      var mouse = makeScene("none");
+      mouse.game.craftOpenSources = {};
+      var clickOk = false, dragOk = false, longest = null;
+      for (var mr = 0; mr < mouse.list.rows.length; mr++) {
+        if (!mouse.list.rows[mr].value) continue;
+        mouse.list.setIndex(mr);
+        step(mouse, null);
+        var hit = (mouse.pane.hits || [])[1];   // 1つめの素材の「▶ 手に入る場所」
+        if (!hit) continue;
+        pointer = { x: hit.rect.x + 20, y: hit.rect.y + 8, inside: true, clicked: true, wheel: 0, moved: false, down: false };
+        step(mouse, null);
+        pointer = IDLE;
+        step(mouse, null);
+        clickOk = !!mouse.game.craftOpenSources[hit.id];
+        break;
+      }
+      // いちばん長いレシピで、つまみを下へずらす
+      mouse.game.craftOpenSources = new Proxy({}, { get: function () { return true; } });
+      for (var lr = 0; lr < mouse.list.rows.length; lr++) {
+        if (!mouse.list.rows[lr].value) continue;
+        mouse.list.setIndex(lr);
+        mouse._detailCache = null;
+        step(mouse, null);
+        var mm = mouse.pane.measure();
+        if (mm.total > mm.visible && (!longest || mm.total > longest.total)) longest = { row: lr, total: mm.total };
+      }
+      if (longest) {
+        mouse.list.setIndex(longest.row);
+        mouse._detailCache = null;
+        step(mouse, null);
+        var m2 = mouse.pane.measure();
+        var track = mouse.pane.barRect(m2), handle = mouse.pane.handleRect(track, m2);
+        var gx = track.x + 3, gy = handle.y + 4;
+        pointer = { x: gx, y: gy, inside: true, clicked: false, wheel: 0, moved: true, down: true };
+        step(mouse, null);
+        pointer = { x: gx, y: track.y + track.h + 40, inside: true, clicked: false, wheel: 0, moved: true, down: true };
+        step(mouse, null);
+        pointer = { x: gx, y: track.y + track.h + 40, inside: true, clicked: true, wheel: 0, moved: false, down: false };
+        step(mouse, null);
+        pointer = IDLE;
+        dragOk = mouse.pane.scroll === m2.total - m2.visible;
+      }
+
+      expect(badTexts.length === 0, "文に undefined や NaN が出ない" + (badTexts.length ? "（出た：" + badTexts.join(" / ") + "）" : ""));
+      expect(leaks.length === 0, "まだ出会っていない相手の名前は、手に入る場所に出ない" + (leaks.length ? "（出た：" + leaks.slice(0, 5).join("・") + "）" : ""));
+      expect(clickOk, "「▶ 手に入る場所」を押すと開く");
+      expect(!longest || dragOk, "右のバーのつまみを下までずらすと、説明の最後まで送れる" + (longest ? "（" + longest.total + " 行のレシピで）" : "（入りきらないレシピがない）"));
+      expect(openedEarly === 0, "手に入る場所は、開くまで出ない" + (openedEarly ? "（出た：" + openedEarly + " 件）" : ""));
+      expect(notOpened === 0, "C で足りない素材の手に入る場所が開く" + (notOpened ? "（開かない：" + notOpened + " 件）" : ""));
+      expect(noSources === 0, "素材が足りているときは、手に入る場所を出さない" + (noSources ? "（出た：" + noSources + " 件）" : ""));
+      expect(wide.length === 0, "右の文が枠の幅に収まる" + (wide.length ? "（はみ出す：" + wide.join(" ") + "）" : ""));
+      lines.unshift("何も分かっていない・ぜんぶ分かった・素材をたくさん持っている、の3つで " + pages + " 件のレシピを描いた");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- お店の右の説明（v1.4.0） ---
+    function checkShop(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var canvas = document.createElement("canvas");
+      canvas.width = 800; canvas.height = 600;
+      var g2 = canvas.getContext("2d");
+      var drawn = [], badTexts = [];
+      var fill = g2.fillText;
+      g2.fillText = function (s) {
+        s = String(s);
+        drawn.push(s);
+        if (/undefined|NaN|null|\[object/.test(s) && badTexts.length < 8) badTexts.push(s);
+        return fill.apply(g2, arguments);
+      };
+      var pressed = {};
+      var input = {
+        isPressed: function (a) { return !!pressed[a]; },
+        isDown: function () { return false; },
+        getPointer: function () { return { x: -1, y: -1, inside: false, clicked: false, wheel: 0, moved: false, down: false }; }
+      };
+      var cleared = {};
+      Object.keys(gd.dungeons || {}).forEach(function (k) { cleared[k] = true; });
+
+      // 連れている仲間：1体目は武器を着けている（入れ替えになる）、2体目は何も着けていない
+      var ids = Object.keys(gd.monsters);
+      var weapons = Object.keys(gd.items).filter(function (id) { var it = gd.items[id]; return it.equip && NS.EffectSystem.slotOf(it) === "weapon"; });
+      var party = new NS.Party(6);
+      var a = new NS.MonsterInstance(ids[0], 20, gd, {}); a.equipment = [weapons[0]];
+      var b = new NS.MonsterInstance(ids[1], 30, gd, {});
+      party.add(a); party.add(b);
+      var before = JSON.stringify([a.equipment, b.equipment]);
+      var stats0 = [a.getAttack(), a.getDefense(), b.getAttack(), b.getDefense()].join(",");
+
+      var game = {
+        ctx: g2, canvas: canvas, data: gd, assets: null, clock: 0, input: input,
+        discovery: new NS.Discovery(), clearedDungeons: cleared, party: party, gold: 999999,
+        inventory: { getCount: function () { return 5; }, groupByCategory: function () {
+          var cats = (gd.categories || {}).item || {};
+          return Object.keys(cats).map(function (c) {
+            return { category: cats[c], slots: Object.keys(gd.items).filter(function (id) { return gd.items[id].category === c; })
+              .map(function (id) { return { itemId: id, count: 5 }; }) };
+          });
+        } },
+        canAfford: function () { return true; },
+        hasBoughtBlessing: function (id) { return id.length % 2 === 0; },
+        isBlessingActive: function () { return true; },
+        audio: { playBgm: function () {}, playSe: function () {} },
+        playError: function () {},
+        story: null,
+        scenes: { change: function () {} }
+      };
+      var scene = new NS.ShopScene(game, null);
+      function step(action) {
+        pressed = {};
+        if (action) pressed[action] = true;
+        game.clock += 16;
+        scene.update(16);
+        pressed = {};
+        scene.render(g2);
+      }
+
+      var lines = [], ok = true, pages = 0, compared = 0, swaps = 0, wide = [];
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var rect = scene.layout.detail, origin = scene.panel.innerOrigin(rect);
+      g2.font = (gd.ui.theme || {}).smallFont || "12px monospace";
+
+      for (var sh = 0; sh < scene.shops.length; sh++) {
+        for (var tab = 0; tab < 2; tab++) {
+          var rows = scene.list.rows.length;
+          for (var r = 0; r < rows; r++) {
+            step(null);
+            var content = scene._detailContent();
+            if (content) {
+              pages++;
+              content.lines.forEach(function (line) {
+                if (line.sprite && line.right) compared++;
+                if (line.indent && line.dim && /入れ替え/.test(line.text || "")) swaps++;
+                var x = origin.x + (line.indent || 0) + ((line.sprite || line.unknownSprite) ? 24 : line.icon ? 22 : 0);
+                var w = line.text ? g2.measureText(line.text).width : 0;
+                var limit = rect.x + rect.w - 24 - (line.right ? g2.measureText(line.right).width + 8 : 0);
+                if (x + w > limit && wide.length < 5) wide.push("「" + (line.text || "") + "／" + (line.right || "") + "」");
+              });
+            }
+            step("down");
+          }
+          step("right");
+        }
+        step("nextTab");
+      }
+
+      expect(badTexts.length === 0, "文に undefined や NaN が出ない" + (badTexts.length ? "（出た：" + badTexts.join(" / ") + "）" : ""));
+      expect(compared > 0, "装備に「仲間がつけると」が出る（" + compared + " 行）");
+      expect(swaps > 0, "武器を着けている仲間には「〇〇 と入れ替え」が出る（" + swaps + " 行）");
+      expect(JSON.stringify([a.equipment, b.equipment]) === before &&
+             [a.getAttack(), a.getDefense(), b.getAttack(), b.getDefense()].join(",") === stats0,
+             "見比べたあとも、仲間の装備と能力は元のまま");
+      expect(wide.length === 0, "右の文が枠の幅に収まる" + (wide.length ? "（はみ出す：" + wide.join(" ") + "）" : ""));
+      lines.unshift("お店 " + scene.shops.length + " 軒の買う・売るで " + pages + " 件の説明を描いた");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 持ち物の右の説明（v1.4.0） ---
+    function checkItems(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var canvas = document.createElement("canvas");
+      canvas.width = 800; canvas.height = 600;
+      var g2 = canvas.getContext("2d");
+      var badTexts = [];
+      var fill = g2.fillText;
+      g2.fillText = function (s) {
+        s = String(s);
+        if (/undefined|NaN|null|\[object/.test(s) && badTexts.length < 8) badTexts.push(s);
+        return fill.apply(g2, arguments);
+      };
+      var pressed = {};
+      var input = {
+        isPressed: function (a) { return !!pressed[a]; },
+        isDown: function () { return false; },
+        getPointer: function () { return { x: -1, y: -1, inside: false, clicked: false, wheel: 0, moved: false, down: false }; }
+      };
+      var cleared = {};
+      Object.keys(gd.dungeons || {}).forEach(function (k) { cleared[k] = true; });
+
+      var ids = Object.keys(gd.monsters);
+      var weapons = Object.keys(gd.items).filter(function (id) { var it = gd.items[id]; return it.equip && NS.EffectSystem.slotOf(it) === "weapon"; });
+      var party = new NS.Party(6);
+      var a = new NS.MonsterInstance(ids[0], 20, gd, {}); a.equipment = [weapons[0]];
+      var b = new NS.MonsterInstance(ids[1], 30, gd, {});
+      party.add(a); party.add(b);
+      var before = JSON.stringify([a.equipment, b.equipment]);
+
+      var cats = (gd.categories || {}).item || {};
+      var inventory = {
+        getCount: function () { return 3; },
+        slotCount: function () { return 99; },
+        groupByCategory: function () {
+          return Object.keys(cats).map(function (c) {
+            return { category: cats[c], slots: Object.keys(gd.items).filter(function (id) { return gd.items[id].category === c; })
+              .map(function (id) { return { itemId: id, count: 3 }; }) };
+          }).filter(function (gr) { return gr.slots.length > 0; });
+        }
+      };
+      var game = {
+        ctx: g2, canvas: canvas, data: gd, assets: null, clock: 0, input: input,
+        discovery: new NS.Discovery(), clearedDungeons: cleared, party: party, gold: 0,
+        inventory: inventory, audio: { playBgm: function () {}, playSe: function () {} },
+        playError: function () {}, story: null, scenes: { change: function () {} }
+      };
+      var scene = new NS.ItemScene(game, null, "home");
+      function step(action) {
+        pressed = {};
+        if (action) pressed[action] = true;
+        game.clock += 16;
+        scene.update(16);
+        pressed = {};
+        scene.render(g2);
+      }
+
+      var lines = [], ok = true, pages = 0, uses = 0, compared = 0, crafted = 0, opened = 0, wide = [];
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var rect = scene.layout.detail, origin = scene.panel.innerOrigin(rect);
+      g2.font = (gd.ui.theme || {}).smallFont || "12px monospace";
+      var seen = {};
+
+      // 1回目：閉じたまま全部。2回目：C で開いて全部
+      for (var pass = 0; pass < 2; pass++) {
+        scene.list.setIndex(0);
+        for (var guard = 0; guard < 400; guard++) {
+          step(null);
+          var sel = scene.list.getSelected();
+          if (!sel) { step("down"); continue; }
+          var key = pass + ":" + sel.value;
+          if (seen[key]) break;
+          seen[key] = true;
+          if (pass === 1) { step("menu"); }
+          var content = scene._detailContent();
+          if (content) {
+            pages++;
+            var item = gd.items[sel.value];
+            content.lines.forEach(function (line) {
+              if (/^・/.test(line.text || "") && item.effect && line.text.indexOf("・") === 0) uses++;
+              if (line.sprite && line.right) compared++;
+              if (line.toggle && /^▼/.test(line.text)) opened++;
+              var x = origin.x + (line.indent || 0) + ((line.sprite || line.unknownSprite) ? 24 : line.icon ? 22 : 0);
+              var w = line.text ? g2.measureText(line.text).width : 0;
+              var limit = rect.x + rect.w - 24 - (line.right ? g2.measureText(line.right).width + 8 : 0);
+              if (x + w > limit && wide.length < 5) wide.push("「" + (line.text || "") + "／" + (line.right || "") + "」");
+            });
+            if (!item.equip && !item.effect && content.lines.some(function (l) { return l.heading && l.text === scene.texts.usedInLabel; })) crafted++;
+          }
+          if (pass === 1) step("menu");
+          step("down");
+        }
+      }
+      var openLeft = Object.keys(game.craftOpenSources || {}).length;
+
+      expect(badTexts.length === 0, "文に undefined や NaN が出ない" + (badTexts.length ? "（出た：" + badTexts.join(" / ") + "）" : ""));
+      expect(uses > 0, "使う道具に「使うと」が出る（" + uses + " 行）");
+      expect(compared > 0, "装備に「仲間がつけると」が出る（" + compared + " 行）");
+      expect(crafted > 0, "素材に「使い道（工房）」が出る（" + crafted + " 件）");
+      expect(opened === pages / 2, "C で「手に入る場所」が開く（" + opened + " / " + (pages / 2) + " 件）");
+      expect(openLeft === 0, "もう一度 C で閉じる（開いたまま " + openLeft + " 件）");
+      expect(JSON.stringify([a.equipment, b.equipment]) === before, "見比べたあとも、仲間の装備は元のまま");
+      expect(wide.length === 0, "右の文が枠の幅に収まる" + (wide.length ? "（はみ出す：" + wide.join(" ") + "）" : ""));
+      lines.unshift("持ち物 " + (pages / 2) + " 品の説明を、閉じたまま・開いて描いた");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 仲間の画面・様子を見るの説明（v1.4.0） ---
+    function checkParty(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var canvas = document.createElement("canvas");
+      canvas.width = 800; canvas.height = 600;
+      var g2 = canvas.getContext("2d");
+      var badTexts = [];
+      var fill = g2.fillText;
+      g2.fillText = function (s) {
+        s = String(s);
+        if (/undefined|NaN|null|\[object/.test(s) && badTexts.length < 8) badTexts.push(s);
+        return fill.apply(g2, arguments);
+      };
+      var pressed = {};
+      var input = {
+        isPressed: function (a) { return !!pressed[a]; },
+        isDown: function () { return false; },
+        getPointer: function () { return { x: -1, y: -1, inside: false, clicked: false, wheel: 0, moved: false, down: false }; }
+      };
+      var cleared = {};
+      Object.keys(gd.dungeons || {}).forEach(function (k) { cleared[k] = true; });
+
+      // 全種族を 6 体ずつ連れて、一覧・様子を見るの3ページを描く。1体目は装備を4つ着ける
+      var ids = Object.keys(gd.monsters);
+      var natureIds = Object.keys(gd.natures || {});
+      var equips = Object.keys(gd.items).filter(function (id) { return gd.items[id].equip; });
+      var lines = [], ok = true, drawn = 0, pages = 0, wide = [], stuck = [], changed = [];
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      g2.font = (gd.ui.theme || {}).smallFont || "12px monospace";
+
+      function measure(pane, content) {
+        var rect = pane.rect, origin = pane.panel.innerOrigin(rect);
+        (content.lines || []).forEach(function (line) {
+          var x = origin.x + (line.indent || 0) + ((line.sprite || line.unknownSprite) ? 24 : line.icon ? 22 : 0);
+          g2.font = line.font || (gd.ui.theme || {}).smallFont || "12px monospace";
+          var w = line.text ? g2.measureText(line.text).width : 0;
+          g2.font = (gd.ui.theme || {}).smallFont || "12px monospace";
+          var limit = rect.x + rect.w - 24 - (line.right ? g2.measureText(line.right).width + 8 : 0);
+          if (x + w > limit && wide.length < 5) wide.push("「" + (line.text || "") + "／" + (line.right || "") + "」");
+        });
+        // 最後まで送れる
+        var max = pane.maxScroll();
+        pane.scrollBy(max + 5);
+        if (pane.scroll !== max && stuck.length < 3) stuck.push(content.lines.length + " 行");
+        pane.scrollBy(-(max + 5));
+      }
+
+      for (var start = 0; start < ids.length; start += 6) {
+        var party = new NS.Party(6);
+        var members = [];
+        for (var k = start; k < Math.min(ids.length, start + 6); k++) {
+          var m = new NS.MonsterInstance(ids[k], 1 + (k * 7) % 60, gd, {});
+          if (natureIds.length) m.natureId = natureIds[k % natureIds.length];
+          party.add(m); members.push(m);
+        }
+        members[0].equipment = equips.slice(0, 4);
+        var before = members.map(function (m) { return JSON.stringify(m.equipment) + m.getAttack() + "," + m.getDefense(); });
+        var storage = new NS.MonsterStorage(300);
+        storage.add(new NS.MonsterInstance(ids[start], 10, gd, {}));
+        var game = {
+          ctx: g2, canvas: canvas, data: gd, assets: null, clock: 0, input: input,
+          discovery: new NS.Discovery(), clearedDungeons: cleared, party: party, storage: storage, gold: 0,
+          inventory: { getCount: function () { return 0; }, groupByCategory: function () { return []; } },
+          audio: { playBgm: function () {}, playSe: function () {} }, playError: function () {}, story: null,
+          scenes: { change: function () {} }
+        };
+        var scene = new NS.PartyScene(game, null, {});
+        var step = function (action) {
+          pressed = {};
+          if (action) pressed[action] = true;
+          game.clock += 16;
+          scene.update(16);
+          pressed = {};
+          scene.render(g2);
+        };
+        for (var r = 0; r < members.length; r++) {
+          step(null);
+          drawn++;
+          measure(scene.pane, scene.pane.content);
+          step("down");
+        }
+        // 様子を見る：3ページ × 仲間
+        scene.index = 0;
+        scene.mode = "inspect";
+        scene.inspectPage = "stats";
+        for (var q = 0; q < members.length; q++) {
+          step(null);
+          step("right"); step(null); measure(scene.inspectPane, scene.inspectPane.content); pages++;
+          step("right"); step(null); measure(scene.inspectPane, scene.inspectPane.content); pages++;
+          step("right"); step(null); pages++;
+          step("down");
+        }
+        members.forEach(function (m, i) {
+          if (JSON.stringify(m.equipment) + m.getAttack() + "," + m.getDefense() !== before[i] && changed.length < 3) changed.push(m.getName());
+        });
+      }
+
+      expect(badTexts.length === 0, "文に undefined や NaN が出ない" + (badTexts.length ? "（出た：" + badTexts.join(" / ") + "）" : ""));
+      expect(wide.length === 0, "右の文が枠の幅に収まる" + (wide.length ? "（はみ出す：" + wide.join(" ") + "）" : ""));
+      expect(stuck.length === 0, "入りきらない説明も最後まで送れる" + (stuck.length ? "（止まる：" + stuck.join(" ") + "）" : ""));
+      expect(changed.length === 0, "見たあとも、仲間の装備と能力は元のまま" + (changed.length ? "（変わった：" + changed.join(" ") + "）" : ""));
+      lines.unshift("全 " + ids.length + " 種の一覧の説明を " + drawn + " 回、様子を見るを " + pages + " ページ描いた");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 設定の画面（v1.4.0） ---
+    function checkSettings(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var canvas = document.createElement("canvas");
+      canvas.width = 800; canvas.height = 600;
+      var g2 = canvas.getContext("2d");
+      var t = gd.ui.theme || {};
+      var L = gd.ui.settings || {};
+      var I = L.items, A = L.about || {}, K = L.keys;
+      var pad = t.padding || 8;
+      var settings = new NS.SettingsManager(gd);
+      var lines = [], ok = true, bad = [];
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      function width(text, font) { g2.font = font; return g2.measureText(text).width; }
+
+      var count = settings.items.length;
+      var boxW = I.w, innerX = I.x + pad, right = I.x + boxW - pad;
+      var barX = innerX + 18 + (I.labelWidth || 112);
+      var values = 0;
+      settings.items.forEach(function (item) {
+        // 項目名が ◀（横棒の 14px 左）に届かない
+        if (innerX + 18 + width(item.label, t.font) > barX - 16 && bad.length < 5) bad.push("名前「" + item.label + "」");
+        if (item.type === "action") return;
+        var original = settings.get(item.id);
+        for (var v = item.min; v <= item.max; v += item.step || 1) {
+          settings.values[item.id] = v;
+          var text = settings.formatValue(item.id);
+          var end = barX + I.barWidth + 12 + width(text, t.smallFont) + 6 + width("▶", t.smallFont);
+          if (end > right && bad.length < 5) bad.push(item.label + "「" + text + "」");
+          values++;
+        }
+        settings.values[item.id] = original;
+        var desc = NS.wrapText(item.description || "", A.charsPerLine || 27);
+        var need = 14 + (A.lineHeight || 17) + 2 + desc.length * (A.lineHeight || 17) - (A.lineHeight || 17);
+        if (pad + need > (A.h || 84) - 4 && bad.length < 5) bad.push("説明「" + item.label + "」が " + desc.length + " 行");
+        if (!item.description && bad.length < 5) bad.push("説明が無い「" + item.label + "」");
+      });
+
+      // 操作キー：名前とキーの札が重ならない
+      var labels = gd.keys.actionLabels || {};
+      var keyRight = K.x + K.w - pad - 14;   // バーのぶん
+      var codes = gd.keys.bindings || {};
+      (gd.keys.order || []).forEach(function (action) {
+        var caps = (codes[action] || []).map(function (c) { return (gd.keys.keyLabels || {})[c] || c; });
+        var capsW = caps.reduce(function (sum, k) { return sum + Math.max(K.capHeight || 20, Math.ceil(width(k, t.smallFont)) + 12) + 4; }, 0);
+        if (K.x + pad + width(labels[action] || action, t.smallFont) + 8 > keyRight - capsW && bad.length < 8) bad.push("キー「" + (labels[action] || action) + "」");
+      });
+
+      expect(bad.length === 0, "名前・値・説明・キーが枠に収まり、重ならない" + (bad.length ? "（" + bad.join(" / ") + "）" : ""));
+      lines.unshift(count + " 項目・" + values + " 通りの値と、操作キー " + (gd.keys.order || []).length + " 行を測った");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- お店の絞り込み・加護を選ぶ・ダンジョンを選ぶ（v1.4.0）で使う、試し用の game ---
+    function checkSceneEnv(NS, gd) {
+      var canvas = document.createElement("canvas");
+      canvas.width = 800; canvas.height = 600;
+      var g2 = canvas.getContext("2d");
+      var badTexts = [];
+      var fill = g2.fillText;
+      g2.fillText = function (s) {
+        s = String(s);
+        if (/undefined|NaN|null|\[object/.test(s) && badTexts.length < 8) badTexts.push(s);
+        return fill.apply(g2, arguments);
+      };
+      var env = { g2: g2, badTexts: badTexts, pressed: {} };
+      var input = {
+        isPressed: function (a) { return !!env.pressed[a]; },
+        isDown: function () { return false; },
+        getPointer: function () { return { x: -1, y: -1, inside: false, clicked: false, wheel: 0, moved: false, down: false }; }
+      };
+      var cleared = {};
+      Object.keys(gd.dungeons || {}).forEach(function (k) { cleared[k] = true; });
+      var ids = Object.keys(gd.monsters);
+      var party = new NS.Party(6);
+      party.add(new NS.MonsterInstance(ids[0], 20, gd, {}));
+      party.add(new NS.MonsterInstance(ids[1], 30, gd, {}));
+      var bought = {};
+      Object.keys(gd.blessings || {}).forEach(function (k) { bought[k] = true; });
+      var game = {
+        ctx: g2, canvas: canvas, data: gd, assets: null, clock: 0, input: input,
+        discovery: new NS.Discovery(), clearedDungeons: cleared, party: party, gold: 999999,
+        boughtBlessings: bought, offBlessings: {},
+        inventory: { getCount: function () { return 5; }, groupByCategory: function () {
+          var cats = (gd.categories || {}).item || {};
+          return Object.keys(cats).map(function (c) {
+            return { category: cats[c], slots: Object.keys(gd.items).filter(function (id) { return gd.items[id].category === c; })
+              .map(function (id) { return { itemId: id, count: 5 }; }) };
+          });
+        } },
+        canAfford: function () { return true; },
+        audio: { playBgm: function () {}, playSe: function () {} },
+        playError: function () {},
+        story: null,
+        scenes: { change: function () {} }
+      };
+      // 加護・クリアの判定は本物（js/core/Game.js）をそのまま使う
+      Object.getOwnPropertyNames(NS.Game.prototype).forEach(function (name) {
+        if (/Blessing|Cleared|cleared/.test(name) && typeof NS.Game.prototype[name] === "function") {
+          game[name] = NS.Game.prototype[name].bind(game);
+        }
+      });
+      env.game = game;
+      env.step = function (scene, action) {
+        env.pressed = {};
+        if (action) env.pressed[action] = true;
+        game.clock += 16;
+        scene.update(16);
+        env.pressed = {};
+        scene.render(g2);
+      };
+      env.entries = function (scene) {
+        return scene.list.rows.filter(function (r) { return r.type !== "header"; });
+      };
+      return env;
+    }
+
+    // --- お店の絞り込み（v1.4.0） ---
+    function checkShopFilter(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var env = checkSceneEnv(NS, gd), game = env.game;
+      var scene = new NS.ShopScene(game, null);
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var T = scene.layout.tabs, L = scene.layout.list;
+      var tabsRight = T.x + T.w * 2 + T.gap;
+      var combos = 0, tried = 0, empty = [], sums = [], overlap = [], sources = 0;
+      var BASE = ["use", "weapon", "armor", "accessory", "material"];
+
+      for (var sh = 0; sh < scene.shops.length; sh++) {
+        for (var tab = 0; tab < 2; tab++) {
+          if (scene.filters) {
+            combos++;
+            var counts = {};
+            scene.filters.forEach(function (f) {
+              game.shopFilter = f;
+              scene._rebuildList();
+              scene.render(env.g2);
+              tried++;
+              var n = env.entries(scene).length;
+              counts[f] = n;
+              if (f.indexOf("from:") === 0) sources++;
+              if (n === 0 && empty.length < 5) empty.push(scene._filterName(f));
+              var r = scene._filterRect;
+              if (!r || r.x < tabsRight + 4 || r.x + r.w > L.x + L.w + 10) {
+                if (overlap.length < 3) overlap.push(scene._filterName(f));
+              }
+            });
+            var parts = BASE.reduce(function (sum, f) { return sum + (counts[f] || 0); }, 0);
+            var fromSum = scene.filters.filter(function (f) { return f.indexOf("from:") === 0; })
+              .reduce(function (sum, f) { return sum + counts[f]; }, 0);
+            if (parts !== counts.all && sums.length < 3) sums.push("分類の合計 " + parts + " ≠ すべて " + counts.all);
+            if (fromSum > (counts.material || 0) && sums.length < 3) sums.push("場所の合計 " + fromSum + " > 素材 " + counts.material);
+            game.shopFilter = "all";
+            scene._rebuildList();
+          }
+          env.step(scene, "right");
+        }
+        env.step(scene, "nextTab");
+      }
+
+      expect(env.badTexts.length === 0, "文に undefined や NaN が出ない" + (env.badTexts.length ? "（出た：" + env.badTexts.join(" / ") + "）" : ""));
+      expect(empty.length === 0, "札に出る絞り込みは、どれも1つ以上の品が残る" + (empty.length ? "（空：" + empty.join(" / ") + "）" : ""));
+      expect(sums.length === 0, "回復・道具／武器／防具／アクセサリー／素材を合わせると「すべて」と同じ数" + (sums.length ? "（" + sums.join(" / ") + "）" : ""));
+      expect(sources > 0, "素材の手に入る場所でも絞り込める（" + sources + " 通り）");
+      expect(overlap.length === 0, "絞り込みの札が、買う・売るのタブと重ならず一覧の幅に収まる" + (overlap.length ? "（" + overlap.join(" / ") + "）" : ""));
+      lines.unshift("お店 " + scene.shops.length + " 軒・" + combos + " 通りの一覧で、絞り込みを " + tried + " 回切り替えた");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 加護を選ぶ（v1.4.0） ---
+    function checkBlessingSelect(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var env = checkSceneEnv(NS, gd), game = env.game;
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      // 2つだけ入れておく（入れている／外している の両方が出て、入れる余地も上限まで残るように）
+      game.getOwnedBlessingIds().forEach(function (id, i) { if (i >= 2) game.offBlessings[id] = true; });
+      var scene = new NS.BlessingSelectScene(game, null);
+      var blessings = gd.blessings || {};
+      var owned = game.getOwnedBlessingIds().length;
+      var wrong = [], empty = [], tierSum = 0, onOff = 0, toggled = 0, keepFocus = 0;
+
+      (scene.filters || []).forEach(function (f) {
+        game.blessingFilter = f;
+        scene._rebuildList();
+        scene.render(env.g2);
+        var rows = env.entries(scene);
+        if (rows.length === 0 && empty.length < 3) empty.push(scene._filterName(f));
+        rows.forEach(function (r) {
+          if (!scene._matches(f, r.value, blessings[r.value]) && wrong.length < 3) wrong.push(scene._filterName(f) + "に" + blessings[r.value].name);
+        });
+        if (f.indexOf("tier:") === 0) tierSum += rows.length;
+        if (f === "on" || f === "off") onOff += rows.length;
+      });
+
+      // 入れる・外すを押しても、絞り込みの中で選んでいる場所が飛ばない
+      game.blessingFilter = "all";
+      scene._rebuildList();
+      for (var k = 0; k < 4; k++) {
+        env.step(scene, "down");
+        var before = scene.list.getSelected() && scene.list.getSelected().value;
+        var was = game.isBlessingActive(before);
+        env.step(scene, "confirm");
+        if (game.isBlessingActive(before) !== was) toggled++;
+        if (scene.list.getSelected() && scene.list.getSelected().value === before) keepFocus++;
+      }
+
+      expect(env.badTexts.length === 0, "文に undefined や NaN が出ない" + (env.badTexts.length ? "（出た：" + env.badTexts.join(" / ") + "）" : ""));
+      expect(wrong.length === 0, "絞り込んだ一覧には、当てはまる加護だけが並ぶ" + (wrong.length ? "（" + wrong.join(" / ") + "）" : ""));
+      expect(empty.length === 0, "札に出る絞り込みは、どれも1つ以上残る" + (empty.length ? "（空：" + empty.join(" / ") + "）" : ""));
+      expect(tierSum === owned, "等級ごとの数を合わせると、持っている加護の数（" + tierSum + " / " + owned + "）");
+      expect(onOff === owned, "入れている＋外しているも、持っている加護の数（" + onOff + " / " + owned + "）");
+      expect(toggled === 4 && keepFocus === 4, "決定で入れる・外すが切り替わり、選んでいる加護はそのまま（" + toggled + "・" + keepFocus + " / 4）");
+      lines.unshift("持っている加護 " + owned + " 個で、絞り込み " + (scene.filters || []).length + " 通りを試した");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- ダンジョンを選ぶ（v1.4.0） ---
+    function checkDungeonSelect(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var env = checkSceneEnv(NS, gd), game = env.game, g2 = env.g2;
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var t = gd.ui.theme || {};
+      var rect = (gd.ui.dungeonSelect || {}).detail;
+      var pad = t.padding || 8;
+      var wide = [], counts = [], fits = [], pages = 0;
+      var allIds = Object.keys(gd.dungeons || {});
+      var monsterIds = Object.keys(gd.monsters);
+
+      // 何もクリアしていない／半分／全部、見た記録も 無し／一部／全部 で描く
+      var states = [
+        { cleared: [], seen: 0 },
+        { cleared: allIds.slice(0, Math.ceil(allIds.length / 2)), seen: 2 },
+        { cleared: allIds, seen: 1 }
+      ];
+      states.forEach(function (state) {
+        game.clearedDungeons = {};
+        state.cleared.forEach(function (id) { game.clearedDungeons[id] = true; });
+        game.discovery = new NS.Discovery();
+        monsterIds.forEach(function (id, i) { if (state.seen === 1 || (state.seen === 2 && i % 2)) game.discovery.markMonsterSeen(id); });
+        Object.keys(gd.items).forEach(function (id, i) { if (state.seen === 1 || (state.seen === 2 && i % 2)) game.discovery.markItemObtained(id); });
+
+        var scene = new NS.DungeonSelectScene(game, null);
+        function measure(content) {
+          if (!content) return;
+          pages++;
+          g2.font = "18px monospace";
+          var headX = rect.x + pad + 72;
+          var chipW = (content.head.chips || []).reduce(function (sum, c) {
+            g2.font = t.smallFont || "12px monospace";
+            return sum + Math.ceil(g2.measureText(c.label).width) + 14 + 6;
+          }, 0);
+          if (headX + chipW > rect.x + rect.w - pad && wide.length < 5) wide.push("札「" + content.head.name + "」");
+          g2.font = t.smallFont || "12px monospace";
+          content.lines.forEach(function (line) {
+            var x = rect.x + pad + (line.indent || 0) + ((line.sprite || line.unknownSprite) ? 24 : line.icon ? 22 : 0);
+            var w = line.text ? g2.measureText(line.text).width : 0;
+            var limit = rect.x + rect.w - 24 - (line.right ? g2.measureText(String(line.right)).width + 8 : 0);
+            if (x + w > limit && wide.length < 5) wide.push("「" + (line.text || "") + "／" + (line.right || "") + "」");
+          });
+        }
+        // 穴の段と区画の段を、すべて回る
+        for (var r = 0; r < scene.regions.length; r++) {
+          scene.phase = "region";
+          scene.regionIndex = r;
+          scene.render(g2);
+          measure(scene._detailContent());
+          var region = scene.regions[r];
+          if (!scene.isRegionUnlocked(region)) continue;
+          scene._openRegion(r, false);
+          for (var d = 0; d < scene.dungeons.length; d++) {
+            scene.index = d;
+            scene.render(g2);
+            var content = scene._detailContent();
+            measure(content);
+            var dungeon = scene.dungeons[d];
+            if (!scene.isUnlocked(dungeon) || dungeon.ready === false) continue;
+            var species = NS.DungeonCatalog.getSpecies(gd, dungeon).length;
+            var drops = NS.DungeonCatalog.getDropItems(gd, dungeon, game.isDungeonCleared(dungeon.id)).length;
+            // はじめ（たたんだまま）は送らなくても1画面に収まる
+            game.dungeonListsOpen = {};
+            scene.pane.setContent(scene._detailContent(), "closed:" + dungeon.id);
+            var m = scene.pane.measure();
+            if (m.total > m.visible && fits.length < 3) fits.push(dungeon.name + "（" + m.total + "/" + m.visible + " 行）");
+            // 開くと、出現するモンスター・手に入るものが全部並ぶ
+            game.dungeonListsOpen = { monsters: true, items: true };
+            var openLines = scene._detailContent().lines.filter(function (l) { return l.sprite || l.unknownSprite || l.icon; }).length;
+            if (openLines < species + drops && counts.length < 3) counts.push(dungeon.name + "（開いて " + openLines + " 行）");
+            game.dungeonListsOpen = {};
+            var monsterLines = scene._monsterLines(dungeon).lines.length;
+            var itemLines = scene._itemLines(dungeon, game.isDungeonCleared(dungeon.id)).lines.length;
+            if ((monsterLines !== species || itemLines !== Math.max(1, drops)) && counts.length < 3) {
+              counts.push(dungeon.name + "（モンスター " + monsterLines + "/" + species + "・品 " + itemLines + "/" + drops + "）");
+            }
+          }
+        }
+      });
+
+      expect(env.badTexts.length === 0, "文に undefined や NaN が出ない" + (env.badTexts.length ? "（出た：" + env.badTexts.join(" / ") + "）" : ""));
+      expect(counts.length === 0, "出現するモンスター・手に入るものが、1つずつ漏れなく並ぶ" + (counts.length ? "（" + counts.join(" / ") + "）" : ""));
+      expect(wide.length === 0, "右の文と札が枠の幅に収まる" + (wide.length ? "（はみ出す：" + wide.join(" ") + "）" : ""));
+      expect(fits.length === 0, "はじめ（モンスターと品は2つずつ）は、送らなくても区画の説明が1画面に収まる" + (fits.length ? "（入りきらない：" + fits.join(" / ") + "）" : ""));
+      lines.unshift("クリアの進み 3 通りで、穴と区画の説明を " + pages + " 件描いた");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 加護の選択・挑戦の結果・セーブの画面（v1.4.0） ---
+    function checkRunScreens(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var env = checkSceneEnv(NS, gd), game = env.game, g2 = env.g2;
+      var t = gd.ui.theme || {};
+      var lines = [], ok = true, wide = [];
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      function w(text, font) { g2.font = font || t.smallFont || "12px monospace"; return g2.measureText(text).width; }
+      var all = Object.keys(gd.blessings || {}).map(function (id) { return gd.blessings[id]; });
+
+      // 加護の選択：どの加護でも、説明と効果が枠に、名前が出やすさの札に届かない
+      var C = gd.ui.blessing.card, inner = gd.ui.blessing.cardInner || {};
+      var textX = C.x + 16 + (inner.iconSize || 40) + 14, right = C.x + C.w - 12;
+      all.forEach(function (b) {
+        var rarity = NS.BlessingSystem.getRarity(gd, b);
+        var chipW = w((gd.messages.blessing.rarityLabel || "") + (rarity.label || "")) + 14;
+        var effects = (b.effects || []).map(function (e) { return NS.EffectSystem.describeEffect(e, gd); }).filter(Boolean).join("　");
+        if (textX + w(b.name, t.font) > right - chipW - 8 && wide.length < 5) wide.push("名前「" + b.name + "」");
+        if (textX + w(b.description || "") > right && wide.length < 5) wide.push("説明「" + b.name + "」");
+        if (textX + w(effects) > right && wide.length < 5) wide.push("効果「" + b.name + "」");
+      });
+      game.run = { getBlessings: function () { return all.slice(0, 12); } };
+      for (var n = 1; n <= 3; n++) {
+        var scene = new NS.BlessingScene(game, all.slice(n, n + n), {});
+        scene.render(g2);
+      }
+      game.run = null;
+
+      // 挑戦の結果：仲間6体・仲間になった相手・加護をすべて出しても文が欄に収まる
+      var ids = Object.keys(gd.monsters);
+      var party = new NS.Party(6);
+      for (var p = 0; p < 6; p++) party.add(new NS.MonsterInstance(ids[p * 3 % ids.length], 40 + p, gd, {}));
+      game.party = party;
+      var starts = party.getMembers().map(function (m) { return { monster: m, level: m.level - 3 }; });
+      var result = new NS.ResultScene(game, { outcome: "cleared", dungeon: gd.dungeons[Object.keys(gd.dungeons)[0]], floor: 3, gold: 999,
+        items: Object.keys(gd.items).slice(0, 15).map(function (id) { return { itemId: id, count: 12 }; }), lostItems: [], saved: true,
+        monsters: [new NS.MonsterInstance(ids[5], 12, gd, {})], blessings: all.slice(0, 9), startLevels: starts });
+      result.render(g2);
+      var R = gd.ui.result.detail, rp = t.padding || 8;
+      var content = result._sideContent();
+      var grew = 0;
+      content.lines.forEach(function (line) {
+        if (/→/.test(line.right || "")) grew++;
+        var x = R.x + rp + ((line.sprite || line.unknownSprite) ? 24 : line.icon ? 22 : 0);
+        var limit = R.x + R.w - 24 - (line.right ? w(String(line.right)) + 8 : 0);
+        if (line.text && x + w(line.text) > limit && wide.length < 8) wide.push("結果「" + line.text + "」");
+      });
+
+      // セーブ：仲間6体の絵・主人公の名前（8文字）・中断中の場所が重ならない
+      var S = gd.ui.saveSlot, row = S.row;
+      var save = new NS.SaveSlotScene(game, {}, "continue");
+      save.slots = [1, 2, 3].map(function (k) {
+        return { slot: k, exists: true, broken: false, savedAt: Date.now(), playerName: "ああああああああ", leadName: "ジュエキスライム",
+          level: 99, partyCount: 6, gold: 9999999, cleared: k * 2, playTime: 999 * 3600000,
+          members: ids.slice(0, 6).map(function (id) { return { speciesId: id, level: 99 }; }),
+          suspended: { name: "千年樹の根底", floor: 4 }, place: null };
+      });
+      // クリアした区画の数は出さない（作者の指定 2026-11-13）
+      var drawn = [], fill0 = g2.fillText;
+      g2.fillText = function (text) { drawn.push(String(text)); return fill0.apply(g2, arguments); };
+      save.render(g2);
+      g2.fillText = fill0;
+      if (drawn.some(function (s) { return /クリア/.test(s); })) wide.push("セーブにクリアの数が出ている");
+      var labelX = row.x + (t.padding || 8) + (S.textPadding || 8) + ((S.icon || {}).size ? S.icon.size + 10 : 0);
+      var rightX = row.x + row.w - (S.textPadding || 8);
+      var nameEnd = labelX + w("スロット3", t.font) + 16 + w("ああああああああ", t.font);
+      if (nameEnd > rightX - w("999時間0分") - 12) wide.push("セーブの名前とプレイ時間");
+      var line2End = labelX + 6 * ((S.memberSize || 22) + 3) + 8 + w("ジュエキスライム Lv99");
+      if (line2End > rightX - w("中断中: 千年樹の根底 B4F") - 12) wide.push("セーブの仲間と場所");
+
+      expect(env.badTexts.length === 0, "文に undefined や NaN が出ない" + (env.badTexts.length ? "（出た：" + env.badTexts.join(" / ") + "）" : ""));
+      expect(grew === 6, "結果の仲間に「Lv → Lv」が出る（" + grew + " / 6 体）");
+      expect(wide.length === 0, "文が枠に収まり、重ならない" + (wide.length ? "（" + wide.join(" / ") + "）" : ""));
+      lines.unshift("加護 " + all.length + " 個の候補の枠・結果の右の欄 " + content.lines.length + " 行・セーブ 3 ファイルを描いた");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 遊び方・拠点のひと言・「 / 」の折り返し（v1.4.0） ---
+    function checkHelpHome(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var env = checkSceneEnv(NS, gd), game = env.game, g2 = env.g2;
+      var t = gd.ui.theme || {};
+      var lines = [], ok = true, wide = [], split = [];
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      function w(text, font) { g2.font = font || t.smallFont || "12px monospace"; return g2.measureText(text).width; }
+
+      // 遊び方：どの質問の答えも右の欄の幅に収まる（すべての区画をクリアした状態＝すべての質問が出る）
+      var help = new NS.HelpScene(game, {});
+      var R = gd.ui.help.detail, pad = t.padding || 8;
+      var count = 0;
+      help.list.rows.forEach(function (row, i) {
+        if (row.type !== "entry") return;
+        help.list.index = i;
+        var content = help._answerContent();
+        if (!content) return;
+        count++;
+        content.lines.forEach(function (line) {
+          if (line.text && R.x + pad + w(line.text, line.font) > R.x + R.w - 24 && wide.length < 5) wide.push("遊び方「" + line.text + "」");
+        });
+      });
+      help.render(g2);
+
+      // 拠点のひと言：たき火を囲む仲間（いちばん左の席）にかからない
+      var D = gd.ui.home.description, seats = (gd.ui.home.camp || {}).seats || [400];
+      var limit = Math.min.apply(null, seats) - 24;
+      var texts = gd.messages.home.descriptions || {};
+      Object.keys(texts).forEach(function (k) { if (D.x + w(texts[k]) > limit && wide.length < 8) wide.push("拠点「" + texts[k] + "」"); });
+      var info = gd.messages.home.info || {};
+      var sample = { name: "千年樹の根底", level: 99, n: 99, max: 6, stored: 300, total: 99, active: 9, seen: 99, caught: 99 };
+      Object.keys(info).forEach(function (k) {
+        var text = info[k].replace(/\{(\w+)\}/g, function (m, key) { return sample[key] !== undefined ? sample[key] : m; });
+        if (D.x + w(text) > limit && wide.length < 8) wide.push("拠点「" + text + "」");
+      });
+
+      // 「Q / E」「買う / 売る」を2行に割らない（パッチノート・遊び方の文を、いろいろな幅で折り返す）
+      var all = [];
+      (gd.patchnotes.versions || []).forEach(function (v) { (v.entries || []).forEach(function (e) { if (e.text) all.push(e.text); }); });
+      Object.keys(gd.help.entries || {}).forEach(function (id) { (gd.help.entries[id].answer || []).forEach(function (a) { all.push(a); }); });
+      [18, 20, 24, 26, 30, 34].forEach(function (n) {
+        all.forEach(function (text) {
+          var rows = NS.wrapText(text, n);
+          for (var r = 0; r + 1 < rows.length; r++) {
+            if ((/ \/ ?$|\/ $/.test(rows[r]) || /^\/ /.test(rows[r + 1]) || (/ $/.test(rows[r]) && /^\//.test(rows[r + 1]))) && split.length < 4) {
+              split.push(rows[r].slice(-6) + "｜" + rows[r + 1].slice(0, 6));
+            }
+          }
+        });
+      });
+
+      expect(env.badTexts.length === 0, "文に undefined や NaN が出ない" + (env.badTexts.length ? "（出た：" + env.badTexts.join(" / ") + "）" : ""));
+      expect(wide.length === 0, "遊び方の答えと拠点のひと言が、枠やたき火の仲間にかからない" + (wide.length ? "（" + wide.join(" / ") + "）" : ""));
+      expect(split.length === 0, "「Q / E」のような「 / 」の所で行が割れない" + (split.length ? "（" + split.join(" / ") + "）" : ""));
+      lines.unshift("遊び方 " + count + " 問・拠点のひと言 " + Object.keys(texts).length + " 項目・文 " + all.length + " 本を折り返した");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 名前と見た目を決める画面（v1.4.0） ---
+    function checkPlayerSetup(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var env = checkSceneEnv(NS, gd), game = env.game, g2 = env.g2;
+      var t = gd.ui.theme || {};
+      var lines = [], ok = true, wide = [];
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      function w(text, font) { g2.font = font || t.smallFont || "12px monospace"; return g2.measureText(text).width; }
+      game.getPlayerName = function () { return "ああああああああ"; };
+      game.getPlayerColor = function () { return null; };
+      game.getPlayerGender = function () { return null; };
+      game.getPlayerFirstPerson = function () { return null; };
+
+      var results = {};
+      ["new", "edit"].forEach(function (mode) {
+        var scene = new NS.PlayerSetupScene(game, {}, mode);
+        scene.enter();
+        var L = scene.layout, B = L.preview;
+        // すべての欄を回って描く（文字が欠けない・下のひと言が枠や戻るボタンにかからない）
+        var back = ((gd.ui.theme || {}).backButton || {}).x || 688;
+        for (var i = 0; i < scene.rows.length; i++) {
+          env.step(scene, null);
+          var kind = scene._rowKind();
+          if (kind === "done") kind = (mode === "new") ? "doneNew" : "doneEdit";
+          var text = (scene.texts.descriptions || {})[kind] || "";
+          if (!text) wide.push("ひと言が無い：" + kind);
+          var limit = (mode === "edit") ? back - 12 : 800 - 24;
+          if (L.description.x + w(text, L.description.font) > limit) wide.push("ひと言「" + text + "」");
+          env.step(scene, "down");
+        }
+        var hint = (mode === "new") ? scene.texts.hintNew : scene.texts.hintEdit;
+        if (L.hint.x + w(hint) > ((mode === "edit") ? back - 12 : 800 - 24)) wide.push("案内「" + hint + "」");
+        // 欄は左の姿の枠の下端より上で終わる・下のひと言より上
+        var last = scene._doneRect();
+        results[mode + "Bottom"] = last.y + last.h;
+        if (last.y + last.h > B.boxY + B.boxH + 2 || last.y + last.h > L.description.y - 14) wide.push("欄が下にはみ出す（" + (last.y + last.h) + "）");
+        // 色の欄の右端の名前が、いちばん右の見本にかからない（いちばん長い名前・色コード）
+        ["hairColor", "color", "pants"].forEach(function (k) {
+          var p = scene.palettes[k], row = scene._rowRect(scene.rows.indexOf(k));
+          var end = scene._optionRect(k, p.customIndex);
+          var longest = "#FFFFFF";
+          p.list.forEach(function (c) { if (w(c.name) > w(longest)) longest = c.name; });
+          if (row.x + row.w - 12 - w(longest) < end.x + end.w + 6) wide.push(k + " の名前「" + longest + "」が見本にかかる");
+        });
+        // 向きの札が左の枠に収まる
+        env.step(scene, null);
+        var fr = scene._facingRects;
+        if (fr.length && (fr[0].x < B.boxX + 4 || fr[fr.length - 1].x + fr[fr.length - 1].w > B.boxX + B.boxW - 4)) wide.push("向きの札が枠からはみ出す");
+        results[mode + "Facing"] = fr.length;
+      });
+
+      // Q/E で向きが回る・R は名前と性別と一人称を変えない
+      var s = new NS.PlayerSetupScene(game, {}, "new");
+      s.enter();
+      env.step(s, null);
+      var start = s.facing;
+      env.step(s, "nextTab");
+      var turned = s.facing !== start && s._facingDir() === "down";
+      env.step(s, "prevTab");
+      var back2 = s.facing === start;
+      s.genderIndex = 1; s.firstPersonIndex = 2;
+      var before = { g: s.genderIndex, f: s.firstPersonIndex, n: s.name };
+      var changed = false, ref = JSON.stringify(s._selection());
+      for (var k = 0; k < 6; k++) { env.step(s, "sort"); if (JSON.stringify(s._selection()) !== ref) changed = true; }
+      var kept = s.genderIndex === before.g && s.firstPersonIndex === before.f && s.name === before.n;
+
+      expect(env.badTexts.length === 0, "文に undefined や NaN が出ない" + (env.badTexts.length ? "（出た：" + env.badTexts.join(" / ") + "）" : ""));
+      expect(wide.length === 0, "ひと言・案内・色の名前・向きの札が、枠や戻るボタンにかからない" + (wide.length ? "（" + wide.join(" / ") + "）" : ""));
+      expect(results.newFacing === 5 && results.editFacing === 5, "左の姿の下に向きの札が5つ（↓ ← ↑ → 自動）");
+      expect(turned && back2, "Q / E で向きが回り、もとへ戻せる");
+      expect(changed && kept, "R のおまかせで見た目が変わり、名前・性別・一人称は変わらない");
+      lines.unshift("新規・変更の2通りで、" + s.rows.length + " 欄を回して描いた（欄の下端 " + results.newBottom + "）");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 戦闘：技の効き目の印・範囲の札・戦闘のログ（v1.4.0） ---
+    function checkBattleMarks(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var env = checkSceneEnv(NS, gd), game = env.game, g2 = env.g2;
+      var t = gd.ui.theme || {};
+      var lines = [], ok = true, wide = [];
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      function w(text, font) { g2.font = font || t.smallFont || "12px monospace"; return g2.measureText(text).width; }
+
+      // 水の技を持つスライムで、水に弱いスミビ・水に強いキングスライムと戦う
+      var party = new NS.Party(6);
+      party.add(new NS.MonsterInstance("slime", 20, gd, {}));
+      game.party = party;
+      game.discovery = new NS.Discovery();
+      var weakFoe = new NS.MonsterInstance("cinderling", 20, gd, {});
+      var strongFoe = new NS.MonsterInstance("kingSlime", 20, gd, {});
+      var scene = new NS.BattleScene(game, party, [weakFoe, strongFoe], {}, function () {}, {});
+      var aqua = gd.getSkill("aqua"), tackle = gd.getSkill("tackle");
+      // 盤面に敵が並ぶのは戦いが始まってから
+      if (scene.enter) scene.enter();
+      for (var f = 0; f < 3; f++) env.step(scene, null);
+
+      // スカウトしていない相手には出さない → スカウトしたら出る
+      var hiddenBefore = scene._effectOf(aqua, weakFoe) === null && scene._effectOf(aqua, strongFoe) === null;
+      game.discovery.markMonsterCaught("cinderling");
+      game.discovery.markMonsterCaught("kingSlime");
+      var shown = scene._effectOf(aqua, weakFoe) === "weak" && scene._effectOf(aqua, strongFoe) === "resist";
+      var plain = scene._effectOf(tackle, weakFoe) === null;
+      var listMark = scene._weakAgainstField(aqua) === true;
+
+      // 範囲の札：すべての技の target に名前があり、威力の行と重ならない
+      var labels = scene.texts.targetLabels || {}, missing = [];
+      var info = gd.ui.battle, left = info.message.x + (t.padding || 8);
+      var right = (info.skillMenu || info.subMenu).x - ((info.rangeChip || {}).marginRight || 10);
+      Object.keys(gd.skills).forEach(function (id) {
+        var s = gd.skills[id];
+        var range = labels[s.target || "enemy"];
+        if (!range) { if (missing.indexOf(s.target) < 0) missing.push(s.target); return; }
+        var stats = (NS.BattleSystem.dealsDamage(s) ? scene.texts.skillStats : scene.texts.skillStatsNoPower)
+          .replace("{power}", gd.formatSkillPower(s)).replace("{accuracy}", "100").replace("{pp}", "99");
+        if (left + w(stats) + 8 > right - (w(range) + 10) && wide.length < 4) wide.push("範囲の札「" + s.name + "」");
+      });
+
+      // ログ：見せた行が残る・その場の知らせは残らない・長い行は折り返す・開け閉めで元の状態へ
+      var log = scene.messageLog;
+      var start = log.history.length;
+      log.push("テストの文"); log.advance();
+      scene.phase = "command";
+      scene._flashMessage("PPが足りない!");
+      log.push("あ".repeat(120)); log.advance();
+      var kept = log.history.some(function (h) { return h.text === "テストの文"; });
+      var quiet = !log.history.some(function (h) { return h.text === "PPが足りない!"; });
+      var rows = scene._logRows();
+      var maxRow = 0;
+      rows.forEach(function (r) { if (r.text) maxRow = Math.max(maxRow, w(r.text, t.font)); });
+      var L = gd.ui.battle.log;
+      if (L.x + 28 + maxRow > L.x + L.w - 20) wide.push("ログの行の幅");
+      if (L.x + 20 + w(scene.texts.logHint) > L.x + L.w - 12) wide.push("ログの案内");
+      scene.phase = "turnMenu";
+      env.pressed = { menu: true }; scene._updateTurnMenu(game.input); env.pressed = {};
+      var opened = scene.phase === "log";
+      scene.render(g2);
+      env.pressed = { cancel: true }; scene._updateLog(game.input); env.pressed = {};
+      var closed = scene.phase === "turnMenu";
+      scene._buildTurnMenu();
+      var hasItem = scene.commandMenu.items.some(function (i) { return i.value === "log"; });
+
+      expect(env.badTexts.length === 0, "文に undefined や NaN が出ない" + (env.badTexts.length ? "（出た：" + env.badTexts.join(" / ") + "）" : ""));
+      expect(hiddenBefore && shown && plain, "効き目はスカウトした相手だけ・水の技はスミビに◎ キングスライムに△・無属性の体当たりには出ない");
+      expect(listMark, "技の一覧に、よく効く相手がいる技の ◎ が付く");
+      expect(missing.length === 0, "すべての技の範囲に名前がある" + (missing.length ? "（無い：" + missing.join(" / ") + "）" : ""));
+      expect(wide.length === 0, "範囲の札・ログの行・案内が、重ならず枠に収まる" + (wide.length ? "（" + wide.join(" / ") + "）" : ""));
+      expect(kept && quiet && start >= 1, "ログに見せた行が残り、「PPが足りない!」のような知らせは残らない");
+      expect(hasItem && opened && closed, "ターンの頭に「ログ」があり、C で開いて Esc で戻る");
+      lines.unshift("技 " + Object.keys(gd.skills).length + " 個の範囲の札・ログ " + rows.length + " 行を確かめた");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 版の名前 ---
     function checkVersion(ctx) {
       var raw = ctx.raw;
       var version = (raw.config || {}).version;

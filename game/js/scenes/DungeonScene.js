@@ -946,7 +946,10 @@
       gold: (summary && summary.gold) || 0,
       items: (summary && summary.items) || [],
       lostItems: (lost && lost.items) || [],
-      saved: saved
+      saved: saved,
+      monsters: (summary && summary.monsters) || [],
+      blessings: (summary && summary.blessings) || [],
+      startLevels: (summary && summary.startLevels) || []
     }));
   };
 

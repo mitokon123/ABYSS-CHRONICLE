@@ -18,6 +18,13 @@
  *   "target"  … 相手を選ぶ
  *   "message" … メッセージ送り待ち
  *   "done"    … 戦闘終了
+ *   "log"     … 戦闘のログを見返す（v1.4.0。ターンの頭の「ログ」か C。閉じると元の状態へ戻る）
+ *
+ * ▼ v1.4.0（2026-11-13 作者の指定）
+ *   ・技の効き目の印：スカウトしたことのある種族の敵だけ、技を選んでいる間と相手を選ぶ間に
+ *     敵の欄の下へ「◎ よく効く」「△ 効きにくい」「× 効かない」。技の一覧にも、よく効く相手がいれば ◎（_effectOf）
+ *   ・技の説明に範囲の札（敵1体・敵全体・味方1体・味方全体・自分）
+ *   ・戦闘のログ：MessageLog が見せた行を覚えておき（history）、窓で見返す（_renderLog）
  */
 (function (NS) {
   "use strict";
@@ -62,6 +69,9 @@
     this.renderer = new NS.Renderer(game.ctx);
 
     this.messageLog = new NS.MessageLog(this.panel, this.layout.message, this.layout.messageLines);
+    this.messageLog.mark(this.texts.logStart || "");
+    this._logScroll = 0;      // ログの窓で、いちばん上に出している行
+    this._logReturn = null;   // ログを閉じたら戻る状態
     this.commandMenu = new NS.CommandMenu(this.panel, this.layout.command);
     this.subMenu = new NS.ScrollList(this.panel, this.layout.subMenu, { sprites: this.spriteRenderer });
 
@@ -304,7 +314,9 @@
       // 仲間ごとの作戦を変える（v1.0.0）。行動にはならず、変えたらこのメニューへ戻る
       { label: labels.tactic || "tactic", value: "tactic" },
       { label: labels.flee || "flee", value: "flee",
-        disabled: !this.allowFlee, color: this.allowFlee ? null : t.hintColor }
+        disabled: !this.allowFlee, color: this.allowFlee ? null : t.hintColor },
+      // この戦いで流れた文を見返す（v1.4.0。行動にはならない）
+      { label: labels.log || "log", value: "log" }
     ]);
   };
 
@@ -438,11 +450,15 @@
         // PPが足りない技は薄く表示して、使えないことを分かるようにする
         var affordable = this._canAfford(actor, skill);
         if (id === keepId) at = rows.length;
+        // 盤面の敵（スカウトしたことのある種族だけ）に、よく効く相手がいれば ◎（v1.4.0）
+        var weak = this._weakAgainstField(skill);
         rows.push({
           type: "entry",
           label: skill.name,
           // 払うPP（特性「死神」で即死の技は0になる。BattleSystem.ppCostOf）
           right: "PP" + this.system.ppCostOf(actor, skill),
+          mark: weak ? ((this.texts.effectMarks || {}).listMark || "◎") : null,
+          markColor: ((this.layout.effectMark || {}).colors || {}).weak,
           color: affordable ? theme.textColor : theme.hintColor,
           value: id
         });
@@ -582,6 +598,7 @@
       case "scoutSwap":   this._updateScoutSwap(input); break;
       case "tacticMember": this._updateTacticMember(input); break;
       case "tacticPick":   this._updateTacticPick(input); break;
+      case "log":      this._updateLog(input); break;
       case "done":     this._updateDone(); break;
     }
   };
@@ -1855,6 +1872,7 @@
   };
 
   BattleScene.prototype._updateTurnMenu = function (input) {
+    if (input.isPressed("menu")) { this._openLog(); return; }
     var result = this.commandMenu.handleInput(input);
     if (!result) return;
 
@@ -1875,6 +1893,109 @@
     }
     if (result.value === "go") this._beginCommandPhase();
     if (result.value === "tactic") this._beginTacticMember(0);
+    if (result.value === "log") this._openLog();
+  };
+
+  // --- 戦闘のログ（v1.4.0）---
+
+  BattleScene.prototype._openLog = function () {
+    this._logReturn = this.phase;
+    this.phase = "log";
+    // 開いたときは、いちばん新しい行が見えるところから
+    this._logScroll = Math.max(0, this._logRows().length - this._logVisible());
+  };
+
+  /** ログの行（見出しも1行）。長い行は窓の幅で折り返す */
+  BattleScene.prototype._logRows = function () {
+    var L = this.layout.log || {};
+    var rows = [], history = this.messageLog.history;
+    for (var i = 0; i < history.length; i++) {
+      var h = history[i];
+      if (h.heading) { rows.push({ heading: h.heading }); continue; }
+      var parts = NS.wrapText(String(h.text), L.charsPerLine || 50);
+      for (var k = 0; k < parts.length; k++) rows.push({ text: parts[k], indent: k > 0 });
+    }
+    return rows;
+  };
+
+  BattleScene.prototype._logVisible = function () {
+    var L = this.layout.log || {};
+    return Math.max(1, Math.floor(((L.h || 500) - 76) / (L.lineHeight || 20)));
+  };
+
+  BattleScene.prototype._updateLog = function (input) {
+    if (input.isPressed("cancel") || input.isPressed("confirm") || input.isPressed("menu")) {
+      this.phase = this._logReturn || "turnMenu";
+      return;
+    }
+    var visible = this._logVisible();
+    var max = Math.max(0, this._logRows().length - visible);
+    var step = 0;
+    if (input.isPressed("up")) step = -1;
+    if (input.isPressed("down")) step = 1;
+    if (input.isPressed("left") || input.isPressed("prevTab")) step = -visible;
+    if (input.isPressed("right") || input.isPressed("nextTab")) step = visible;
+    var pointer = input.getPointer ? input.getPointer() : null;
+    if (pointer && pointer.wheel) step = pointer.wheel > 0 ? 3 : -3;
+    this._logScroll = Math.max(0, Math.min(max, this._logScroll + step));
+  };
+
+  /** ログの窓。後ろを暗くして、見出し（ターンの区切り）は黄色で */
+  BattleScene.prototype._renderLog = function (ctx, w, h) {
+    var L = this.layout.log || {};
+    var t = this.theme;
+    var rect = { x: L.x || 40, y: L.y || 40, w: L.w || 720, h: L.h || 500 };
+    var lh = L.lineHeight || 20;
+    var rows = this._logRows();
+    var visible = this._logVisible();
+
+    ctx.save();
+    ctx.fillStyle = L.veil || "rgba(4,6,12,0.78)";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = t.panelBg || "#0d1220";
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.restore();
+    this.panel.drawBox(rect);
+
+    var pad = t.padding || 8;
+    var x = rect.x + pad + 12;
+    this.panel.drawText(this.texts.logTitle || "", x, rect.y + 30, { color: t.cursorColor });
+    if (rows.length > visible) {
+      this.panel.drawText(fill(this.texts.logPosition || "{from}-{to} / {total}", {
+        from: this._logScroll + 1, to: Math.min(rows.length, this._logScroll + visible), total: rows.length
+      }), rect.x + rect.w - pad - 12, rect.y + 30, { align: "right", font: t.smallFont, color: t.hintColor });
+    }
+
+    var top = rect.y + 48;
+    if (rows.length === 0) {
+      this.panel.drawText(this.texts.logEmpty || "", x, top + lh, { font: t.smallFont, color: t.hintColor });
+    }
+    for (var i = 0; i < visible; i++) {
+      var row = rows[this._logScroll + i];
+      if (!row) break;
+      var y = top + lh * (i + 1) - 4;
+      if (row.heading) {
+        this.panel.drawText(row.heading, x, y, { font: t.smallFont, color: L.headingColor || t.cursorColor });
+      } else {
+        this.panel.drawText(row.text, x + (row.indent ? 14 : 0), y, { color: t.textColor });
+      }
+    }
+
+    // 右のバー（どこを見ているか）
+    if (rows.length > visible) {
+      var trackX = rect.x + rect.w - pad - 6, trackY = top + 4, trackH = lh * visible - 8;
+      var barH = Math.max(16, trackH * visible / rows.length);
+      var barY = trackY + (trackH - barH) * (this._logScroll / Math.max(1, rows.length - visible));
+      ctx.save();
+      ctx.fillStyle = "rgba(127,141,184,0.2)";
+      ctx.fillRect(trackX, trackY, 4, trackH);
+      ctx.fillStyle = t.subTextColor || "#9aa4c0";
+      ctx.fillRect(trackX, barY, 4, barH);
+      ctx.restore();
+    }
+
+    this.panel.drawText(this.texts.logHint || "", x, rect.y + rect.h - 14,
+      { font: t.smallFont, color: t.hintColor });
   };
 
   // --- 状態を見る ---
@@ -2157,6 +2278,7 @@
   };
 
   BattleScene.prototype._updateCommand = function (input) {
+    if (input.isPressed("menu")) { this._openLog(); return; }
     var result = this.commandMenu.handleInput(input);
     if (!result) return;
 
@@ -2509,6 +2631,7 @@
     this._captureStatusMarks();
 
     this._turnCount++;
+    this.messageLog.mark(fill(this.texts.logTurn || "{n}", { n: this._turnCount }));
     var events = this.system.takeTurn(this.actions);
 
     // 勝ったときだけ、報酬（ゴールド・ドロップ）を渡す
@@ -2836,7 +2959,9 @@
   BattleScene.prototype._flashMessage = function (text) {
     if (!text) return;
     this.messageLog.push(text);
+    this.messageLog.quiet = true;
     this.messageLog.advance();
+    this.messageLog.quiet = false;
     if (this.game.playError) this.game.playError();
   };
 
@@ -2955,6 +3080,8 @@
 
     // レベルアップの結果（画面中央）。説明より下
     this._renderLevelResult(ctx, w, h);
+
+    if (this.phase === "log") this._renderLog(ctx, w, h);
 
     // 説明はすべての上。読んでいる間は他を触れない
     this.tutorial.render();
@@ -3212,6 +3339,74 @@
   };
 
   /** その敵の種族を、これまでに仲間にしたことがあるか（図鑑の「仲間」） */
+  /**
+   * 技の効き目（v1.4.0）。"weak"（よく効く）・"resist"（効きにくい）・"immune"（効かない）・null（ふつう・分からない）。
+   * スカウトしたことのある種族（図鑑で「仲間にした」）の敵だけ。ダメージを与えない技・無属性の技は null。
+   * 2つの属性を持つ技は、よく効くほうで見る（BattleSystem._damageElementOf と同じ考え）
+   */
+  BattleScene.prototype._effectOf = function (skill, enemy) {
+    if (!skill || !enemy || !NS.BattleSystem.dealsDamage(skill)) return null;
+    if (!this._isCaughtSpecies(enemy)) return null;
+    var sys = this.system;
+    var ids = [skill.element || "none"];
+    if (skill.element2) ids.push(skill.element2);
+    var elemental = false, best = -1;
+    for (var i = 0; i < ids.length; i++) {
+      if (!sys._isNonElemental(ids[i])) elemental = true;
+      var value = sys._isImmune(enemy, ids[i]) ? 0 : sys._elementMultiplier(enemy, ids[i]);
+      if (value > best) best = value;
+    }
+    if (!elemental) return null;
+    if (best <= 0) return "immune";
+    if (best > 1) return "weak";
+    if (best < 1) return "resist";
+    return null;
+  };
+
+  /** 盤面の敵のうち、その技がよく効く相手がいるか（技の一覧の ◎） */
+  BattleScene.prototype._weakAgainstField = function (skill) {
+    var enemies = this.system.getFieldEnemies();
+    for (var i = 0; i < enemies.length; i++) {
+      if (enemies[i].isFainted && enemies[i].isFainted()) continue;
+      if (this._effectOf(skill, enemies[i]) === "weak") return true;
+    }
+    return false;
+  };
+
+  /** いま効き目を見せる技（技を選んでいる間はカーソルの技、敵を選んでいる間は決めた技） */
+  BattleScene.prototype._effectSkill = function () {
+    if (this.phase === "skill") {
+      var selected = this.subMenu.getSelected();
+      return selected ? this.game.data.getSkill(selected.value) : null;
+    }
+    if (this.phase === "target" && this.targetSide === "enemy" && this.pending && this.pending.type === "skill") {
+      return this.game.data.getSkill(this.pending.skillId);
+    }
+    return null;
+  };
+
+  /** 敵の欄の下の「◎ よく効く」の札 */
+  BattleScene.prototype._renderEffectChip = function (monster, rect) {
+    if (monster.isFainted && monster.isFainted()) return;
+    var mark = this._effectOf(this._effectSkill(), monster);
+    if (!mark) return;
+    var E = this.layout.effectMark || {};
+    var text = (this.texts.effectMarks || {})[mark] || mark;
+    var color = (E.colors || {})[mark] || this.theme.cursorColor;
+    var ctx = this.panel.ctx;
+    ctx.save();
+    ctx.font = this.theme.smallFont || "12px monospace";
+    var w = Math.ceil(ctx.measureText(text).width) + 14, h = E.h || 18;
+    var x = Math.round(rect.x + rect.w / 2 - w / 2), y = rect.y + rect.h + (E.gap || 4);
+    ctx.fillStyle = E.fill || "rgba(10,14,26,0.88)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.restore();
+    this.panel.drawText(text, x + w / 2, y + h / 2 + 4, { align: "center", font: this.theme.smallFont, color: color });
+  };
+
   BattleScene.prototype._isCaughtSpecies = function (monster) {
     var discovery = this.game.discovery;
     return !!(discovery && monster && discovery.isMonsterCaught(monster.speciesId));
@@ -3434,6 +3629,9 @@
       this.panel.ctx.lineWidth = 2;
       this.panel.ctx.strokeRect(rect.x - 2, rect.y - 2, rect.w + 4, rect.h + 4);
     }
+
+    // 技の効き目（v1.4.0）
+    if (side === "enemy") this._renderEffectChip(monster, rect);
   };
 
   /** コマンド欄。だれの行動を決めているかも表示する */
@@ -3648,12 +3846,15 @@
     var y = origin.y + 20 + lh + 6;
 
     // 技名と属性
-    var element = (this.game.data.elements || {})[skill.element];
     this.panel.drawText(skill.name, origin.x, y);
-    if (element) {
-      this.panel.drawText("[" + this.game.data.getSkillElementName(skill) + "]",
-        origin.x + (info.elementOffsetX || 110), y,
-        { font: t.smallFont, color: element.color });
+    // 属性は1つずつ、その属性の色で（混合属性の烈火崩地斬は「[火][地]」。v1.4.0）
+    var skillElements = this.game.data.getSkillElements(skill);
+    var elementX = origin.x + (info.elementOffsetX || 110);
+    for (var se = 0; se < skillElements.length; se++) {
+      var tag = "[" + skillElements[se].name + "]";
+      this.panel.drawText(tag, elementX, y, { font: t.smallFont, color: skillElements[se].color });
+      this.panel.ctx.font = t.smallFont;
+      elementX += this.panel.ctx.measureText(tag).width + 2;
     }
     // 技の種類（共鳴・ブレスなど。data/categories.js の skillKind）。属性が2つの技は、そのぶん右へ
     var kind = this.game.data.getSkillKind(skill);
@@ -3679,6 +3880,22 @@
         pp: this._currentActor() ? this.system.ppCostOf(this._currentActor(), skill) : (skill.pp || 0)
       }),
       origin.x, y, { font: t.smallFont, color: t.subTextColor });
+    // 範囲の札（v1.4.0）。情報の欄の右端（技の一覧の左）にそろえる
+    var range = (this.texts.targetLabels || {})[skill.target || "enemy"];
+    if (range) {
+      var R = this.layout.rangeChip || {};
+      var ctx = this.panel.ctx;
+      ctx.save();
+      ctx.font = t.smallFont || "12px monospace";
+      var cw = Math.ceil(ctx.measureText(range).width) + 10, ch = R.h || 16;
+      var right = (this.layout.skillMenu || this.layout.subMenu).x - (R.marginRight || 10);
+      var color = (R.colors || {})[skill.target || "enemy"] || t.subTextColor;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(right - cw + 0.5, y - ch + 4.5, cw - 1, ch - 1);
+      ctx.restore();
+      this.panel.drawText(range, right - cw / 2, y, { align: "center", font: t.smallFont, color: color });
+    }
     y += lh + 4;
 
     // 説明

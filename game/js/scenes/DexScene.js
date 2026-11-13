@@ -1,17 +1,25 @@
 /**
  * DexScene.js
- * 図鑑画面。モンスター図鑑とアイテム図鑑を左右キーで切り替える。
+ * 図鑑画面。画面ぜんぶが「開いた本」（v1.4.0。見本は dex-mockups.html の案 B）。
+ * 上の栞が表（モンスター／アイテム／特性／技／性格／加護）で、Q/E か栞を押して切り替える。
  *
- * どちらも「まだ発見していないもの」は ??? で伏せて表示し、
+ * 「まだ発見していないもの」は ？ で伏せて表示し、
  * 全体の中でどれだけ集まったかが分かるようにしている。
  * 発見の記録は Discovery が持つ。
  *
- * 一覧は分類（categories.js）ごとに区切って並べる。
- * 配置は data/ui.js の dex、文言は data/messages.js の dex で管理する。
+ * 配置と色は data/ui.js の dex、文言は data/messages.js の dex で管理する。
  *
- * ▼ 右側の詳細について
- * 説明が長いと枠に収まらないため、いったん「行の配列」を組み立ててから
- * 入る分だけ描く。決定キーで詳細へカーソルを移すと、上下でスクロールできる。
+ * ▼ モンスターの表（1体で見開き1つ）
+ *   左のページ … 番号・名前・系統と属性・台座に立つ絵・説明・愛情度の記録（慣れ・信頼・絆）・特性の説明
+ *   右のページ … 能力の五角形・耐性の表・落とすもの・特性の名前
+ *   下の帯     … 前後の相手の絵。←→ でめくる（押しっぱなしで送れる）。絵を押してもめくれる
+ *   ↑↓ … 左のページの文を送る　　R … 並べ替え　　決定 … 落とすものの区画を切り替える（区画で違う種族だけ）
+ *   出会っただけの相手は絵・名前・系統・属性・能力まで。まだ出会っていない相手はすべて「？」
+ *
+ * ▼ ほかの表（左のページに一覧・右のページに説明）
+ *   一覧は分類（categories.js）ごとに区切って並べる。
+ *   説明が長いとページに収まらないため、いったん「行の配列」を組み立ててから
+ *   入る分だけ描く。決定キーで説明へカーソルを移すと、上下でスクロールできる。
  */
 (function (NS) {
   "use strict";
@@ -47,13 +55,25 @@
     this.focus = "list";     // "list"（一覧を選ぶ）/ "detail"（説明を読む）
     this.detailScroll = 0;   // 詳細の表示開始行
 
+    // モンスターの表（見開きの本）
+    this.monsterIds = [];    // いまの並べ方での種族idの並び
+    this.monsterId = null;   // 開いている種族
+    this.pageScroll = 0;     // 左のページの文を送った量（px）
+    this.dropGroup = 0;      // 落とすものの、いま見せている区画（区画で違う種族だけ）
+    this._holds = {};        // 押しっぱなしで送るための覚え（_heldStep）
+    this._pageCache = null;  // 左のページの文（種族が変わるまで使い回す）
+    this._statMaxes = {};    // 能力の五角形の目盛り（_statMax）
+
     this._rebuildList();
   }
 
   DexScene.prototype.enter = function () {
+    this._pageCache = null;
     this._rebuildList();
     this.focus = "list";
     this.detailScroll = 0;
+    this.pageScroll = 0;
+    this.dropGroup = 0;
   };
 
   DexScene.prototype.getTab = function () { return TABS[this.tabIndex]; };
@@ -64,8 +84,14 @@
     var tab = this.getTab();
     var rows;
 
-    if (tab === "monsters") rows = this._buildMonsterRows();
-    else if (tab === "items") rows = this._buildItemRows();
+    // モンスターの表は一覧を使わない（見開きの本。並びだけ決める）
+    if (tab === "monsters") {
+      this._rebuildMonsterOrder();
+      this.list.setRows([]);
+      return;
+    }
+
+    if (tab === "items") rows = this._buildItemRows();
     else if (tab === "abilities") rows = this._buildAbilityRows();
     else if (tab === "skills") rows = this._buildSkillRows();
     else if (tab === "natures") rows = this._buildNatureRows();
@@ -231,7 +257,7 @@
     return result;
   };
 
-  /** 技の並べ方（Q/E で切り替える。2026-10-15）。選んだ並びは図鑑を閉じても覚えておく（セーブはしない） */
+  /** 技の並べ方（R で切り替える。2026-10-15）。選んだ並びは図鑑を閉じても覚えておく（セーブはしない） */
   var SKILL_SORTS = ["element", "kind", "role", "name", "order"];
 
   DexScene.prototype._skillSort = function () {
@@ -239,7 +265,7 @@
     return SKILL_SORTS.indexOf(mode) >= 0 ? mode : SKILL_SORTS[0];
   };
 
-  /** モンスターの並べ方（Q/E で切り替える。2026-11-06）。技と同じく、図鑑を閉じても覚えておく（セーブはしない） */
+  /** モンスターの並べ方（R で切り替える。2026-11-06）。技と同じく、図鑑を閉じても覚えておく（セーブはしない） */
   var MONSTER_SORTS = ["family", "element", "name", "order"];
 
   DexScene.prototype._monsterSort = function () {
@@ -247,7 +273,7 @@
     return MONSTER_SORTS.indexOf(mode) >= 0 ? mode : MONSTER_SORTS[0];
   };
 
-  /** アイテムの並べ方（Q/E で切り替える。2026-11-09 作者の依頼）。ほかの表と同じく、図鑑を閉じても覚えておく（セーブはしない） */
+  /** アイテムの並べ方（R で切り替える。2026-11-09 作者の依頼）。ほかの表と同じく、図鑑を閉じても覚えておく（セーブはしない） */
   var ITEM_SORTS = ["category", "price", "name", "order"];
 
   DexScene.prototype._itemSort = function () {
@@ -305,9 +331,12 @@
       for (var i = 0; i < groups[g].ids.length; i++) {
         var id = groups[g].ids[i];
         var known = this._isSkillKnown(id);
+        var skillElement = known ? (data.elements || {})[data.getSkill(id).element] : null;
         rows.push({
           type: "entry",
           label: known ? data.getSkill(id).name : (this.texts.unknownName || "???"),
+          // 属性の絵（無属性は絵が無いので、字下げだけそろう）
+          icon: skillElement ? skillElement.icon : null,
           right: known ? (this.texts.knownLabel || "") : "",
           value: id
         });
@@ -323,40 +352,41 @@
   };
 
   /**
-   * モンスターを並べる。並べ方は系統ごと・属性ごと・名前順・図鑑の順（data/monsters.js に書いた順）。
+   * モンスターの並び（種族idの配列）。並べ方は系統ごと・属性ごと・名前順・図鑑の順（data/monsters.js に書いた順）。
    * 名前順では、まだ出会っていないものは最後にまとめる（技の名前順と同じ）
    */
-  DexScene.prototype._buildMonsterRows = function () {
+  DexScene.prototype._monsterOrder = function () {
     var data = this.game.data;
     var discovery = this.game.discovery;
     var mode = this._monsterSort();
-
-    var makeEntry = function (id, monster) {
-      var seen = discovery.isMonsterSeen(id);
-      var caught = discovery.isMonsterCaught(id);
-      return {
-        label: seen ? monster.name : (this.texts.unknownName || "???"),
-        right: caught ? (this.texts.caughtLabel || "") : (seen ? (this.texts.seenLabel || "") : ""),
-        value: id
-      };
-    }.bind(this);
-
-    if (mode === "family") return buildRows(data.monsters, (data.categories || {}).monster || {}, "family", makeEntry);
-    if (mode === "element") return buildRows(data.monsters, data.elements || {}, "element", makeEntry);
-    if (mode === "order") return flatRows(data.monsters, makeEntry);
-
     var ids = Object.keys(data.monsters);
-    var sorted = ids.slice().sort(function (a, b) {
+    var makeEntry = function (id) { return { value: id }; };
+    var rows = null;
+
+    if (mode === "family") rows = buildRows(data.monsters, (data.categories || {}).monster || {}, "family", makeEntry);
+    else if (mode === "element") rows = buildRows(data.monsters, data.elements || {}, "element", makeEntry);
+    if (rows) {
+      return rows.filter(function (row) { return row.type === "entry"; })
+                 .map(function (row) { return row.value; });
+    }
+    if (mode === "order") return ids;
+
+    return ids.slice().sort(function (a, b) {
       var sa = discovery.isMonsterSeen(a), sb = discovery.isMonsterSeen(b);
       if (sa !== sb) return sa ? -1 : 1;
       if (!sa) return ids.indexOf(a) - ids.indexOf(b);
       return data.monsters[a].name.localeCompare(data.monsters[b].name, "ja") || ids.indexOf(a) - ids.indexOf(b);
     });
-    return sorted.map(function (id) {
-      var entry = makeEntry(id, data.monsters[id]);
-      entry.type = "entry";
-      return entry;
-    });
+  };
+
+  /** 並びを作り直す。開いている種族はそのまま（並べ替えても同じ相手のページにいる） */
+  DexScene.prototype._rebuildMonsterOrder = function () {
+    this.monsterIds = this._monsterOrder();
+    if (this.monsterIds.indexOf(this.monsterId) < 0) {
+      this.monsterId = this.monsterIds.length ? this.monsterIds[0] : null;
+      this.pageScroll = 0;
+      this.dropGroup = 0;
+    }
   };
 
   /**
@@ -422,6 +452,11 @@
       if (!Object.prototype.hasOwnProperty.call(dungeons, dungeonId)) continue;
       defs[dungeonId] = { name: dungeons[dungeonId].name, order: dungeons[dungeonId].order };
     }
+    // ダンジョンではない小見出し（恒常素材など。data/categories.js の materialSource）
+    var sources = (data.categories || {}).materialSource || {};
+    for (var sourceId in sources) {
+      if (Object.prototype.hasOwnProperty.call(sources, sourceId)) defs[sourceId] = sources[sourceId];
+    }
     var subgroups = {
       keyOf: function (id, item) {
         if (item.equip) return NS.EffectSystem.slotOf(item);
@@ -450,15 +485,21 @@
       return;
     }
 
-    if (input.isPressed("left")) this._changeTab(-1);
-    if (input.isPressed("right")) this._changeTab(1);
+    // 栞（表の切り替え）は Q/E か、栞を押す。←→ はモンスターの表でページをめくるのに使う
+    if (input.isPressed("prevTab")) this._changeTab(-1);
+    if (input.isPressed("nextTab")) this._changeTab(1);
     if (this._clickedTab(input)) return;
 
-    // 技・モンスター・アイテムの表は、Q/E（または並びの札を押す）で並べ方を変えられる
-    if (this._hasSort()) {
-      if (input.isPressed("prevTab")) this._changeSort(-1);
-      if (input.isPressed("nextTab")) this._changeSort(1);
-      if (this._clickedSortLabel(input)) { this._changeSort(1); return; }
+    // 技・モンスター・アイテムの表は、R（または並びの札を押す）で並べ方を変えられる
+    if (this._hasSort() && (input.isPressed("sort") || this._clickedSortLabel(input))) {
+      this._changeSort(1);
+      return;
+    }
+
+    // モンスターの表は見開きの本
+    if (this.getTab() === "monsters") {
+      this._updateBook(input);
+      return;
     }
 
     // 説明の上でホイールを回したら、そのままスクロールする
@@ -537,7 +578,7 @@
 
     var tab = this.getTab();
     var content;
-    if (tab === "monsters") content = this._buildMonsterDetail();
+    if (tab === "monsters") content = null;   // モンスターの表は見開きの本（_renderMonsterBook）
     else if (tab === "items") content = this._buildItemDetail();
     else if (tab === "abilities") content = this._buildAbilityDetail();
     else if (tab === "skills") content = this._buildSkillDetail();
@@ -545,10 +586,8 @@
     else content = this._buildBlessingDetail();
 
     var origin = this.panel.innerOrigin(rect);
-    var top = origin.y + 20;
-
-    // スプライトは枠の上部に固定し、その下だけをスクロールさせる
-    if (content && content.sprite) top = origin.y + (rect.spriteSize || 72) + 26;
+    // 上の見出し（絵・名前・札）はスクロールさせず、その下の行だけを送る
+    var top = origin.y + ((content && content.head) ? this._headHeight(content.head) : 0) + 20;
 
     var bottom = rect.y + rect.h - (t.padding || 8);
     var lines = (content && content.lines) || [];
@@ -575,6 +614,7 @@
   DexScene.prototype._changeTab = function (direction) {
     this.tabIndex = (this.tabIndex + direction + TABS.length) % TABS.length;
     this.detailScroll = 0;
+    this._holds = {};
     this._rebuildList();
   };
 
@@ -608,43 +648,37 @@
 
     this.renderer.clear(this.layout.background || "#000000", w, h);
 
-    this._renderHeading();
+    // 栞は本の後ろから出ているので、先に描く
     this._renderTabs();
+    this._renderBookFrame();
     this._renderProgress();
     this._renderSortLabel();
-    this.list.render(this.game.clock);
 
-    this._renderDetail();
+    if (this.getTab() === "monsters") {
+      this._renderMonsterBook();
+    } else {
+      this.list.render(this.game.clock);
+      this._renderDetail();
+    }
+
     this._renderHint();
     this.backButton.render();
   };
 
   /**
-   * 右側の詳細。
-   * 中身は各タブが「行の配列」で作り、ここが枠に入る分だけ描く。
+   * 右のページの説明（モンスター以外の表）。
+   * 中身は各タブが「行の配列」で作り、ここがページに入る分だけ描く。
    */
   DexScene.prototype._renderDetail = function () {
     var rect = this.layout.detail;
-    this.panel.drawBox(rect);
 
     var m = this._measureDetail();
     if (!m.content) return;
 
     var t = this.theme;
-    var origin = this.panel.innerOrigin(rect);
     var lh = t.lineHeight || 18;
 
-    if (m.content.sprite) {
-      // 種族ごとの大きさ（sizeScale）。下端をそろえて上へ伸ばすので、
-      // 大きい相手でも下の説明文に食い込まない
-      var base = rect.spriteSize || 72;
-      var size = Math.round(base * (m.content.sizeScale || 1));
-      // 図鑑でも種族ごとの動きを見せる（どんな動き方をするのか分かるように）
-      this.sprites.drawMotion(m.content.sprite,
-        rect.x + (rect.w - size) / 2, origin.y + 6 + (base - size), size, size,
-        NS.Motion.forSprite(this.game.data, m.content.sprite, m.content.motion,
-          this.game.clock, 0));
-    }
+    if (m.content.head) this._renderHead(m.content.head);
 
     // 内容が変わって行数が減った場合に、行き過ぎたままにならないようにする
     var max = Math.max(0, m.total - m.visible);
@@ -654,26 +688,106 @@
     var end = Math.min(lines.length, this.detailScroll + m.visible);
     var y = m.top;
 
-    // アイテムの絵（icon）は1行目の左に出す。送って1行目が隠れたら絵も出さない
-    var indent = 0;
-    if (m.content.icon && m.content.icon.icon) {
-      indent = NS.StatusMarks.itemIconSize(t) + 8;
-      if (this.detailScroll === 0) NS.StatusMarks.drawItemIcon(this.sprites, m.content.icon, origin.x, m.top - 16, t);
-    }
-
     for (var i = this.detailScroll; i < end; i++) {
-      var line = lines[i];
-      var x = line.center ? (rect.x + rect.w / 2) : origin.x + (line.besideIcon ? indent : 0);
-      this.panel.drawText(line.text, x, y,
-        {
-          align: line.center ? "center" : "left",
-          font: line.font || t.smallFont,
-          color: line.color || t.subTextColor
-        });
+      this._renderLine(lines[i], y);
       y += lh;
     }
 
     this._renderDetailScrollMarks(rect, m);
+  };
+
+  // --- 右のページの見出しと行（モンスター以外の表。v1.4.0） ---
+  //
+  // 説明は { head, lines } で作る。
+  //   head  … ページの上に固定で出す。{ icon（絵のid）, mark（絵の代わりの1文字）, name, nameColor, chips: [{ label, color, icon }], sub }
+  //   lines … その下に1行ずつ。{ text, color, heading（見出しの色）, dim（まだ分からない色）, icon（16px の絵）,
+  //           sprite（モンスターの絵）, unknownSprite（絵の代わりに「？」）, right（右端の文）, rightColor, indent, bar（性格の倍率） }
+
+  /** 見出しの高さ（絵があれば絵の分だけ高い） */
+  DexScene.prototype._headHeight = function (head) {
+    return (head.icon || head.mark) ? 84 : (head.sub ? 70 : 52);
+  };
+
+  DexScene.prototype._renderHead = function (head) {
+    var rect = this.layout.detail;
+    var origin = this.panel.innerOrigin(rect);
+    var t = this.theme;
+    var b = this.layout.book || {};
+    var ctx = this.panel.ctx;
+    var x = origin.x, y = origin.y;
+    var hasPicture = !!(head.icon || head.mark);
+
+    if (hasPicture) {
+      // 小さな台座に、絵を3倍（48px）で立てる
+      ctx.lineWidth = 1;
+      ctx.fillStyle = b.pedestal || "rgba(184,154,90,0.12)";
+      ctx.beginPath(); ctx.ellipse(x + 30, y + 62, 30, 7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = b.pedestalLine || "rgba(184,154,90,0.4)";
+      ctx.beginPath(); ctx.ellipse(x + 30, y + 62, 30, 7, 0, 0, Math.PI * 2); ctx.stroke();
+      if (head.icon) this.sprites.draw(head.icon, x + 6, y + 14, 48, 48);
+      else this.panel.drawText(head.mark, x + 30, y + 54, { align: "center", font: "30px monospace", color: b.dim || "#5a4e36" });
+      x += 72;
+    }
+
+    this.panel.drawText(head.name || "", x, y + (hasPicture ? 30 : 22),
+      { font: b.headFont || "18px monospace", color: head.nameColor || b.name || t.textColor });
+
+    var chipX = x, chipY = y + (hasPicture ? 38 : 32);
+    var chips = head.chips || [];
+    for (var i = 0; i < chips.length; i++) {
+      chipX += this._chip(chips[i].label, chipX, chipY, chips[i].color, chips[i].icon) + 6;
+    }
+    if (head.sub) {
+      this.panel.drawText(head.sub, x, chipY + (chips.length ? 36 : 16), { font: t.smallFont, color: t.subTextColor });
+    }
+
+    // 見出しと本文の境目の線
+    var lineY = y + this._headHeight(head) - 2;
+    ctx.strokeStyle = b.frame || "#3a3020";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(origin.x, lineY + 0.5); ctx.lineTo(rect.x + rect.w - (t.padding || 8), lineY + 0.5); ctx.stroke();
+  };
+
+  /** 右のページの1行。y は文字の下端 */
+  DexScene.prototype._renderLine = function (line, y) {
+    var rect = this.layout.detail;
+    var origin = this.panel.innerOrigin(rect);
+    var t = this.theme;
+    var b = this.layout.book || {};
+    var x = origin.x + (line.indent || 0);
+    var right = rect.x + rect.w - 28;
+    var color = line.color || (line.heading ? (b.gold || t.cursorColor) : line.dim ? (b.dim || t.hintColor) : (b.paper || t.subTextColor));
+
+    if (line.sprite) {
+      this.sprites.draw(firstFrame(line.sprite), x, y - 15, 18, 18);
+      x += 24;
+    } else if (line.unknownSprite) {
+      this.panel.drawText(this.texts.bookUnknownMark || "？", x + 9, y, { align: "center", font: t.smallFont, color: b.dim || t.hintColor });
+      x += 24;
+    } else if (line.icon) {
+      this.sprites.draw(line.icon, x, y - 13, 16, 16);
+      x += 22;
+    }
+
+    // 性格の倍率：まんなか（×1.0）から左右に伸びる棒
+    if (line.bar) {
+      var barX = origin.x + 70, barW = 170, mid = barX + barW / 2;
+      var ctx = this.panel.ctx;
+      ctx.fillStyle = t.hpBarBg || "#2a3350";
+      ctx.fillRect(barX, y - 9, barW, 8);
+      var span = Math.max(-1, Math.min(1, (line.bar.value - 1) / (line.bar.range || 0.2)));
+      ctx.fillStyle = line.bar.color || t.cursorColor;
+      if (span > 0) ctx.fillRect(mid, y - 9, Math.round(barW / 2 * span), 8);
+      else if (span < 0) ctx.fillRect(mid + Math.round(barW / 2 * span), y - 9, Math.round(-barW / 2 * span), 8);
+      ctx.fillStyle = b.ink || t.textColor;
+      ctx.fillRect(mid, y - 11, 1, 12);
+    }
+
+    if (line.text) this.panel.drawText(line.text, x, y, { font: line.font || t.smallFont, color: color });
+    if (line.right) {
+      this.panel.drawText(line.right, right, y,
+        { align: "right", font: t.smallFont, color: line.rightColor || color });
+    }
   };
 
   /** 続きがあることを示す印。読むモードのときは色を変えて分かるようにする */
@@ -691,17 +805,7 @@
     }
   };
 
-  DexScene.prototype._renderHeading = function () {
-    var title = this.layout.title || {};
-    var subtitle = this.layout.subtitle || {};
-
-    this.panel.drawText(this.texts.title || "", title.x, title.y,
-      { font: title.font, color: title.color });
-    this.panel.drawText(this.texts.subtitle || "", subtitle.x, subtitle.y,
-      { font: subtitle.font, color: subtitle.color });
-  };
-
-  /** タブ（モンスター／アイテム） */
+  /** 栞（表の切り替え）。本の上から出ている */
   DexScene.prototype._renderTabs = function () {
     var T = this.layout.tabs;
     if (!T) return;
@@ -715,19 +819,52 @@
       var x = T.x + (T.w + T.gap) * i;
       var selected = (i === this.tabIndex);
 
-      this.panel.ctx.fillStyle = selected ? "rgba(74,107,168,0.35)" : "rgba(8,10,20,0.6)";
+      this.panel.ctx.fillStyle = selected ? (T.activeBg || "#7a5a1e") : (T.bg || "#1f2740");
       this.panel.ctx.fillRect(x, T.y, T.w, T.h);
-      this.panel.ctx.strokeStyle = selected ? (t.cursorColor || "#ffd75e") : (t.panelBorder || "#3a4266");
-      this.panel.ctx.lineWidth = 1;
-      this.panel.ctx.strokeRect(x + 0.5, T.y + 0.5, T.w - 1, T.h - 1);
 
       this.panel.drawText(labels[i], x + T.w / 2, T.y + 20,
         { align: "center", font: t.smallFont,
-          color: selected ? t.cursorColor : t.subTextColor });
+          color: selected ? (T.activeText || t.cursorColor) : t.subTextColor });
     }
   };
 
-  /** 技とモンスターの表の並べ方の札（「並び：属性ごと　Q/E」）。押しても次の並びに変わる */
+  /** 本の位置と、左右のページの文を書き始める左端 */
+  DexScene.prototype._geo = function () {
+    var b = this.layout.book || {};
+    var x = (b.x === undefined) ? 24 : b.x;
+    var y = (b.y === undefined) ? 44 : b.y;
+    var w = b.w || 752;
+    var h = b.h || 452;
+    return { x: x, y: y, w: w, h: h, mid: x + w / 2, lx: x + 28, rx: x + w / 2 + 30 };
+  };
+
+  /** 本の表紙・左右のページ・のどの影・ページの枠の線 */
+  DexScene.prototype._renderBookFrame = function () {
+    var ctx = this.panel.ctx;
+    var b = this.layout.book || {};
+    var g = this._geo();
+
+    ctx.fillStyle = b.cover || "#2a2014";
+    ctx.fillRect(g.x - 6, g.y - 4, g.w + 12, g.h + 10);
+    ctx.fillStyle = b.pageLeft || "#101626";
+    ctx.fillRect(g.x, g.y, g.w / 2 - 4, g.h);
+    ctx.fillStyle = b.pageRight || "#0f1524";
+    ctx.fillRect(g.mid + 4, g.y, g.w / 2 - 4, g.h);
+
+    var shade = ctx.createLinearGradient(g.mid - 18, 0, g.mid + 18, 0);
+    shade.addColorStop(0, "rgba(0,0,0,0)");
+    shade.addColorStop(0.5, "rgba(0,0,0,0.55)");
+    shade.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = shade;
+    ctx.fillRect(g.mid - 18, g.y, 36, g.h);
+
+    ctx.strokeStyle = b.frame || "#3a3020";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(g.x + 10.5, g.y + 10.5, g.w / 2 - 24, g.h - 21);
+    ctx.strokeRect(g.mid + 13.5, g.y + 10.5, g.w / 2 - 24, g.h - 21);
+  };
+
+  /** 並べ方の札（「並び：属性ごと」。右下）。押すと次の並びに変わる（キーは R） */
   DexScene.prototype._renderSortLabel = function () {
     this._sortRect = null;
     if (!this._hasSort()) return;
@@ -739,12 +876,13 @@
     var ctx = this.panel.ctx;
     ctx.save();
     ctx.font = t.smallFont || "12px monospace";
-    var w = ctx.measureText(text).width;
+    var w = Math.ceil(ctx.measureText(text).width);
     ctx.restore();
-    this._sortRect = { x: pos.x - 6, y: pos.y - 15, w: w + 12, h: 20 };
+    // pos.x は札の右端（文字の数が変わっても右をそろえる）
+    this._sortRect = { x: pos.x - w - 12, y: pos.y - 15, w: w + 12, h: 20 };
     ctx.fillStyle = "rgba(74,107,168,0.25)";
     ctx.fillRect(this._sortRect.x, this._sortRect.y, this._sortRect.w, this._sortRect.h);
-    this.panel.drawText(text, pos.x, pos.y, { font: t.smallFont, color: t.cursorColor });
+    this.panel.drawText(text, pos.x - 6, pos.y, { align: "right", font: t.smallFont, color: t.cursorColor });
   };
 
   /** 収集率（発見数／総数） */
@@ -792,105 +930,628 @@
       { align: "right", font: this.theme.smallFont, color: this.theme.subTextColor });
   };
 
+  // ============================================================
+  // モンスターの表：見開きの本（v1.4.0）
+  // ============================================================
+
+  /** 能力の五角形に並べる順（上から時計回り）。名前は仲間画面と同じもの（messages.party） */
+  var BOOK_STATS = [
+    { key: "baseHp",      label: "HP" },
+    { key: "baseAttack",  partyLabel: "attackLabel" },
+    { key: "baseDefense", partyLabel: "defenseLabel" },
+    { key: "baseSpeed",   partyLabel: "speedLabel" },
+    { key: "basePp",      label: "PP" }
+  ];
+
+  /** 落とすものを1度に並べる数（これより多い種族・区画で違う種族は、決定で次を見る） */
+  var DROP_ROWS = 3;
+
   /**
-   * モンスターの詳細を行の配列にする。
-   * @returns {{sprite:string, lines:object[]}|null}
+   * その相手をどこまで見せるか。
+   *   "open" … 仲間にした（倒すだけで開く種族は、倒した）。すべて見せる
+   *   "seen" … 出会っただけ。絵・名前・系統・属性・能力まで
+   *   "none" … まだ出会っていない。すべて「？」
    */
-  DexScene.prototype._buildMonsterDetail = function () {
-    var selected = this.list.getSelected();
-    if (!selected) return null;
+  DexScene.prototype._monsterKind = function (id) {
+    if (this._dexOpen(id)) return "open";
+    var discovery = this.game.discovery;
+    return (discovery && discovery.isMonsterSeen(id)) ? "seen" : "none";
+  };
+
+  /** 図鑑の番号（data/monsters.js に書いた順。並べ替えても変わらない） */
+  DexScene.prototype._monsterNumber = function (id) {
+    var n = Object.keys(this.game.data.monsters || {}).indexOf(id) + 1;
+    return (this.texts.numberLabel || "No.") + (n < 10 ? "00" : n < 100 ? "0" : "") + n;
+  };
+
+  /**
+   * 五角形の目盛り（その能力の「満タン」の値）。
+   * いちばん大きい種族（主など）に合わせると、ほとんどの種族が小さくなるので、
+   * 8割の種族が収まる値を満タンにする（はみ出す種族は満タンで止まる）
+   */
+  DexScene.prototype._statMax = function (key) {
+    if (this._statMaxes[key]) return this._statMaxes[key];
+    var monsters = this.game.data.monsters || {};
+    var values = Object.keys(monsters).map(function (id) { return monsters[id][key] || 0; })
+                       .sort(function (a, b) { return a - b; });
+    this._statMaxes[key] = values[Math.floor(values.length * 0.8)] || 1;
+    return this._statMaxes[key];
+  };
+
+  // --- 操作 ---
+
+  DexScene.prototype._updateBook = function (input) {
+    var pointer = input.getPointer ? input.getPointer() : null;
+    var lineHeight = (this.layout.book || {}).lineHeight || 17;
+
+    if (this.monsterIds.length > 0) {
+      // ←→ でめくる（押しっぱなしで送れる）
+      var step = this._heldStep(input, "left", "right");
+      if (step) this._flip(step);
+
+      // 帯の絵・◀▶ を押してもめくれる。落とすものの欄を押すと、次の区画に変わる
+      if (pointer && pointer.clicked) {
+        var hit = this._stripHit(pointer);
+        if (hit && hit.flip) this._flip(hit.flip);
+        else if (hit && hit.id) this._openMonster(hit.id);
+        else if (this._dropRect && NS.Panel.containsPoint(this._dropRect, pointer)) this._nextDropPage();
+      }
+
+      // ホイール：帯の上ならめくる。ほかは左のページの文を送る
+      if (pointer && pointer.wheel && pointer.inside) {
+        if (NS.Panel.containsPoint(this._stripRect(), pointer)) this._flip(pointer.wheel > 0 ? 1 : -1);
+        else this._scrollPage(pointer.wheel * lineHeight);
+      }
+
+      // ↑↓ で左のページの文を送る
+      var move = this._heldStep(input, "up", "down");
+      if (move) this._scrollPage(move * lineHeight);
+
+      if (input.isPressed("confirm")) this._nextDropPage();
+    }
+
+    if (input.isPressed("cancel")) this.game.scenes.change(this.returnScene);
+  };
+
+  /**
+   * 押した瞬間と、押しっぱなしの間の「1つ送る」を返す（-1 / 0 / 1）。
+   * 種族が多いので、←→ を1回ずつ押さなくても送れるようにする。
+   * 待つ時間は data/ui.js の dex.repeat（delay … 送り始めるまで／interval … 送る間隔。ms）
+   */
+  DexScene.prototype._heldStep = function (input, negative, positive) {
+    var now = this.game.clock || 0;
+    var repeat = this.layout.repeat || {};
+    var key = negative + "/" + positive;
+
+    var pressed = input.isPressed(negative) ? negative : (input.isPressed(positive) ? positive : null);
+    if (pressed) {
+      this._holds[key] = { action: pressed, next: now + (repeat.delay || 380) };
+      return (pressed === negative) ? -1 : 1;
+    }
+
+    var hold = this._holds[key];
+    if (!hold) return 0;
+    if (!input.isDown || !input.isDown(hold.action)) { delete this._holds[key]; return 0; }
+    if (now < hold.next) return 0;
+    hold.next = now + (repeat.interval || 90);
+    return (hold.action === negative) ? -1 : 1;
+  };
+
+  /** 前後の相手へめくる（端までいったら反対の端へ） */
+  DexScene.prototype._flip = function (direction) {
+    var count = this.monsterIds.length;
+    if (!count) return;
+    var index = this.monsterIds.indexOf(this.monsterId);
+    this._openMonster(this.monsterIds[(index + direction + count) % count]);
+  };
+
+  /** その種族のページを開く。文と落とすものは頭から */
+  DexScene.prototype._openMonster = function (id) {
+    if (id === this.monsterId) return;
+    this.monsterId = id;
+    this.pageScroll = 0;
+    this.dropGroup = 0;
+  };
+
+  DexScene.prototype._scrollPage = function (amount) {
+    this.pageScroll = Math.max(0, Math.min(this._pageMax(), this.pageScroll + amount));
+  };
+
+  /** 落とすものの次の区画（または続き）を見せる。1つしか無ければ何もしない */
+  DexScene.prototype._nextDropPage = function () {
+    var pages = this._dropPages(this.monsterId);
+    if (pages.length < 2) return;
+    this.dropGroup = (this.dropGroup + 1) % pages.length;
+  };
+
+  // --- 左のページの文 ---
+
+  /** 左のページで、文を見せる範囲（絵の下からページの下まで） */
+  DexScene.prototype._pageView = function () {
+    var g = this._geo();
+    return { x: g.x + 14, y: g.y + 216, w: g.w / 2 - 32, h: g.h - 234 };
+  };
+
+  /**
+   * 左のページの文を、行の配列で返す（[{ text, color, h, extra }]。h は行の高さ・extra は同じ行の右に添える文）。
+   *   説明 → 愛情度の記録（慣れ・信頼・絆。まだ読めない段階は見出しと「？？？」）→ 特性の説明
+   * 出会っただけ・まだ出会っていない相手は、説明の代わりに一言だけ。
+   * 種族が変わるまで使い回す（図鑑を開いている間に、記録が増えることは無い）
+   */
+  DexScene.prototype._pageLines = function () {
+    var id = this.monsterId;
+    if (this._pageCache && this._pageCache.id === id) return this._pageCache.lines;
 
     var data = this.game.data;
-    var discovery = this.game.discovery;
-    var monster = data.getMonsterData(selected.value);
-    if (!monster) return null;
-
-    var t = this.theme;
+    var b = this.layout.book || {};
+    var texts = this.texts;
+    var monster = data.getMonsterData(id) || {};
+    var kind = this._monsterKind(id);
+    var chars = b.charsPerLine || 26;
+    var lineHeight = b.lineHeight || 17;
+    var paper = b.paper || "#c9c0a8", gold = b.gold || "#b89a5a", dim = b.dim || "#5a4e36";
     var lines = [];
 
-    // 未発見なら伏せる
-    if (!discovery.isMonsterSeen(selected.value)) {
-      lines.push({ text: this.texts.unknownName || "???", font: t.font, color: t.textColor });
-      lines.push({ text: "" });
-      lines.push({ text: this.texts.unknownDesc || "" });
-      return { sprite: null, lines: lines };
+    function push(text, color, extra) { lines.push({ text: text, color: color, h: lineHeight, extra: extra || null }); }
+    function gap(h) { lines.push({ text: "", h: h }); }
+    function wrapped(text, color) {
+      var parts = wrapText(text || "", chars);
+      for (var i = 0; i < parts.length; i++) push(parts[i], color);
     }
 
-    var partyTexts = (data.messages || {}).party || {};
-    var family = ((data.categories || {}).monster || {})[monster.family];
-    var element = (data.elements || {})[monster.element];
+    if (kind === "open") wrapped(monster.description, paper);
+    else push((kind === "seen" ? texts.bookNotCaughtNote : texts.unknownDesc) || "", dim);
+    gap(10);
 
-    lines.push({ text: monster.name, font: t.font, color: t.textColor, center: true });
-    lines.push({ text: (this.texts.familyLabel || "") + " " + (family ? family.name : "-"),
-                 color: family ? family.color : null });
-    lines.push({ text: (this.texts.elementLabel || "") + " " + (element ? element.name : "-"),
-                 color: element ? element.color : null });
-    lines.push({ text: "HP " + monster.baseHp });
-    lines.push({ text: (partyTexts.attackLabel || "") + " " + monster.baseAttack });
-    lines.push({ text: (partyTexts.defenseLabel || "") + " " + monster.baseDefense });
-    lines.push({ text: (partyTexts.speedLabel || "") + " " + monster.baseSpeed });
-    lines.push({ text: "PP " + (monster.basePp || 0) });
-
-    // 仲間にしたもの（倒すだけで開く種族は、倒したもの）だけ、より詳しい情報と説明を見せる
-    if (!this._dexOpen(selected.value)) {
-      lines.push({ text: this.texts.notCaught || "", color: t.hintColor });
-      return { sprite: monster.sprite, motion: monster.motion,
-               sizeScale: monster.sizeScale || 1, lines: lines };
+    // 愛情度の記録。どこまで読めるかは、その種族でいちばん深まった段階（Discovery.getAffectionStage）
+    var stages = (data.affection || {}).stages || [];
+    var discovery = this.game.discovery;
+    var reached = (kind === "open" && discovery && discovery.getAffectionStage) ? discovery.getAffectionStage(id) : 0;
+    var records = monster.records || {};
+    for (var s = 1; s < stages.length; s++) {
+      var label = (texts.recordLabel || "― {stage} ―").replace("{stage}", stages[s].name);
+      if (s <= reached && records[stages[s].id]) {
+        push(label, gold);
+        wrapped(records[stages[s].id], paper);
+      } else {
+        push(label, dim, { text: texts.recordUnknown || "？？？", dx: 84, color: dim });
+      }
+      gap(6);
     }
 
-    // レベル上限（どこまで育つか）。仲間にした種族だけ見せる
-    var growth = data.growth || {};
-    var maxLevel = monster.maxLevel || growth.defaultMaxLevel || 50;
-    if (growth.levelCap) maxLevel = Math.min(maxLevel, growth.levelCap);
-    lines.push({ text: (this.texts.maxLevelLabel || "") + " " + maxLevel });
-
-    lines.push({ text: (this.texts.scoutLabel || "") + " " +
-                       Math.round((monster.scoutRate || 0) * 100) + "%" });
-
-    // 耐性（0でないものだけ）
-    this._pushResistanceLines(lines, monster, data);
-
-    // 落とすもの。一度でも仲間にすれば、そのモンスターから取れるものが全て分かる
-    this._pushDropLines(lines, monster, data);
-
-    // 特性（アビリティ）は名前と効果の説明を出す
-    var abilities = this.abilitySystem.resolveAbilities(monster);
-    for (var a = 0; a < abilities.length; a++) {
-      lines.push({ text: "" });
-      lines.push({ text: "【" + abilities[a].name + "】", color: t.cursorColor });
-      this._pushWrapped(lines, abilities[a].description);
+    // 特性の説明（右のページには名前だけ出している）
+    if (kind === "open") {
+      var abilities = this.abilitySystem.resolveAbilities(monster);
+      for (var a = 0; a < abilities.length; a++) {
+        push((texts.abilityRecordLabel || "― 特性：{name} ―").replace("{name}", abilities[a].name), gold);
+        wrapped(abilities[a].description, paper);
+        gap(6);
+      }
     }
 
-    lines.push({ text: "" });
-    this._pushWrapped(lines, monster.description);
-
-    // 愛情度で書き足される記録。その種族でいちばん深まった段階までを出す
-    this._pushAffectionRecords(lines, monster, selected.value);
-
-    return { sprite: monster.sprite, motion: monster.motion, lines: lines };
+    this._pageCache = { id: id, lines: lines };
+    return lines;
   };
+
+  /** 左のページの文をどこまで送れるか（px。0 なら全部見えている） */
+  DexScene.prototype._pageMax = function () {
+    var lines = this._pageLines();
+    var total = 0;
+    for (var i = 0; i < lines.length; i++) total += lines[i].h;
+    // 最後の行のあとの空きは数えない
+    if (lines.length && !lines[lines.length - 1].text) total -= lines[lines.length - 1].h;
+    return Math.max(0, total - this._pageView().h);
+  };
+
+  // --- 落とすもの ---
 
   /**
-   * 愛情度の段階ごとに書き足される、主人公の記録（data/monsters.js の records）。
-   * 段階の id（used / trust / bond）をキーに書く。まだ書いていない段階は何も出さない。
-   * どこまで読めるかは、その種族でいちばん深まった段階（Discovery.getAffectionStage）
+   * 右のページの「落とすもの」を、1度に見せる分ごとに分けて返す。[{ areas, drops }]
+   * 区画で違う種族（_dropGroups が2つ以上）は区画ごと。1つの区画に DROP_ROWS より多ければ、続きを次に回す。
+   * 仲間にしていない相手は空（「？？？」と出す）
    */
-  DexScene.prototype._pushAffectionRecords = function (lines, monster, speciesId) {
-    var entries = DexScene.recordEntries(this.game, speciesId);
-    for (var i = 0; i < entries.length; i++) {
-      lines.push({ text: "" });
-      lines.push({ text: entries[i].label, color: this.theme.cursorColor });
-      this._pushWrapped(lines, entries[i].text);
+  DexScene.prototype._dropPages = function (id) {
+    if (!id || this._monsterKind(id) !== "open") return [];
+    var data = this.game.data;
+    var groups = this._dropGroups(data.getMonsterData(id) || {});
+    var pages = [];
+
+    for (var g = 0; g < groups.length; g++) {
+      var drops = (groups[g].drops || []).filter(function (drop) { return !!data.getItem(drop.item); });
+      var areas = (groups.length > 1) ? groups[g].areas : [];
+      if (drops.length === 0) { if (groups.length > 1) pages.push({ areas: areas, drops: [] }); continue; }
+      for (var i = 0; i < drops.length; i += DROP_ROWS) {
+        pages.push({ areas: areas, drops: drops.slice(i, i + DROP_ROWS) });
+      }
+    }
+    return pages;
+  };
+
+  // --- 描く ---
+
+  DexScene.prototype._renderMonsterBook = function () {
+    this._dropRect = null;
+    var id = this.monsterId;
+    var monster = id ? this.game.data.getMonsterData(id) : null;
+    if (!monster) return;
+
+    var kind = this._monsterKind(id);
+    this._renderLeftPage(id, monster, kind);
+    this._renderRightPage(id, monster, kind);
+    this._renderStrip();
+  };
+
+  /** 枠つきの小さな札（系統・属性）。属性は絵（icon）つき。描いた幅を返す */
+  DexScene.prototype._chip = function (label, x, y, color, iconId) {
+    var ctx = this.panel.ctx;
+    var t = this.theme;
+    color = color || t.subTextColor;
+
+    ctx.font = t.smallFont || "12px monospace";
+    var left = iconId ? 22 : 7;
+    var w = Math.ceil(ctx.measureText(label).width) + left + (iconId ? 8 : 7);
+
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.fillRect(x, y, w, 20);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, 19);
+    if (iconId) this.sprites.draw(iconId, x + 3, y + 2, 16, 16);
+    this.panel.drawText(label, x + left, y + 15, { font: t.smallFont, color: color });
+    return w;
+  };
+
+  /** 左のページ：番号・名前・系統と属性・台座に立つ絵・説明と記録 */
+  DexScene.prototype._renderLeftPage = function (id, monster, kind) {
+    var data = this.game.data;
+    var t = this.theme;
+    var b = this.layout.book || {};
+    var g = this._geo();
+    var ctx = this.panel.ctx;
+    var texts = this.texts;
+    var known = (kind !== "none");
+    var gold = b.gold || "#b89a5a", dim = b.dim || "#5a4e36";
+
+    this.panel.drawText(this._monsterNumber(id), g.lx, g.y + 36, { font: t.smallFont, color: gold });
+    this.panel.drawText(known ? monster.name : (texts.bookUnknownName || "？？？"), g.lx, g.y + 62,
+      { font: b.nameFont || "22px monospace", color: known ? (b.name || "#f0e6cc") : dim });
+
+    if (known) {
+      var family = ((data.categories || {}).monster || {})[monster.family];
+      var element = (data.elements || {})[monster.element];
+      var x = g.lx;
+      if (family) x += this._chip(family.name, x, g.y + 72, family.color, null) + 6;
+      if (element) x += this._chip(element.name, x, g.y + 72, element.color, element.icon) + 6;
+      if (!this.game.discovery.isMonsterCaught(id)) {
+        this.panel.drawText(texts.notCaught || "", Math.max(x + 4, g.lx + 200), g.y + 87,
+          { font: t.smallFont, color: t.hintColor });
+      }
+    }
+
+    // 台座と絵。絵は今までの図鑑と同じく、種族ごとの動きで動かす
+    var px = g.x + g.w / 4, py = g.y + 196;
+    ctx.lineWidth = 1;
+    ctx.fillStyle = b.pedestal || "rgba(184,154,90,0.12)";
+    ctx.beginPath(); ctx.ellipse(px, py, 84, 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = b.pedestalLine || "rgba(184,154,90,0.4)";
+    ctx.beginPath(); ctx.ellipse(px, py, 84, 16, 0, 0, Math.PI * 2); ctx.stroke();
+
+    if (known) {
+      var size = Math.round((b.spriteSize || 104) * Math.min(b.spriteMaxScale || 1.15, monster.sizeScale || 1));
+      this.sprites.drawMotion(monster.sprite, px - size / 2, py - size + 6, size, size,
+        NS.Motion.forSprite(data, monster.sprite, monster.motion, this.game.clock, 0));
+    } else {
+      this.panel.drawText(texts.bookUnknownMark || "？", px, py - 22,
+        { align: "center", font: b.unknownFont || "64px monospace", color: b.frame || "#3a3020" });
+    }
+
+    // 説明と記録。入りきらない分は ↑↓ で送る
+    var view = this._pageView();
+    var lines = this._pageLines();
+    var max = this._pageMax();
+    if (this.pageScroll > max) this.pageScroll = max;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(view.x, view.y, view.w, view.h);
+    ctx.clip();
+    var y = view.y - this.pageScroll;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (line.text && y + line.h > view.y && y < view.y + view.h) {
+        this.panel.drawText(line.text, g.lx, y + 14, { font: t.smallFont, color: line.color });
+        if (line.extra) {
+          this.panel.drawText(line.extra.text, g.lx + line.extra.dx, y + 14,
+            { font: t.smallFont, color: line.extra.color });
+        }
+      }
+      y += line.h;
+    }
+    ctx.restore();
+
+    if (this.pageScroll > 0) {
+      this.panel.drawText("▲", g.mid - 32, view.y + 12, { font: t.smallFont, color: gold });
+    }
+    if (this.pageScroll < max) {
+      this.panel.drawText("▼", g.mid - 32, view.y + view.h - 2, { font: t.smallFont, color: gold });
     }
   };
+
+  /** 右のページ：能力の五角形・耐性の表・落とすもの・特性 */
+  DexScene.prototype._renderRightPage = function (id, monster, kind) {
+    var data = this.game.data;
+    var t = this.theme;
+    var b = this.layout.book || {};
+    var g = this._geo();
+    var ctx = this.panel.ctx;
+    var texts = this.texts;
+    var party = (data.messages || {}).party || {};
+    var known = (kind !== "none"), open = (kind === "open");
+    var gold = b.gold || "#b89a5a", dim = b.dim || "#5a4e36", ink = b.ink || "#e0d6bc";
+    var rx = g.rx;
+    var i;
+
+    // --- 能力（基礎値）の五角形 ---
+    this.panel.drawText(texts.statsLabel || "", rx, g.y + 36, { font: t.smallFont, color: gold });
+
+    var cx = rx + 160, cy = g.y + 124, radius = b.statRadius || 64;
+    var count = BOOK_STATS.length;
+    function point(index, r) {
+      var angle = -Math.PI / 2 + index * Math.PI * 2 / count;
+      return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r };
+    }
+    function polygon(radiusOf) {
+      ctx.beginPath();
+      for (var k = 0; k < count; k++) {
+        var p = point(k, radiusOf(k));
+        if (k) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y);
+      }
+      ctx.closePath();
+    }
+
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = b.grid || "rgba(184,154,90,0.25)";
+    var rings = [1, 0.66, 0.33];
+    for (i = 0; i < rings.length; i++) {
+      polygon(function () { return radius * rings[i]; });
+      ctx.stroke();
+    }
+
+    if (known) {
+      var self = this;
+      polygon(function (k) {
+        var ratio = (monster[BOOK_STATS[k].key] || 0) / self._statMax(BOOK_STATS[k].key);
+        return radius * Math.min(1, Math.max(0.08, ratio));
+      });
+      ctx.fillStyle = b.statFill || "rgba(255,215,94,0.28)";
+      ctx.fill();
+      ctx.strokeStyle = t.cursorColor || "#ffd75e";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+
+    for (i = 0; i < count; i++) {
+      var stat = BOOK_STATS[i];
+      var name = stat.label || party[stat.partyLabel] || "";
+      var at = point(i, radius + 18);
+      this.panel.drawText(name + " " + (known ? (monster[stat.key] || 0) : (texts.bookUnknownMark || "？")),
+        at.x, at.y + 4, { align: "center", font: b.statFont || "11px monospace", color: known ? ink : dim });
+    }
+
+    // スカウト率とレベル上限は、仲間にした種族だけ
+    if (open) {
+      var growth = data.growth || {};
+      var maxLevel = monster.maxLevel || growth.defaultMaxLevel || 50;
+      if (growth.levelCap) maxLevel = Math.min(maxLevel, growth.levelCap);
+      this.panel.drawText(
+        (texts.scoutLabel || "") + " " + Math.round((monster.scoutRate || 0) * 100) + "%   " +
+        (texts.maxLevelShort || "") + " " + maxLevel,
+        rx, g.y + 222, { font: t.smallFont, color: t.subTextColor });
+    }
+
+    // --- 耐性の表（絵のある属性をぜんぶ。弱点は赤・強いものは青） ---
+    var top = g.y + 252;
+    this.panel.drawText(texts.resistanceLabel || "", rx, top, { font: t.smallFont, color: gold });
+
+    var elements = data.elements || {};
+    var elementIds = Object.keys(elements).filter(function (key) { return !!elements[key].icon; });
+    var resistances = monster.resistances || {};
+    for (i = 0; i < elementIds.length; i++) {
+      var element = elements[elementIds[i]];
+      var value = resistances[elementIds[i]] || 0;
+      var ex = rx + (i % 4) * 82, ey = top + 10 + Math.floor(i / 4) * 30;
+
+      ctx.fillStyle = !open ? "rgba(255,255,255,0.03)"
+        : value > 0 ? (b.resistBg || "rgba(79,140,232,0.18)")
+        : value < 0 ? (b.weakBg || "rgba(232,84,42,0.2)") : "rgba(255,255,255,0.04)";
+      ctx.fillRect(ex, ey, 76, 24);
+      this.sprites.draw(element.icon, ex + 4, ey + 4, 16, 16);
+      this.panel.drawText(element.name, ex + 24, ey + 16,
+        { font: t.smallFont, color: (open && value) ? t.textColor : t.hintColor });
+      this.panel.drawText(
+        !open ? (texts.bookUnknownMark || "？") : (value === 0 ? "-" : (value > 0 ? "+" : "") + value),
+        ex + 70, ey + 16,
+        { align: "right", font: t.smallFont,
+          color: !open ? dim : value > 0 ? (b.resistText || "#8fb8ff") : value < 0 ? (b.weakText || "#ff9a7a") : t.hintColor });
+    }
+
+    // --- 落とすもの ---
+    var dropTop = top + 90;
+    this.panel.drawText(texts.dropLabel || "", rx, dropTop, { font: t.smallFont, color: gold });
+
+    if (open) {
+      var pages = this._dropPages(id);
+      if (this.dropGroup >= pages.length) this.dropGroup = 0;
+      var page = pages[this.dropGroup];
+
+      // 区画で違う種族・3つより多い種族は、決定（またはこの欄を押す）で次を見る
+      if (pages.length > 1) {
+        var area = page.areas.length ? fillText(texts.dropAreaLabel || "〈{area}〉", { area: page.areas.join("・") }) + "  " : "";
+        this.panel.drawText(area + (this.dropGroup + 1) + "/" + pages.length, rx + 310, dropTop,
+          { align: "right", font: t.smallFont, color: t.subTextColor });
+        this._dropRect = { x: rx - 6, y: dropTop - 14, w: 322, h: 22 + DROP_ROWS * 22 };
+      }
+
+      if (!page || page.drops.length === 0) {
+        this.panel.drawText(texts.dropNone || "-", rx, dropTop + 22, { font: t.smallFont, color: dim });
+      } else {
+        for (i = 0; i < page.drops.length; i++) {
+          var drop = page.drops[i];
+          var item = data.getItem(drop.item);
+          var rowY = dropTop + 22 + i * 22;
+
+          // 個数に幅があるものは「（1〜2個）」を添える
+          var min = (drop.min === undefined) ? 1 : drop.min;
+          var most = (drop.max === undefined) ? min : drop.max;
+          var amount = (most > min) ? ("（" + min + "〜" + most + "個）") : "";
+
+          if (item.icon) this.sprites.draw(item.icon, rx, rowY - 14, 16, 16);
+          this.panel.drawText(item.name + amount, rx + 22, rowY, { font: t.smallFont, color: b.dropText || "#d8ceb4" });
+          this.panel.drawText(Math.round((drop.rate || 0) * 100) + "%", rx + 310, rowY,
+            { align: "right", font: t.smallFont, color: b.dropText || "#d8ceb4" });
+        }
+      }
+    } else {
+      this.panel.drawText(texts.recordUnknown || "？？？", rx, dropTop + 22, { font: t.smallFont, color: dim });
+    }
+
+    // --- 特性（名前だけ。説明は左のページの最後） ---
+    var abilityText = texts.recordUnknown || "？？？";
+    if (open) {
+      var abilities = this.abilitySystem.resolveAbilities(monster);
+      var names = [];
+      for (i = 0; i < abilities.length; i++) names.push(abilities[i].name);
+      abilityText = names.length ? names.join("・") : "-";
+    }
+    this.panel.drawText((texts.abilityLabel || "") + "  " + abilityText, rx, g.y + g.h - 24,
+      { font: t.smallFont, color: open ? ink : dim });
+  };
+
+  // --- 下の帯（前後の相手） ---
+
+  /** 帯の配置（data/ui.js の dex.strip） */
+  DexScene.prototype._stripLayout = function () {
+    var S = this.layout.strip || {};
+    return {
+      x: S.x || 330, y: S.y || 508, pitch: S.pitch || 66,
+      w: S.w || 56, h: S.h || 44, side: S.side || 4
+    };
+  };
+
+  /** 帯ぜんたいの範囲（◀ から ▶ まで） */
+  DexScene.prototype._stripRect = function () {
+    var S = this._stripLayout();
+    var left = S.x - S.side * S.pitch - 36;
+    return { x: left, y: S.y, w: (S.x + S.side * S.pitch + S.w + 26) - left, h: S.h };
+  };
+
+  /** いま帯に並ぶ相手（[{ id, current, rect }]。端では片側が空く）と、◀▶ の範囲 */
+  DexScene.prototype._stripSlots = function () {
+    var S = this._stripLayout();
+    var index = this.monsterIds.indexOf(this.monsterId);
+    var slots = [];
+    for (var k = -S.side; k <= S.side; k++) {
+      var i = index + k;
+      if (i < 0 || i >= this.monsterIds.length) continue;
+      slots.push({ id: this.monsterIds[i], current: k === 0,
+                   rect: { x: S.x + k * S.pitch, y: S.y, w: S.w, h: S.h } });
+    }
+    return {
+      slots: slots,
+      prev: { x: S.x - S.side * S.pitch - 36, y: S.y, w: 30, h: S.h },
+      next: { x: S.x + S.side * S.pitch + S.w, y: S.y, w: 26, h: S.h }
+    };
+  };
+
+  /** 帯のどこを押したか。{ flip: -1/1 }（◀▶）か { id }（絵）。帯の外なら null */
+  DexScene.prototype._stripHit = function (pointer) {
+    var strip = this._stripSlots();
+    if (NS.Panel.containsPoint(strip.prev, pointer)) return { flip: -1 };
+    if (NS.Panel.containsPoint(strip.next, pointer)) return { flip: 1 };
+    for (var i = 0; i < strip.slots.length; i++) {
+      if (NS.Panel.containsPoint(strip.slots[i].rect, pointer)) return { id: strip.slots[i].id };
+    }
+    return null;
+  };
+
+  DexScene.prototype._renderStrip = function () {
+    var t = this.theme;
+    var b = this.layout.book || {};
+    var ctx = this.panel.ctx;
+    var data = this.game.data;
+    var discovery = this.game.discovery;
+    var strip = this._stripSlots();
+
+    this.panel.drawText("◀", strip.prev.x + 4, strip.prev.y + 30, { font: t.font, color: t.subTextColor });
+    this.panel.drawText("▶", strip.next.x + 4, strip.next.y + 30, { font: t.font, color: t.subTextColor });
+
+    for (var i = 0; i < strip.slots.length; i++) {
+      var slot = strip.slots[i];
+      var r = slot.rect;
+      var monster = data.getMonsterData(slot.id) || {};
+      var kind = this._monsterKind(slot.id);
+
+      ctx.fillStyle = slot.current ? (b.stripCurrent || "rgba(255,215,94,0.12)") : (b.stripBg || "#0e1424");
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      if (slot.current) {
+        ctx.strokeStyle = t.cursorColor || "#ffd75e";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+      }
+
+      if (kind === "none") {
+        this.panel.drawText(this.texts.bookUnknownMark || "？", r.x + r.w / 2, r.y + 30,
+          { align: "center", font: "18px monospace", color: b.stripUnknown || "#4a5578" });
+      } else {
+        var size = slot.current ? 40 : 32;
+        this.sprites.draw(firstFrame(monster.sprite), r.x + (r.w - size) / 2, r.y + (r.h - size) / 2, size, size);
+      }
+      if (discovery.isMonsterCaught(slot.id)) {
+        this.panel.drawText("★", r.x + r.w - 3, r.y + 11,
+          { align: "right", font: "10px monospace", color: t.cursorColor });
+      }
+    }
+  };
+
+  /** コマ絵（配列）なら1枚目 */
+  function firstFrame(sprite) {
+    return (Object.prototype.toString.call(sprite) === "[object Array]") ? sprite[0] : sprite;
+  }
 
   /**
    * いま読める愛情度の記録を [{ label, text }] で返す（label は「― 慣れ ―」の見出し）。
-   * 図鑑と、仲間の「様子を見る」（モンスター説明のページ）の両方で使う。
+   * 仲間の「様子を見る」（モンスター説明のページ）が使う。
+   * 図鑑の左のページ（_pageLines）は、まだ読めない段階も「？？？」で出すので自分で組み立てている。
    * どこまで読めるかは、その種族でいちばん深まった段階（Discovery.getAffectionStage）
    * @param {MyGame.Game} game
    * @param {string} speciesId
    */
+  /**
+   * アイテムの手に入る場所を、図鑑を開かずに行で返す（工房の「足りない素材」で使う。v1.4.0）。
+   * 図鑑のアイテムのページと同じ中身・同じ伏せ方（会っていない相手は「？？？」）。
+   * 行の形は右のページと同じ（{ text, sprite, unknownSprite, icon, right, indent, dim }）
+   * @param {MyGame.Game} game
+   * @param {string} itemId
+   */
+  DexScene.itemSources = function (game, itemId, options) {
+    var view = Object.create(DexScene.prototype);
+    view.game = game;
+    view.texts = (game.data.messages || {}).dex || {};
+    // reveal … アイテムの名前は伏せない（工房・お店。レシピはそこで名前ごと見えているので）。モンスターは伏せたまま
+    view._revealItems = !!(options && options.reveal);
+    return view._itemSources(itemId);
+  };
+
+  /** そのアイテムを材料にして作れるもの（いま工房に並んでいるレシピだけ）。行の形は itemSources と同じ */
+  DexScene.itemUses = function (game, itemId, options) {
+    var view = Object.create(DexScene.prototype);
+    view.game = game;
+    view.texts = (game.data.messages || {}).dex || {};
+    view._revealItems = !!(options && options.reveal);
+    return view._itemUses(itemId);
+  };
+
   DexScene.recordEntries = function (game, speciesId) {
     var species = game.data.getMonsterData ? game.data.getMonsterData(speciesId) : null;
     var records = (species && species.records) || {};
@@ -906,51 +1567,6 @@
       result.push({ label: label.replace("{stage}", stages[i].name), text: text });
     }
     return result;
-  };
-
-  /**
-   * 落とすものを「・薬草  15%」の形で並べる。
-   *
-   * 一度でも仲間にすれば、その種族から取れるものが全て見えるようになる。
-   * まだ拾ったことのない品も出す —— 何が取れるか分からないまま
-   * 同じ相手を延々と倒し続ける、という状態を避けるため。
-   * （落とさない種族では、見出しごと出さない）
-   */
-  DexScene.prototype._pushDropLines = function (lines, monster, data) {
-    // 区画で落とすものが違う種族（data/dungeons.js の dropOverrides）は、区画ごとに分けて並べる。
-    // 違わない種族は今までどおり1つの一覧（groups は1件で、区画の見出しを付けない）
-    var groups = this._dropGroups(monster);
-    var hasAny = false;
-    for (var g = 0; g < groups.length; g++) {
-      if (groups[g].drops.length > 0) hasAny = true;
-    }
-    if (!hasAny) return;
-
-    var t = this.theme;
-    lines.push({ text: "" });
-    lines.push({ text: this.texts.dropLabel || "", color: t.cursorColor });
-
-    for (var k = 0; k < groups.length; k++) {
-      var drops = groups[k].drops;
-      if (groups.length > 1) {
-        lines.push({ text: fillText(this.texts.dropAreaLabel || "〈{area}〉", { area: groups[k].areas.join("・") }),
-                     color: t.hintColor });
-      }
-      for (var i = 0; i < drops.length; i++) {
-        var item = data.getItem(drops[i].item);
-        if (!item) continue;
-
-        // 個数に幅があるものは「（1〜2個）」を添える
-        var min = (drops[i].min === undefined) ? 1 : drops[i].min;
-        var max = (drops[i].max === undefined) ? min : drops[i].max;
-        var count = (max > min) ? ("（" + min + "〜" + max + "個）") : "";
-
-        lines.push({
-          text: "・" + item.name + count + "  " + Math.round((drops[i].rate || 0) * 100) + "%",
-          color: t.subTextColor
-        });
-      }
-    }
   };
 
   /**
@@ -1003,34 +1619,23 @@
     return false;
   }
 
-  /** 0以外の耐性を「属性 +2」の形で並べる */
-  DexScene.prototype._pushResistanceLines = function (lines, monster, data) {
-    var resistances = monster.resistances || {};
-    var elements = data.elements || {};
-    var entries = [];
+  // ============================================================
+  // ほかの表の右のページ（v1.4.0。{ head, lines } で作る。描き方は _renderHead / _renderLine）
+  // ============================================================
 
-    for (var id in resistances) {
-      if (!Object.prototype.hasOwnProperty.call(resistances, id)) continue;
-      if (!resistances[id]) continue;   // 0（等倍）は出さない
-      entries.push({ id: id, value: resistances[id] });
-    }
-    if (entries.length === 0) return;
-
-    lines.push({ text: "" });
-    lines.push({ text: this.texts.resistanceLabel || "", color: this.theme.cursorColor });
-
-    for (var i = 0; i < entries.length; i++) {
-      var element = elements[entries[i].id];
-      var value = entries[i].value;
-      lines.push({
-        text: "・" + (element ? element.name : entries[i].id) +
-              " " + (value > 0 ? "+" : "") + value,
-        color: element ? element.color : null
-      });
-    }
+  /** まだ分からないものの見出し（名前は「？？？」・絵の代わりに「？」） */
+  DexScene.prototype._unknownHead = function (withMark) {
+    var b = this.layout.book || {};
+    return { mark: withMark ? (this.texts.bookUnknownMark || "？") : null,
+             name: this.texts.bookUnknownName || "？？？", nameColor: b.dim || this.theme.hintColor };
   };
 
-  /** アイテムの詳細を行の配列にする */
+  /** 見出しの行（金色） */
+  function heading(text) { return { text: text, heading: true }; }
+  /** 空きの行 */
+  function blank() { return { text: "" }; }
+
+  /** アイテムの説明 */
   DexScene.prototype._buildItemDetail = function () {
     var selected = this.list.getSelected();
     if (!selected) return null;
@@ -1039,66 +1644,72 @@
     var item = data.getItem(selected.value);
     if (!item) return null;
 
-    var t = this.theme;
+    var texts = this.texts;
     var lines = [];
 
     if (!this.game.discovery.isItemObtained(selected.value)) {
-      lines.push({ text: this.texts.unknownName || "???", font: t.font, color: t.textColor });
-      lines.push({ text: "" });
-      lines.push({ text: this.texts.unknownItem || "" });
-      return { sprite: null, lines: lines };
+      lines.push({ text: texts.unknownItem || "", dim: true });
+      return { head: this._unknownHead(true), lines: lines };
     }
 
-    // 名前と分類は、左上の絵（icon）の右に並べる（besideIcon）
-    lines.push({ text: item.name, font: t.font, color: t.textColor, besideIcon: true });
-
+    // 見出し：絵・名前・分類（装備は「装備・武器」）・持っている数と売値
+    var chips = [];
     var category = ((data.categories || {}).item || {})[item.category];
     if (category) {
-      // 装備は「装備・武器」のように枠まで出す
       var label = category.name;
       if (item.equip) label += "・" + NS.EffectSystem.slotName(item, data);
-      lines.push({ text: label, color: category.color, besideIcon: true });
+      chips.push({ label: label, color: category.color });
     }
+    var shop = new NS.ShopSystem(data);
+    var sell = shop.getSellPrice(item);
+    var owned = this.game.inventory ? this.game.inventory.getCount(item.id) : 0;
+    var sub = fillText(texts.ownedLabel || "所持 {n}", { n: owned }) + "　" +
+              (sell > 0 ? fillText(texts.sellLabel || "売値 {g}G", { g: sell }) : (texts.sellNone || "売れない"));
 
-    lines.push({ text: "所持 " + this.game.inventory.getCount(item.id) });
-    lines.push({ text: "" });
     this._pushWrapped(lines, item.description);
 
     // 装備なら効果
     if (item.equip) {
-      lines.push({ text: "" });
-      lines.push({ text: this.texts.effectLabel || "", color: t.cursorColor });
+      lines.push(blank());
+      lines.push(heading(texts.effectLabel || ""));
       var effects = item.equip.effects || [];
       for (var e = 0; e < effects.length; e++) {
         var text = NS.EffectSystem.describeEffect(effects[e], data);
-        if (text) lines.push({ text: "・" + text });
+        if (text) this._pushWrapped(lines, "・" + text);
       }
     }
 
-    // 誰が落とすか・どこで拾えるか
+    // 手に入る場所：落とす相手・宝箱・店・工房
     var sources = this._itemSources(item.id);
-    lines.push({ text: "" });
-    lines.push({ text: this.texts.sourceLabel || "", color: t.cursorColor });
-    if (sources.length === 0) {
-      lines.push({ text: "・" + (this.texts.sourceNone || ""), color: t.hintColor });
-    }
-    for (var s = 0; s < sources.length; s++) lines.push({ text: "・" + sources[s] });
+    lines.push(blank());
+    lines.push(heading(texts.sourceLabel || ""));
+    if (sources.length === 0) lines.push({ text: texts.sourceNone || "", dim: true });
+    for (var s = 0; s < sources.length; s++) lines.push(sources[s]);
 
-    return { sprite: null, icon: item, lines: lines };
+    // 使い道：これを材料にして、工房で作れるもの
+    var uses = this._itemUses(item.id);
+    if (uses.length > 0) {
+      lines.push(blank());
+      lines.push(heading(texts.usedInLabel || ""));
+      for (var u = 0; u < uses.length; u++) lines.push(uses[u]);
+    }
+
+    return { head: { icon: item.icon, name: item.name, chips: chips, sub: sub }, lines: lines };
   };
 
   /**
-   * そのアイテムの出どころ（落とすモンスター・宝箱）を文にして返す。
+   * そのアイテムの出どころを、右のページの行で返す。
    *
-   * ★ まだ会っていないモンスターは名前を伏せる（???）。
+   * ★ まだ会っていないモンスターは名前も絵も伏せる（？？？）。
    *   図鑑に載っていない相手が「何を落とすか」で先に分かってしまうと、
    *   出会いの楽しみが減る。会っていれば確率まで出す。
-   * 店・工房は出さない（そちらの画面で分かるので）。
+   * 店と工房は、いま開いているものだけ（まだ並んでいない店の品は出さない）。
    */
   DexScene.prototype._itemSources = function (itemId) {
     var data = this.game.data;
     var discovery = this.game.discovery;
     var texts = this.texts;
+    var cleared = this.game.clearedDungeons || {};
     var lines = [];
     var id;
 
@@ -1114,30 +1725,93 @@
         var drops = groups[g].drops || [];
         for (var i = 0; i < drops.length; i++) {
           if (drops[i].item !== itemId) continue;
-          var values = {
-            name: seen ? monsters[id].name : (texts.unknownName || "???"),
-            area: groups[g].areas.join("・"),
-            rate: seen ? Math.round((drops[i].rate || 0) * 100) : "?"
-          };
-          lines.push(fillText(groups[g].areas.length > 0 ? (texts.sourceDropAt || "{name}（{area}）  {rate}%")
-                                                         : (texts.sourceDrop || "{name}  {rate}%"), values));
+          var name = seen ? monsters[id].name : (texts.unknownName || "???");
+          if (groups[g].areas.length > 0) name += "（" + groups[g].areas.join("・") + "）";
+          lines.push({
+            sprite: seen ? monsters[id].sprite : null,
+            unknownSprite: !seen,
+            text: name,
+            dim: !seen,
+            right: seen ? Math.round((drops[i].rate || 0) * 100) + "%" : "?%"
+          });
         }
       }
     }
 
     // 宝箱。どこでも出る中身と、その場所だけの中身
     var chest = ((data.features || {}).chest || {}).effect || {};
-    if (tableHas(chest.table, itemId)) lines.push(texts.sourceChest || "宝箱");
+    if (tableHas(chest.table, itemId)) lines.push({ text: texts.sourceChest || "宝箱" });
 
     var dungeons = data.dungeons || {};
     for (id in dungeons) {
       if (!Object.prototype.hasOwnProperty.call(dungeons, id)) continue;
       var tables = dungeons[id].featureTables || {};
       if (tableHas(tables.chest, itemId)) {
-        lines.push(fillText(texts.sourceChestAt || "宝箱（{name}）", { name: dungeons[id].name }));
+        lines.push({ text: fillText(texts.sourceChestAt || "宝箱（{name}）", { name: dungeons[id].name }) });
+      }
+    }
+
+    // 店（いま並んでいる店だけ。加護の店は品物を売らない）
+    if (NS.ShopSystem) {
+      var shopSystem = new NS.ShopSystem(data);
+      var shops = shopSystem.getShops(cleared);
+      for (var k = 0; k < shops.length; k++) {
+        if (shops[k].type === "blessing") continue;
+        var stock = shopSystem.getStock(cleared, shops[k]);
+        for (var st = 0; st < stock.length; st++) {
+          if (stock[st].item.id !== itemId) continue;
+          lines.push({ icon: "iconShop", text: fillText(texts.sourceShop || "{shop}で買える", { shop: shops[k].name }),
+                       right: stock[st].price + "G" });
+        }
+      }
+    }
+
+    // 工房（いま作れるレシピだけ）。材料も並べる
+    var recipes = this._openRecipes();
+    for (var r = 0; r < recipes.length; r++) {
+      if ((recipes[r].result || {}).item !== itemId) continue;
+      lines.push({ icon: "iconCraft", text: texts.sourceCraft || "工房で作れる",
+                   right: recipes[r].gold ? recipes[r].gold + "G" : "" });
+      var materials = recipes[r].materials || [];
+      for (var m = 0; m < materials.length; m++) {
+        lines.push(this._itemRow(materials[m].item, "×" + materials[m].count, 22));
       }
     }
     return lines;
+  };
+
+  /** そのアイテムを材料にして作れるもの（いま作れるレシピだけ） */
+  DexScene.prototype._itemUses = function (itemId) {
+    var recipes = this._openRecipes();
+    var lines = [];
+    for (var r = 0; r < recipes.length; r++) {
+      var materials = recipes[r].materials || [];
+      for (var m = 0; m < materials.length; m++) {
+        if (materials[m].item !== itemId) continue;
+        lines.push(this._itemRow((recipes[r].result || {}).item, fillText(this.texts.usedCount || "{n}個使う", { n: materials[m].count }), 0));
+      }
+    }
+    return lines;
+  };
+
+  /** いま工房に並んでいるレシピ */
+  DexScene.prototype._openRecipes = function () {
+    if (!NS.CraftSystem) return [];
+    return new NS.CraftSystem(this.game.data).getRecipes(this.game.clearedDungeons || {});
+  };
+
+  /** アイテム1つの行（絵と名前。まだ手に入れていないものは「？？？」） */
+  DexScene.prototype._itemRow = function (itemId, right, indent) {
+    var item = this.game.data.getItem(itemId) || {};
+    var known = this._revealItems || this.game.discovery.isItemObtained(itemId);
+    return {
+      indent: indent || 0,
+      icon: known ? item.icon : null,
+      unknownSprite: !known,
+      text: known ? item.name : (this.texts.unknownName || "???"),
+      dim: !known,
+      right: right
+    };
   };
 
   function tableHas(table, itemId) {
@@ -1153,7 +1827,22 @@
     });
   }
 
-  /** 特性の詳細を行の配列にする */
+  /**
+   * モンスターの行（絵と名前）。図鑑で詳しく開いていない相手は「？？？」。
+   * 特性の「持っているモンスター」・技の「覚えるモンスター」で使う
+   */
+  DexScene.prototype._monsterRow = function (species, right) {
+    var open = this._dexOpen(species.id);
+    return {
+      sprite: open ? species.sprite : null,
+      unknownSprite: !open,
+      text: open ? species.name : (this.texts.unknownName || "???"),
+      dim: !open,
+      right: open ? right : "?"
+    };
+  };
+
+  /** 特性の説明 */
   DexScene.prototype._buildAbilityDetail = function () {
     var selected = this.list.getSelected();
     if (!selected) return null;
@@ -1162,38 +1851,32 @@
     var ability = (data.abilities || {})[selected.value];
     if (!ability) return null;
 
-    var t = this.theme;
+    var texts = this.texts;
     var lines = [];
 
     // まだ持っているモンスターを仲間にしていなければ伏せる
     if (!this._isAbilityKnown(selected.value)) {
-      lines.push({ text: this.texts.unknownName || "???", font: t.font, color: t.textColor });
-      lines.push({ text: "" });
-      lines.push({ text: this.texts.unknownAbility || "" });
-      return { sprite: null, lines: lines };
+      lines.push({ text: texts.unknownAbility || "", dim: true });
+      return { head: this._unknownHead(false), lines: lines };
     }
 
-    lines.push({ text: ability.name, font: t.font, color: t.textColor });
-
+    var chips = [];
     var category = ((data.categories || {}).ability || {})[ability.category];
-    if (category) lines.push({ text: category.name, color: category.color });
+    if (category) chips.push({ label: category.name, color: category.color });
 
-    lines.push({ text: "" });
     this._pushWrapped(lines, ability.description);
 
-    // 仲間にしたモンスターのうち、この特性を持つもの
-    var owners = this._ownersOf(selected.value, true);
+    // この特性を持つモンスター。まだ仲間にしていない相手も「？？？」で並ぶ（あと何体いるかが分かる）
+    var owners = this._ownersOf(selected.value, false);
     if (owners.length > 0) {
-      lines.push({ text: "" });
-      lines.push({ text: this.texts.ownerLabel || "", color: t.cursorColor });
-      for (var i = 0; i < owners.length; i++) {
-        lines.push({ text: "・" + owners[i].name });
-      }
+      lines.push(blank());
+      lines.push(heading(texts.ownerLabel || ""));
+      for (var i = 0; i < owners.length; i++) lines.push(this._monsterRow(owners[i], ""));
     }
-    return { sprite: null, lines: lines };
+    return { head: { name: ability.name, chips: chips }, lines: lines };
   };
 
-  /** 技の詳細を行の配列にする */
+  /** 技の説明 */
   DexScene.prototype._buildSkillDetail = function () {
     var selected = this.list.getSelected();
     if (!selected) return null;
@@ -1203,104 +1886,93 @@
     if (!skill) return null;
 
     var t = this.theme;
+    var texts = this.texts;
     var lines = [];
 
     // まだ覚えるモンスターを仲間にしていなければ伏せる
     if (!this._isSkillKnown(selected.value)) {
-      lines.push({ text: this.texts.unknownName || "???", font: t.font, color: t.textColor });
-      lines.push({ text: "" });
-      lines.push({ text: this.texts.unknownSkill || "" });
-      return { sprite: null, lines: lines };
+      lines.push({ text: texts.unknownSkill || "", dim: true });
+      return { head: this._unknownHead(false), lines: lines };
     }
 
-    lines.push({ text: skill.name, font: t.font, color: t.textColor });
-
+    // 見出し：属性の絵・名前・属性／種類／当たる相手の札
+    var chips = [];
     var element = (data.elements || {})[skill.element];
-    lines.push({ text: (this.texts.elementLabel || "") + " " + (element ? data.getSkillElementName(skill) : "-"),
-                 color: element ? element.color : null });
-    // 技の種類（共鳴・ブレスなど）。種類の決まり（note）があれば次の行に添える
-    var kind = data.getSkillKind(skill);
-    if (kind) {
-      lines.push({ text: (this.texts.skillKindLabel || "") + " " + kind.name, color: kind.color });
-      if (kind.note) this._pushWrapped(lines, kind.note);
+    // 混合属性（烈火崩地斬の火と地）は、属性ごとに別の札にする（2026-11-12 作者「わけてほしい」）
+    var skillElements = data.getSkillElements(skill);
+    for (var se = 0; se < skillElements.length; se++) {
+      chips.push({ label: skillElements[se].name, color: skillElements[se].color, icon: skillElements[se].icon });
     }
+    var kind = data.getSkillKind(skill);
+    if (kind) chips.push({ label: kind.name, color: kind.color });
+    var target = (texts.targetNames || {})[skill.target];
+    if (target) chips.push({ label: target, color: t.subTextColor });
 
-    // ダメージを与えない技（回復・バフ／デバフ・状態異常だけの技）は、威力の行ごと出さない。
-    //   キュアやどくのいきに「威力」と並ぶと、殴る技のように見えてしまうため。
+    // 数字は右にそろえる。ダメージを与えない技（回復・バフ／デバフ・状態異常だけの技）は、威力の行ごと出さない。
     //   判定は戦闘と同じ BattleSystem.dealsDamage
     if (skill.power) {
-      lines.push({ text: (this.texts.powerLabel || "") + " " + this.game.data.formatSkillPower(skill) });
+      lines.push({ text: texts.powerLabel || "", right: String(data.formatSkillPower(skill)) });
     } else if (NS.BattleSystem.dealsDamage(skill)) {
-      lines.push({ text: (this.texts.powerLabel || "") + " " + (this.texts.powerNormal || "-") });
+      lines.push({ text: texts.powerLabel || "", right: texts.powerNormal || "-" });
     }
-    lines.push({ text: (this.texts.ppLabel || "") + " " + (skill.pp || 0) });
+    lines.push({ text: texts.ppLabel || "", right: String(skill.pp || 0) });
 
     // accuracy を書いていない技は data/battle.js の既定値で当たる
     var fallback = (data.battle || {}).defaultAccuracy;
-    var accuracy = (skill.accuracy === undefined)
-      ? ((fallback === undefined) ? 1 : fallback)
-      : skill.accuracy;
-    lines.push({ text: (this.texts.accuracyLabel || "") + " " +
-                       Math.round(accuracy * 100) + "%" });
-
+    var accuracy = (skill.accuracy === undefined) ? ((fallback === undefined) ? 1 : fallback) : skill.accuracy;
+    lines.push({ text: texts.accuracyLabel || "", right: Math.round(accuracy * 100) + "%" });
     if (skill.criticalBonus) {
-      lines.push({ text: (this.texts.criticalLabel || "") + " +" +
-                         Math.round(skill.criticalBonus * 100) + "%" });
+      lines.push({ text: texts.criticalLabel || "", right: "+" + Math.round(skill.criticalBonus * 100) + "%" });
     }
+    // 種類の決まり（共鳴は防御を半分だけ引く、など）
+    if (kind && kind.note) this._pushWrapped(lines, kind.note, { dim: true });
 
     // 一時的な強化・弱体（バフ／デバフ）。効果の説明は EffectSystem に任せる
     if (skill.modifier) {
-      lines.push({ text: "" });
-      lines.push({ text: (this.texts.modifierLabel || "") + " " +
-                         (this.texts.durationLabel || "{n}ターン")
-                           .replace("{n}", skill.modifier.duration || 1),
-                   color: t.cursorColor });
-
+      lines.push(blank());
+      lines.push({ text: texts.modifierLabel || "", heading: true,
+                   right: (texts.durationLabel || "{n}ターン").replace("{n}", skill.modifier.duration || 1) });
       var mods = skill.modifier.effects || [];
       for (var m = 0; m < mods.length; m++) {
         var line = NS.EffectSystem.describeEffect(mods[m], data);
-        if (line) lines.push({ text: "・" + line });
-      }
-      if (skill.target === "self") {
-        lines.push({ text: this.texts.selfTarget || "", color: t.hintColor });
+        if (line) this._pushWrapped(lines, "・" + line);
       }
     }
 
-    // 状態異常をあたえる技。何をどれくらいの確率で入れるかを出す。
-    // 色は data/statuses.js のものを使う（戦闘中の印と同じ色）
+    // 状態異常をあたえる技。色は data/statuses.js のもの（戦闘中の印と同じ色）
     if (skill.status) {
       var status = data.getStatus ? data.getStatus(skill.status.id) : null;
       if (status) {
         var chance = (skill.status.chance === undefined) ? 1 : skill.status.chance;
-        lines.push({ text: "" });
-        lines.push({ text: (this.texts.statusLabel || "") + " " + status.name +
-                           "  " + Math.round(chance * 100) + "%",
-                     color: status.color || t.cursorColor });
+        lines.push(blank());
+        lines.push({ text: (texts.statusLabel || "") + "  " + status.name, icon: status.icon,
+                     color: status.color || t.cursorColor, right: Math.round(chance * 100) + "%" });
         // 通る確率は相手の耐性で下がる。数字だけ見て決められると誤解を招く
-        lines.push({ text: this.texts.statusNote || "", color: t.hintColor });
+        lines.push({ text: texts.statusNote || "", dim: true });
       }
     }
 
-    lines.push({ text: "" });
+    lines.push(blank());
     this._pushWrapped(lines, skill.description);
 
-    // 仲間にしたモンスターのうち、この技を覚えるもの
-    var learners = this._learnersOf(selected.value, true);
+    // この技を覚えるモンスター。まだ仲間にしていない相手も「？？？」で並ぶ
+    var learners = this._learnersOf(selected.value, false);
     if (learners.length > 0) {
-      lines.push({ text: "" });
-      lines.push({ text: this.texts.learnerLabel || "", color: t.cursorColor });
+      lines.push(blank());
+      lines.push(heading(texts.learnerLabel || ""));
       for (var i = 0; i < learners.length; i++) {
-        lines.push({ text: "・" + learners[i].monster.name + " " +
-          (learners[i].bond ? (this.texts.learnByBond || "絆") : "Lv" + learners[i].level) });
+        lines.push(this._monsterRow(learners[i].monster,
+          learners[i].bond ? (texts.learnByBond || "絆") : "Lv" + learners[i].level));
       }
     }
 
-    return { sprite: null, lines: lines };
+    return { head: { icon: element && element.icon, name: skill.name, chips: chips }, lines: lines };
   };
 
   /**
-   * 性格の詳細。どのステータスが上がり下がりするかを並べる。
+   * 性格の説明。どのステータスが上がり下がりするかを、×1.0 を中心にした棒で並べる。
    * 倍率1.0（変化なし）の項目も、比べやすいように出す。
+   * その下に、いまこの性格の仲間（連れている仲間と預かり所）を並べる。
    */
   DexScene.prototype._buildNatureDetail = function () {
     var selected = this.list.getSelected();
@@ -1310,11 +1982,10 @@
     if (!nature) return null;
 
     var t = this.theme;
+    var texts = this.texts;
     var party = (this.game.data.messages || {}).party || {};
     var lines = [];
-
-    lines.push({ text: nature.name, font: t.font, color: t.textColor });
-    lines.push({ text: "" });
+    var chips = [];
 
     var stats = [
       { key: "hp", label: "HP" },
@@ -1323,22 +1994,41 @@
       { key: "speed", label: party.speedLabel || "素早さ" }
     ];
 
+    var up = t.hpBarHigh || "#5fd18c", down = t.hpBarLow || "#e8542a";
     for (var i = 0; i < stats.length; i++) {
       var value = (nature[stats[i].key] === undefined) ? 1 : nature[stats[i].key];
-      var color = t.subTextColor;
-      if (value > 1) color = t.hpBarHigh || "#5fd18c";
-      else if (value < 1) color = t.hpBarLow || "#e8542a";
+      var color = value > 1 ? up : value < 1 ? down : t.subTextColor;
+      lines.push({ text: stats[i].label, bar: { value: value, color: color, range: 0.2 },
+                   right: "×" + (Math.round(value * 100) % 10 === 0 ? value.toFixed(1) : value.toFixed(2)), rightColor: color });
+      if (value > 1) chips.push({ label: fillText(texts.natureUp || "{stat}↑", { stat: stats[i].label }), color: up });
+      if (value < 1) chips.push({ label: fillText(texts.natureDown || "{stat}↓", { stat: stats[i].label }), color: down });
+    }
+    if (chips.length === 0) chips.push({ label: texts.natureFlat || "補正なし", color: t.subTextColor });
 
-      lines.push({ text: stats[i].label + " ×" + value, color: color });
+    lines.push(blank());
+    this._pushWrapped(lines, texts.natureNote, { dim: true });
+
+    // この性格の仲間（連れている仲間・預かり所）
+    var members = [];
+    var groups = [this.game.party, this.game.storage];
+    for (var g = 0; g < groups.length; g++) {
+      var list = (groups[g] && groups[g].getMembers) ? groups[g].getMembers() : [];
+      for (var k = 0; k < list.length; k++) {
+        if (list[k] && list[k].natureId === selected.value) members.push(list[k]);
+      }
+    }
+    lines.push(blank());
+    lines.push({ text: texts.natureMembersLabel || "", heading: true, right: members.length ? String(members.length) : "" });
+    if (members.length === 0) lines.push({ text: texts.natureMembersNone || "", dim: true });
+    for (var n = 0; n < members.length; n++) {
+      var species = members[n].getSpecies ? members[n].getSpecies() : null;
+      lines.push({ sprite: species ? species.sprite : null, text: members[n].getName(), right: "Lv" + members[n].level });
     }
 
-    lines.push({ text: "" });
-    this._pushWrapped(lines, this.texts.natureNote);
-
-    return { sprite: null, lines: lines };
+    return { head: { name: nature.name, chips: chips }, lines: lines };
   };
 
-  /** 加護の詳細。効果と出やすさを出す */
+  /** 加護の説明。効果と出やすさを出す */
   DexScene.prototype._buildBlessingDetail = function () {
     var selected = this.list.getSelected();
     if (!selected) return null;
@@ -1346,58 +2036,56 @@
     var blessing = (this.game.data.blessings || {})[selected.value];
     if (!blessing) return null;
 
-    var t = this.theme;
+    var texts = this.texts;
     var lines = [];
 
     // まだ買っていない加護は、名前も効果も出さない。
-    // 一覧で伏せておいて詳細で見えたら、伏せた意味がない
+    // 一覧で伏せておいて説明で見えたら、伏せた意味がない
     if (!this._isBlessingKnown(selected.value, blessing)) {
-      lines.push({ text: this.texts.unknownName || "???", font: t.font, color: t.textColor });
-      lines.push({ text: "" });
-      this._pushWrapped(lines, this.texts.blessingLockedNote);
-      return { sprite: null, lines: lines };
-    }
-
-    lines.push({ text: blessing.name, font: t.font, color: t.textColor });
-    lines.push({ text: "" });
-    this._pushWrapped(lines, blessing.description);
-
-    lines.push({ text: "" });
-    lines.push({ text: this.texts.effectLabel || "", color: t.cursorColor });
-
-    var effects = blessing.effects || [];
-    for (var i = 0; i < effects.length; i++) {
-      var text = NS.EffectSystem.describeEffect(effects[i], this.game.data);
-      if (text) lines.push({ text: "・" + text });
+      this._pushWrapped(lines, texts.blessingLockedNote, { dim: true });
+      return { head: this._unknownHead(true), lines: lines };
     }
 
     var rarity = NS.BlessingSystem.getRarity(this.game.data, blessing);
-    lines.push({ text: "" });
-    lines.push({
-      text: (this.texts.rarityLabel || "") + rarity.label,
-      color: rarity.color || t.hintColor
-    });
+    var chips = [{ label: (texts.rarityLabel || "") + rarity.label, color: rarity.color || this.theme.subTextColor }];
 
-    lines.push({ text: "" });
-    this._pushWrapped(lines, this.texts.blessingNote);
+    this._pushWrapped(lines, blessing.description);
+    lines.push(blank());
+    lines.push(heading(texts.effectLabel || ""));
+    var effects = blessing.effects || [];
+    for (var i = 0; i < effects.length; i++) {
+      var text = NS.EffectSystem.describeEffect(effects[i], this.game.data);
+      if (text) this._pushWrapped(lines, "・" + text);
+    }
 
-    return { sprite: null, lines: lines };
+    lines.push(blank());
+    this._pushWrapped(lines, texts.blessingNote, { dim: true });
+
+    return { head: { icon: "iconBlessing", name: blessing.name, chips: chips }, lines: lines };
   };
 
-  /** 長い文章を折り返して行に足す */
-  DexScene.prototype._pushWrapped = function (lines, text) {
+  /** 長い文章を折り返して行に足す（extra は行に付ける色など） */
+  DexScene.prototype._pushWrapped = function (lines, text, extra) {
     var chars = (this.layout.detail || {}).charsPerLine || 15;
     var wrapped = wrapText(text || "", chars);
-    for (var i = 0; i < wrapped.length; i++) lines.push({ text: wrapped[i] });
+    for (var i = 0; i < wrapped.length; i++) {
+      var line = { text: wrapped[i] };
+      for (var key in (extra || {})) line[key] = extra[key];
+      lines.push(line);
+    }
   };
 
   DexScene.prototype._renderHint = function () {
-    var pos = this.layout.hint || { x: 48, y: 570 };
+    var pos = this.layout.hint || { x: 48, y: 584 };
     var hint;
 
-    // 並べ替えのある表（技・モンスター・アイテム）は Q/E の案内も出す
+    // 並べ替えのある表（技・アイテム）は R の案内も出す
     var skills = this._hasSort();
-    if (this.focus === "detail") hint = this.texts.hintDetail;
+    if (this.getTab() === "monsters") {
+      // 落とすものが区画で違う種族を開いているときだけ、決定の案内を足す
+      hint = (this._dropPages(this.monsterId).length > 1) ? this.texts.hintBookDrops : this.texts.hintBook;
+    }
+    else if (this.focus === "detail") hint = this.texts.hintDetail;
     else if (this._canScrollDetail()) hint = skills ? this.texts.hintSkillsScrollable : this.texts.hintScrollable;
     else hint = skills ? this.texts.hintSkills : this.texts.hint;
 

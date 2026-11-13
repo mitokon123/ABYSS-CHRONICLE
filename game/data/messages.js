@@ -173,6 +173,7 @@
       go:      "戦う",
       tactic:  "作戦",     // 仲間ごとの作戦を変える（v1.0.0。行動にはならない）
       flee:    "逃げる",
+      log:     "ログ",     // この戦いの文を見返す（v1.4.0。行動にはならない）
       // 仲間ごとのコマンド
       attack:  "攻撃",
       fight:   "技",
@@ -206,7 +207,7 @@
 
       // ターンの頭
       turnPrompt:  "どうする?",
-      hintTurn:    "↑↓: 選択    決定: 決定",
+      hintTurn:    "↑↓: 選択    決定: 決定    C: ログ",
       cannotFlee:  "主からは逃げられない!",
       // 状態を見る
       inspectNone: "状態異常なし",
@@ -224,6 +225,17 @@
       skillStats:  "威力{power}　命中{accuracy}%　PP{pp}",   // power, accuracy, pp
       // ダメージを与えない技（回復・バフ／デバフ・状態異常だけ）。威力を並べない
       skillStatsNoPower: "命中{accuracy}%　PP{pp}",          // accuracy, pp
+      // 技の範囲の札（v1.4.0。技の target ごと）
+      targetLabels: { enemy: "敵1体", allEnemies: "敵全体", ally: "味方1体", allAllies: "味方全体", self: "自分" },
+      // 技の効き目（v1.4.0）。スカウトしたことのある種族の敵だけ。listMark は技の一覧の印
+      effectMarks: { weak: "◎ よく効く", resist: "△ 効きにくい", immune: "× 効かない", listMark: "◎" },
+      // 戦闘のログ（v1.4.0）
+      logTitle:    "戦闘のログ",
+      logStart:    "― 戦いのはじまり ―",
+      logTurn:     "― {n}ターン目 ―",                     // n
+      logEmpty:    "まだ何も起きていない",
+      logPosition: "{from}-{to} / {total}",
+      logHint:     "↑↓: 1行ずつ    ←→: 1画面ずつ    ホイールでも送れる    決定/Esc/C: 閉じる",
       selectItem:  "どの道具?",
       noItems:     "使える道具がない",
       notEnoughPp: "PPが足りない!",
@@ -255,7 +267,7 @@
       selectTacticMember: "だれの作戦を変える?",
       selectTactic:       "{name} の作戦は?",                 // name
       tacticCurrent:      "いま",
-      hintCommand: "↑↓: 選択    決定: 決定    Esc: 前の仲間へ",
+      hintCommand: "↑↓: 選択    決定: 決定    Esc: 前の仲間へ    C: ログ",
       // 相手は横一列に並んでいるので、左右で選ぶ
       hintTarget:  "←→: 相手を選ぶ    決定: 決定    Esc: 戻る"
     },
@@ -268,6 +280,8 @@
       resume:   "中断したところから",
       // バージョン表記の隣のアイコン。カーソルを乗せたときだけ出す
       patchNote:"パッチノート",
+      // メニューの下の1行（v1.4.0）。保存した日時がいちばん新しいファイル。{time} はプレイ時間
+      lastPlayed: "前回：スロット{slot}  {name}  ・  {time}",
       hint:     "↑↓: 選択    決定: Enter / Space / Z",
       // 左下のクレジット1件ぶん。{label} {name} {url} は data/audio.js の credits から
       credit:   "{label}：{name} {url}",
@@ -339,6 +353,33 @@
       badgeCraft: "作れる",
       badgeShop:  "新入荷",
       badgeDex:   "NEW",
+      // メニューの下のひと言（v1.4.0）。キーはメニューの value（data/home.js）。26文字くらいまで
+      descriptions: {
+        dungeon:  "穴の区画を選んで潜る。",
+        party:    "仲間の並び・装備・作戦を決める。預かり所もここ。",
+        shop:     "道具・装備・素材を売り買いする。",
+        craft:    "拾った素材から、道具や装備を作る。",
+        blessing: "潜ったとき選択肢に出す加護を決める。",
+        items:    "持っている道具を使う。装備も見比べられる。",
+        dex:      "出会ったモンスターや手に入れた品の記録。",
+        help:     "困ったときに読む。",
+        save:     "いまの進み具合をファイルに残す。",
+        settings: "音・表示・操作キーなど。"
+      },
+      // ひと言の下の「いまの様子」（v1.4.0。HomeScene._buildMenuInfo）
+      info: {
+        nextDungeon:        "次は {name}（推奨Lv{level}）",   // name, level
+        nextDungeonNoLevel: "次は {name}",                    // name
+        allCleared:         "開いている区画は、すべてクリアした",
+        party:              "連れている仲間 {n}/{max}　預かり所 {stored}",  // n, max, stored
+        craft:              "いまの素材で作れるもの {n}",       // n, total
+        craftNone:          "いまの素材で作れるものは無い",     // total
+        shopNew:            "新しく並んだ品がある",
+        blessing:           "編成 {active}/{max}",              // active, max
+        items:              "持ち物 {n} 種類",                  // n
+        dex:                "出会ったモンスター {seen}　仲間にした {caught}", // seen, caught
+        save:               "いまのファイル：スロット{n}"        // n
+      },
       hint:       "↑↓: 選択    決定: 決定    Esc: タイトルへ",
       // Esc でタイトルへ戻る前の確認。既定は「いいえ」
       toTitleTitle: "タイトルに戻りますか？",
@@ -375,6 +416,26 @@
       start: "この姿で始める",
       apply: "この内容にする",
 
+      // v1.4.0：右の欄の見出し・左の姿の下・下のひと言
+      sectionYou:  "あなた",
+      sectionLook: "見た目",
+      facingLabels: ["↓", "←", "↑", "→", "自動"],   // 左の姿の向きの札（Q/E で送る）
+      profile: "{gender}・一人称「{me}」",
+      mapSizeLabel: "冒険中の大きさ",
+      descriptions: {
+        name:        "物語や会話で呼ばれる名前。8文字まで。決定で文字盤を開く",
+        gender:      "体つきが変わる。ゲームの進み方には影響しない",
+        firstPerson: "物語の台詞で、あなたが自分を呼ぶときの言葉",
+        hair:        "髪の形。どちらの性別でも、どの髪型でも選べる",
+        hairColor:   "髪の色。いちばん右の「＋」で、好きな色を作れる",
+        color:       "ふく（上着）の色。いちばん右の「＋」で、好きな色を作れる",
+        pants:       "ズボンの色。いちばん右の「＋」で、好きな色を作れる",
+        acc:         "飾りは、いくつでも着けられる。決定で着ける／外す",
+        accColor:    "上の欄で選んでいる飾りの色。左端は、その飾りのもとの色",
+        doneNew:     "この姿で冒険を始める。名前と見た目は、あとから拠点の「設定」で変えられる",
+        doneEdit:    "この内容にする。Esc なら、変えずに戻る"
+      },
+
       // 自分で色を作る（色見本のいちばん右）
       // 色見本の「じぶんで」（右下に＋の付いた見本）を選んでいるときの案内
       hintCustom:    "↑↓: 選択    ←→: 色を選ぶ    決定: この色を作り直す",
@@ -394,8 +455,8 @@
       // 飾りの色の欄。色を選ぶと、その飾りを着ける
       hintAccColor: "←→: 色を選ぶ（左端はもとの色）    色を変える飾りは、上の欄で選ぶ",
 
-      hintNew:  "↑↓: 選択    ←→: 選ぶ    決定: 決定",
-      hintEdit: "↑↓: 選択    ←→: 選ぶ    決定: 決定    Esc: 戻る"
+      hintNew:  "↑↓: 選択    ←→: 選ぶ    決定: 決定    Q / E: 向き    R: おまかせ",
+      hintEdit: "↑↓: 選択    ←→: 選ぶ    決定: 決定    Q / E: 向き    R: おまかせ    Esc: 戻る"
     },
 
     /**
@@ -418,8 +479,9 @@
       slotLabel: "スロット{n}",                      // n
       empty:     "空き",
       broken:    "読み込めません（形式が違います）",
-      party:     "{name} Lv{level}   ほか{rest}体",  // name, level, rest
-      status:    "{gold}G   クリア {cleared}",       // gold, cleared
+      // 2行目は仲間の絵を並べたあとに続ける（v1.4.0。「ほか{rest}体」は絵で分かるので外した）
+      party:     "{name} Lv{level}",                 // name, level（rest も使える）
+      status:    "{gold}G",   // gold。クリアした区画の数は出さない（作者の指定 2026-11-13）
       place:     "{name} B{floor}F",                 // name, floor
       atHome:    "拠点",
       // 合計プレイ時間。1時間未満は「12分」、それ以上は「3時間45分」
@@ -532,8 +594,11 @@
     help: {
       title:    "遊び方",
       subtitle: "困ったときに読む",
-      // 答えの送りは Q/E。↑↓ は質問を選ぶのに使っているため
-      hint:     "↑↓: 質問を選ぶ    Q/E・ホイール: 答えを送る    Esc: 戻る"
+      // 答えの送りは Q/E。↑↓ は質問を選ぶのに使っているため。{extra} は答えが入りきらないときだけ hintScroll
+      hint:     "↑↓: 質問を選ぶ{extra}   Esc: 戻る",
+      hintScroll: "   Q/E・ホイール: 答えを送る",
+      // 右の上の欄（v1.4.0）
+      position: "{n} / {total} 問目"            // n, total（その分類の中で）
     },
 
     /** ショップ */
@@ -543,6 +608,14 @@
       tabSell:      "売る",
       owned:        "所持 {count}",                         // count
       effectLabel:  "効果",
+      // 右の説明（v1.4.0）
+      ownedSell:    "所持 {count}　売値 {price}G",           // count, price（売る一覧）
+      compareLabel: "仲間がつけると",                        // 装備の、連れている仲間ごとの変わり方
+      compareWorn:  "装備中",
+      compareNone:  "能力は変わらない",
+      compareNoSlot:"つけられない",
+      compareSwap:  "{name} と入れ替え",                     // name（いまの装備）
+      usedInLabel:  "使い道（工房）",                        // 素材などを使うレシピ（いま並んでいるものだけ）
 
       // 買うときの確認（個数 → はい／いいえ）
       countLabel:   "個数",
@@ -583,9 +656,15 @@
       blessingFull:   "（選択肢がいっぱい。拠点で入れ替える）",
       already:        "もう持っている",
       notForSale:     "これは売り物ではない",
-      hint:         "↑↓: 選択    ←→: 買う / 売る    決定: 決定    Esc: 戻る",
+      // {extra} には、絞り込みがあるとき hintFilter が入る（v1.4.0）
+      hint:         "↑↓: 選択   ←→: 買う / 売る{extra}   決定: 決定   Esc: 戻る",
       // 2軒以上開いているときだけ、店の移動を案内する
-      hintShops:    "↑↓: 選択    ←→: 買う/売る    Q/E: 店を変える    決定: 決定    Esc: 戻る",
+      hintShops:    "↑↓: 選択   ←→: 買う/売る   Q/E: 店を変える{extra}   決定: 決定   Esc: 戻る",
+      hintFilter:   "   F: 絞り込み",
+      // 絞り込み（v1.4.0）。札は「≡ 素材・苔むす坑道」
+      filterLabel:  "≡ {name}",                 // name
+      filters: { all: "すべて", use: "回復・道具", weapon: "武器", armor: "防具", accessory: "アクセサリー", material: "素材" },
+      filterSource: "素材・{name}",              // name（手に入る場所。恒常素材も）
       // 数字の左右に ◀▶ が出ているので、左右が1個ずつ・上下がまとめて
       hintQuantity: "←→: 1個ずつ    ↑↓: 10個ずつ    決定: 確認へ    Esc: やめる",
       hintConfirm:  "↑↓: 選択    決定: 決定    Esc: 個数へ戻る"
@@ -598,6 +677,11 @@
       materialLabel:"必要な素材",
       costLabel:    "費用",
       effectLabel:  "効果",
+      // 右の上の欄（v1.4.0）。count は持っている数
+      ownedLabel:   "所持 {count}",
+      // 足りない素材の下の「▶ 手に入る場所」。押すか C で開くと、図鑑と同じ中身が並ぶ（v1.4.0。中身の文は messages.dex）
+      sourcesLabel: "手に入る場所",
+      sourceNone:   "まだ分かっていない",
       empty:        "まだ作れるものがない",
       emptyFiltered:"当てはまるものがない",
       // 絞り込み（←→ か F で切り替え。2026-11-09）
@@ -610,7 +694,10 @@
       stackFull:    "これ以上は持てない",
       yes:          "はい",
       no:           "いいえ",
-      hint:         "↑↓: 選択    ←→/F: 絞り込み    決定: 作る    Esc: 戻る",
+      // {extra} には、足りない素材があれば hintSources、右の説明が入りきらなければ hintScroll が入る（v1.4.0）
+      hint:         "↑↓: 選択   ←→/F: 絞り込み{extra}   決定: 作る   Esc: 戻る",
+      hintSources:  "   C: 手に入る場所",
+      hintScroll:   "   Q/E: 送る",
       hintConfirm:  "↑↓: 選択    決定: 決定    Esc: やめる"
     },
 
@@ -620,20 +707,34 @@
       subtitle:   "潜ったときに選択肢へ出る加護を決める",
       count:      "編成 {active}/{max}",           // active, max
       markOn:     "◆ ",   // 入れている加護の印
-      markOff:    "・ ",   // 外している加護の印
+      markOff:    "◇ ",   // 外している加護の印
+      rowOn:      "入れている",
+      rowOff:     "外している",
       rarityLabel:"出やすさ",
       stateOn:    "選択肢に入れている",
       stateOff:   "選択肢から外している",
+      effectLabel:"効果",
+      // 一覧の等級の見出し（v1.4.0）。右に「入れている数/持っている数」
+      tierHeader: "- {name}（{rate}%） -",           // name, rate
+      tierHeaderRight: "{on}/{all}",                 // on, all
       // 等級ごとの編成数。0個の等級があると、その枠は選択肢に出てこない
       tierLabel:  "等級ごとの編成",
-      tierRow:    "{name}  {rate}%  {count}個",    // name, rate, count
+      tierName:   "{name}  {rate}%",                 // name, rate
+      tierCount:  "{count}個",                       // count
+      tierEmptyNote: "0個の等級があると、その枠は選択肢に出てこない。",
+      // 絞り込み（v1.4.0）
+      filterLabel: "≡ {name}",                       // name
+      filters: { all: "すべて", on: "入れているもの", off: "外しているもの" },
+      emptyFiltered: "当てはまる加護がない",
+      hintScroll: "   Q/E: 送る",
       turnedOn:   "{name} を選択肢に入れた",       // name
       turnedOff:  "{name} を選択肢から外した",     // name
       // 上限に達しているとき。どれかを外してから、と伝える
       full:       "編成は{max}個まで。どれかを外してから入れる",  // max
       notOwned:   "まだ持っていない",
       empty:      "持っている加護がない",
-      hint:       "↑↓: 選択    決定: 入れる / 外す    Esc: 戻る"
+      // {extra} には、右の説明が入りきらないとき hintScroll が入る
+      hint:       "↑↓: 選択   決定: 入れる / 外す   F: 絞り込み{extra}   Esc: 戻る"
     },
 
     /** 設定画面 */
@@ -682,7 +783,29 @@
       // 蘇生の道具を、倒れていない仲間に使おうとした（v1.0.0）
       notFainted:  "{name} は 倒れていない",               // name
       cannotUse:   "ここでは使えない",
-      hintList:    "↑↓: 選択    決定: 使う    Esc: 戻る",
+      // 右の説明（v1.4.0）
+      ownedLabel:  "所持 {count}",                     // count
+      sellLabel:   "　売値 {price}G",                  // price（売れるものだけ、所持の後ろに続ける）
+      useLabel:    "使うと",
+      useTexts: {
+        healHp:     "HPが {value} 回復する",           // value
+        healPp:     "PPが {value} 戻る",               // value
+        cureStatus: "{names} を治す",                  // names（状態異常の名前）
+        revive:     "倒れた仲間が HP{percent}% で起き上がる", // percent
+        escape:     "ダンジョンから拠点へ帰る"
+      },
+      usableInLabel: "使える所：{where}",               // where
+      sceneNames:  { home: "拠点", dungeon: "探索中", battle: "戦闘" },
+      usableHere:  "ここで使える",
+      notUsableHere: "ここでは使えない",
+      effectLabel: "効果",
+      compareLabel:"仲間がつけると",
+      usedInLabel: "使い道（工房）",
+      sourcesLabel:"手に入る場所",
+      sourceNone:  "まだ分かっていない",
+      // {extra} には、右の説明が入りきらないとき hintScroll が入る
+      hintList:    "↑↓: 選択   C: 手に入る場所{extra}   決定: 使う   Esc: 戻る",
+      hintScroll:  "   Q/E: 送る",
       hintTarget:  "↑↓: 相手を選ぶ    決定: 使う（続けて使える）    Esc: 一覧へ"
     },
 
@@ -700,8 +823,7 @@
     },
 
     dex: {
-      title:        "図鑑",
-      subtitle:     "出会ったモンスターと手に入れたアイテム",
+      // 栞（表の切り替え）の名前
       tabMonsters:  "モンスター",
       tabItems:     "アイテム",
       tabAbilities: "特性",
@@ -742,14 +864,12 @@
       seenLabel:    "発見",
       caughtLabel:  "仲間",
       obtainedLabel:"入手",
-      familyLabel:  "分類",
       elementLabel: "属性",
       scoutLabel:   "スカウト率",
-      maxLevelLabel:"レベル上限",   // 仲間にした種族だけ出す
       resistanceLabel: "耐性",
       // アイテムの出どころ（落とすモンスター・宝箱）。会っていない相手は名前と確率を伏せる
       sourceLabel:  "手に入る場所",
-      sourceNone:   "落とす相手はいない（店か工房で）",
+      sourceNone:   "まだ分かっていない",
       sourceDrop:   "{name}  {rate}%",       // name, rate
       // 区画で落とす確率が違う種族（data/dungeons.js の dropOverrides）は区画の名前を添える
       sourceDropAt: "{name}（{area}）  {rate}%",   // name, area, rate
@@ -762,14 +882,44 @@
       notCaught:    "（未加入）",
       // 愛情度で書き足される記録の見出し。stage は段階の名前（慣れ・信頼・絆）
       recordLabel:  "― {stage} ―",
-      hint:          "↑↓: 選択    ←→: 切替    Esc: 戻る",
-      hintScrollable:"↑↓: 選択    ←→: 切替    決定: 説明を読む    Esc: 戻る",
+      // --- モンスターの表（見開きの本。v1.4.0） ---
+      numberLabel:   "No.",
+      bookUnknownName: "？？？",                  // まだ出会っていない相手の名前
+      bookUnknownMark: "？",                      // 絵・能力・耐性の、まだ分からない所
+      bookNotCaughtNote: "仲間にすると、くわしく書きこめる。",   // 出会っただけの相手の、説明の代わり
+      recordUnknown: "？？？",                    // まだ読めない記録・落とすもの・特性
+      statsLabel:    "能力",
+      maxLevelShort: "Lv上限",
+      abilityLabel:  "特性",
+      abilityRecordLabel: "― 特性：{name} ―",    // name。左のページの最後に、特性の説明を書く
+      dropNone:      "なし",
+      hintBook:      "←→: めくる    Q/E: 栞    ↑↓: 記録を送る    R: 並べ替え    Esc: 戻る",
+      // 落とすものが区画で違う種族を開いているとき
+      hintBookDrops: "←→: めくる    Q/E: 栞    ↑↓: 記録を送る    決定: 落とすものの続き    R: 並べ替え",
+
+      // --- ほかの表（左のページに一覧・右のページに説明） ---
+      ownedLabel:    "所持 {n}",               // n
+      sellLabel:     "売値 {g}G",              // g
+      sellNone:      "売れない",
+      sourceShop:    "{shop}で買える",          // shop。いま並んでいる店だけ
+      sourceCraft:   "工房で作れる",            // いま作れるレシピだけ。下に材料が並ぶ
+      usedInLabel:   "使い道（工房）",          // これを材料にして作れるもの
+      usedCount:     "{n}個使う",              // n
+      // 技の「当たる相手」の札（data/skills.js の target）
+      targetNames:   { enemy: "敵1体", allEnemies: "敵全体", self: "自分", ally: "味方1体", allAllies: "味方全体" },
+      natureUp:      "{stat}↑",                // stat
+      natureDown:    "{stat}↓",                // stat
+      natureFlat:    "補正なし",
+      natureMembersLabel: "この性格の仲間",     // 連れている仲間と預かり所
+      natureMembersNone:  "いない",
+      hint:          "↑↓: 選択    Q/E: 栞    Esc: 戻る",
+      hintScrollable:"↑↓: 選択    Q/E: 栞    決定: 説明を読む    Esc: 戻る",
       hintDetail:    "↑↓: 説明をスクロール    決定/Esc: 一覧へ戻る",
-      // 技の表とモンスターの表の並べ方（Q/E で切り替え）
-      sortLabel:     "並び：{mode}　Q/E",          // mode
+      // 並べ方の札（モンスター・アイテム・技の表。R か、札を押して切り替え）
+      sortLabel:     "並び：{mode}",          // mode
       sortModes:     { family: "系統ごと", element: "属性ごと", kind: "種類ごと", role: "働きごと", category: "分類ごと", price: "値段順", name: "名前順", order: "図鑑の順" },
-      hintSkills:    "↑↓: 選択    ←→: 切替    Q/E: 並び替え    Esc: 戻る",
-      hintSkillsScrollable: "↑↓: 選択    ←→: 切替    Q/E: 並び替え    決定: 説明    Esc: 戻る"
+      hintSkills:    "↑↓: 選択    Q/E: 栞    R: 並べ替え    Esc: 戻る",
+      hintSkillsScrollable: "↑↓: 選択    Q/E: 栞    R: 並べ替え    決定: 説明を読む    Esc: 戻る"
     },
 
     /** ダンジョン選択画面 */
@@ -791,12 +941,26 @@
       unknownBoss:"？？？",
       // まだ戦っていないモンスター・まだ手に入れていないもの（出現するモンスター・手に入るもの の欄）
       unknownEntry:"？？？",
-      hint:       "↑↓: 選択    決定: 挑む    Esc: 穴の一覧へ",
+      // {extra} には、右の説明が入りきらないとき hintScroll が入る（v1.4.0）
+      hint:       "↑↓: 選択   決定: 挑む{extra}   Esc: 穴の一覧へ",
       // 開いている穴が1つだけのとき（穴を選ぶ段が出ない）
-      hintSingle: "↑↓: 選択    決定: 挑む    Esc: 戻る",
+      hintSingle: "↑↓: 選択   決定: 挑む{extra}   Esc: 戻る",
+      hintScroll: "   Q/E: 送る",
+      hintMore:   "   C: ほかも見る",
+      // 右の説明（v1.4.0）
+      // 出現するモンスター・手に入るものの残り（はじめは先頭の2つだけ。押すか C で開く）
+      moreMonsters:     "▶ ほかに{n}体を見る",                  // n
+      moreItems:        "▶ ほかに{n}個を見る",                  // n
+      foldLabel:        "▼ たたむ",
+      countLabel:       "{n}/{total}",                          // n, total（見た数・手に入れた数・クリアした数）
+      caughtMark:       "仲間にした",
+      underLevel:       "　仲間の最高Lv{best}（あと{diff}）",   // best, diff（上の欄の「最深 B4F」に続ける）
+      regionLevelRange: "推奨Lv{min}〜{max}",                    // min, max
+      noBoss:           "主なし",
+      joiner:           " ・ ",
       // 穴（地方）を選ぶ1段目（v1.0.0）
       regionSubtitle:   "潜る穴を選ぶ",
-      regionHint:       "↑↓: 選択    決定: 区画を選ぶ    Esc: 戻る",
+      regionHint:       "↑↓: 選択   決定: 区画を選ぶ{extra}   Esc: 戻る",
       regionProgress:   "{cleared}/{total} 区画",               // cleared, total
       regionLockedHint: "{region} の主を{count}体記録すると開く", // region, count
       sectionsLabel:    "区画",
@@ -840,7 +1004,10 @@
     blessing: {
       title:      "深淵の加護",
       subtitle:   "1つ選ぶ。この挑戦のあいだだけ、仲間全員に効く",
-      ownedLabel: "受けている加護:",
+      ownedHeading: "受けている加護（{n}）",   // n（v1.4.0 で札を並べる枠にした）
+      ownedNone:  "まだ無い",
+      ownedMore:  "ほか{n}",                  // n
+      rarityLabel: "出やすさ ",
       // 選択肢が3つに満たなかったとき。理由を出さないと不具合に見える
       //   （等級を引いてから中身を選ぶので、その等級を編成していないと枠が空になる）
       fewChoices: "編成している加護が偏っているので、選択肢が減っている",
@@ -863,6 +1030,11 @@
       // 黙って書き換えると気づけない
       savedNote:   "クリアを記録しました（セーブ済み）",
       toHome:      "拠点へ",
+      // 右の欄（v1.4.0）
+      partyLabel:     "仲間",
+      levelUp:        "Lv{before} → Lv{after}",   // before, after
+      joinedLabel:    "仲間になった",
+      blessingsLabel: "受けていた加護",
       hint:        "↑↓・ホイール: 送る    決定/クリック: 拠点へ"
     },
 
@@ -1073,18 +1245,20 @@
       // 全属性の耐性の書き方（宝珠の首飾り「全属性への耐性 +2」）
       allElements:  "全属性",
 
-      hintNormal:  "↑↓: 選択    ←→: 預かり所    決定: この仲間を選ぶ    Esc: 閉じる",
+      // {extra} には、右の欄が入りきらないとき hintScroll が入る（v1.4.0）
+      hintNormal:  "↑↓: 選択   ←→: 預かり所   決定: この仲間を選ぶ{extra}   Esc: 閉じる",
+      hintScroll:  "   Q/E: 送る",
       hintBox:       "決定: 出し入れ   C: ほかの操作   Q/E: 箱   R: 並べ替え   F: 絞り込み   Esc: 戻る",
       hintBoxSwap:   "↑↓: 預ける仲間を選ぶ    決定: 入れ替える    Esc: やめる",
       hintBoxMark:   "決定: 印をつける・外す    C: 印の仲間を逃がす    Esc: やめる",
       hintBoxFilter: "↑↓: 選ぶ    決定: 絞り込む    Esc: やめる",
       // 探索中（預かり所へ手が届かないとき）
-      hintNoStorage: "↑↓: 選択    決定: この仲間を選ぶ    Esc: 探索へ戻る",
+      hintNoStorage: "↑↓: 選択   決定: この仲間を選ぶ{extra}   Esc: 探索へ戻る",
       hintAction:  "↑↓: 選択    決定: 決定    Esc: やめる",
       hintReorder: "↑↓: 移動先を選ぶ    決定: そこへ入れ替え    Esc: やめる",
       hintEquipSlots: "↑↓: 枠を選ぶ    ←→: 仲間を切替    決定: 候補へ    R: 並べ替え    Esc: 戻る",
       hintEquipItems: "↑↓: 候補を選ぶ    ←→: 仲間を切替    決定: 着ける・外す    R: 並べ替え    Esc: 枠へ",
-      hintInspect: "↑↓: 別の仲間    ←→: ページ切替    決定・愛情度を押す: 愛情度の詳細    Esc: 戻る",
+      hintInspect: "↑↓: 別の仲間   ←→: ページ切替{extra}   決定・愛情度を押す: 愛情度の詳細   Esc: 戻る",
       // 様子を見るのページ（左上の札）。モンスター説明は図鑑と同じ説明と、愛情度の記録
       inspectPageStats: "ステータス",
       inspectPageSkills: "技・特性",
@@ -1092,6 +1266,7 @@
       skillCount: "{label}（{n}）",       // 「技（12）」。仲間の一覧の右の欄・様子を見るの左の欄・技・特性のページの見出し（label, n）
       notesNoRecords:   "（関係が深まると、記録が書き足されていく）",
       natureLabel: "性格",
+      natureHeading: "{label}　{name}",   // 様子を見るの性格の棒の見出し「性格　素直」（label, name）
       attackLabel: "攻撃",
       defenseLabel:"防御",
       speedLabel:  "素早さ",

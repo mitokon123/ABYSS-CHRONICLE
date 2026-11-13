@@ -7,6 +7,10 @@
  *   左右  … 値を変える
  *   Esc/X … 保存して前の画面へ戻る
  *
+ * ▼ v1.4.0
+ *   左の下に、選んでいる項目の説明（data/settings.js の description）。
+ *   右の操作キーは、キーを枠つきの札で出す。
+ *
  * 調整できる項目は data/settings.js、操作キーは data/keys.js、
  * 配置は data/ui.js の settings、文言は data/messages.js の settings で管理する。
  * どれもデータを足すだけで項目を増やせる。
@@ -195,6 +199,7 @@
 
     this._renderHeading();
     this._renderItems();
+    this._renderAbout();
     this._renderKeyList();
     this._renderNotice(ctx);
     this._renderHint();
@@ -262,7 +267,7 @@
     }
 
     // 値を横棒で表す（選択中は左右で変えられることを ◀ ▶ で示す）
-    var barX = x + 130;
+    var barX = x + 18 + (I.labelWidth || 112);
     var barY = y - 8;
     var ratio = valueRatio(item, this.settings.get(item.id));
 
@@ -271,12 +276,15 @@
     this.panel.ctx.fillStyle = selected ? (t.cursorColor || "#ffd75e") : (t.subTextColor || "#9aa4c0");
     this.panel.ctx.fillRect(barX, barY, Math.round(I.barWidth * ratio), I.barHeight);
 
-    this.panel.drawText(this.settings.formatValue(item.id),
-      barX + I.barWidth + 12, y, { font: t.smallFont, color: color });
+    var valueText = this.settings.formatValue(item.id);
+    this.panel.drawText(valueText, barX + I.barWidth + 12, y, { font: t.smallFont, color: color });
 
     if (selected) {
       this.panel.drawText("◀", barX - 14, y, { font: t.smallFont, color: t.cursorColor });
-      this.panel.drawText("▶", barX + I.barWidth + 52, y, { font: t.smallFont, color: t.cursorColor });
+      // ▶ は値の文字のすぐ右（「とても速い」のような長い値でも重ならない）
+      this.panel.ctx.font = t.smallFont;
+      var valueW = this.panel.ctx.measureText(valueText).width;
+      this.panel.drawText("▶", barX + I.barWidth + 12 + valueW + 6, y, { font: t.smallFont, color: t.cursorColor });
     }
   };
 
@@ -294,14 +302,41 @@
       text = this.game.getPlayerName() + (def ? ("  /  " + def.name) : "");
     }
 
-    this.panel.drawText(text, x + 130, y, { font: t.smallFont, color: color });
+    this.panel.drawText(text, x + 18 + (I.labelWidth || 112), y, { font: t.smallFont, color: color });
 
-    // ★ 右端の位置は、横棒の行の「▶」よりも内側に取る。
-    //   同じ位置（+52）にすると、右揃えの文字が枠から12pxはみ出す
+    // 右端は枠の内側（右揃え）
     if (selected) {
+      var box = this._itemsRect();
       this.panel.drawText(this.texts.openAction || "決定で開く",
-        x + 130 + I.barWidth + 34, y,
+        box.x + box.w - (t.padding || 8) - 4, y,
         { align: "right", font: t.smallFont, color: t.cursorColor });
+    }
+  };
+
+  /** 左の下：選んでいる項目の説明（v1.4.0）。名前・いまの値・説明 */
+  SettingsScene.prototype._renderAbout = function () {
+    var A = this.layout.about;
+    var item = this.settings.items[this.index];
+    if (!A || !item) return;
+
+    var t = this.theme;
+    var items = this._itemsRect();
+    var box = { x: items.x, y: items.y + items.h + (A.gap || 10), w: items.w, h: A.h || 84 };
+    this.panel.drawBox(box);
+    var origin = this.panel.innerOrigin(box);
+    var lh = A.lineHeight || 17;
+    var y = origin.y + 14;
+
+    this.panel.drawText(item.label, origin.x, y, { font: t.smallFont, color: t.cursorColor });
+    if (item.type !== "action") {
+      this.panel.drawText(this.settings.formatValue(item.id), box.x + box.w - (t.padding || 8) - 4, y,
+        { align: "right", font: t.smallFont, color: t.textColor });
+    }
+    y += lh + 2;
+    var lines = NS.wrapText(item.description || "", A.charsPerLine || 27);
+    for (var i = 0; i < lines.length && y < box.y + box.h; i++) {
+      this.panel.drawText(lines[i], origin.x, y, { font: t.smallFont, color: t.subTextColor });
+      y += lh;
     }
   };
 
@@ -329,8 +364,28 @@
 
     this.panel.drawText(labels[action] || action, this.panel.innerOrigin(K).x, y,
       { font: t.smallFont });
-    this.panel.drawText(this.game.input.getKeyLabels(action).join("  /  "), right, y,
-      { align: "right", font: t.smallFont, color: t.subTextColor });
+
+    // キーを右から札にして並べる（v1.4.0）
+    var ctx = this.panel.ctx;
+    var keys = this.game.input.getKeyLabels(action);
+    var capH = K.capHeight || 20;
+    var x = right;
+    for (var i = keys.length - 1; i >= 0; i--) {
+      ctx.save();
+      ctx.font = t.smallFont;
+      var w = Math.max(capH, Math.ceil(ctx.measureText(keys[i]).width) + 12);
+      x -= w;
+      ctx.fillStyle = "rgba(255,255,255,0.06)";
+      ctx.fillRect(x, y - capH + 5, w, capH);
+      ctx.strokeStyle = t.panelBorder || "#3a4670";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y - capH + 5.5, w - 1, capH - 1);
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillRect(x + 1, y + 3, w - 2, 2);   // 下の縁を少し濃く（押せる札に見えるように）
+      ctx.restore();
+      this.panel.drawText(keys[i], x + w / 2, y, { align: "center", font: t.smallFont, color: t.textColor });
+      x -= 4;
+    }
   };
 
   SettingsScene.prototype._renderNotice = function (ctx) {

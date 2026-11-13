@@ -9,8 +9,12 @@
  * ▼ 図鑑や持ち物と同じ「左に一覧・右に中身」の形にしてある。
  *   困って開く画面なので、他の画面と操作を変えないほうがよい。
  *
- * ▼ 答えが長いときは右側を送れる（↑↓ではなく Q/E とホイール）。
+ * ▼ 答えが長いときは右側を送れる（↑↓ではなく Q/E とホイール・右のバー）。
  *   ↑↓ は一覧の移動に使うので、そこを奪わない。
+ *
+ * ▼ 右は共通の部品 NS.DetailPane（v1.4.0・2026-11-12。ほかの画面とそろえた）
+ *   上の欄 … 「？」の絵・分類の名前（分類の色）・その分類の何問目か
+ *   その下 … 質問（見出しの色）→ 答え（段落のあいだは1行あける）
  */
 (function (NS) {
   "use strict";
@@ -27,9 +31,10 @@
 
     this.panel = new NS.Panel(game.ctx, this.theme);
     this.list = new NS.ScrollList(this.panel, this.layout.list);
+    this.sprites = new NS.SpriteRenderer(game.ctx, game.assets);
+    this.pane = new NS.DetailPane(this.panel, this.sprites, this.layout.detail || { x: 0, y: 0, w: 0, h: 0 });
     this.backButton = new NS.BackButton(this.panel, game.data);
 
-    this.answerTop = 0;   // 答えを何行目から出しているか
 
     this._buildList();
   }
@@ -126,33 +131,53 @@
       return;
     }
 
-    // 質問を変えたら、答えは先頭から読み直す
-    if (this.list.handleInput(input)) this.answerTop = 0;
+    // 右の答え（バー・ホイール・Q/E）。バーを触っている間はほかの操作を見ない
+    this.pane.setContent(this._answerContent(), this._answerKey());
+    var paneResult = this.pane.handleInput(input);
+    if (paneResult && paneResult.bar) return;
+    if (input.isPressed("prevTab")) this.pane.scrollBy(-this.pane.keyRows());
+    if (input.isPressed("nextTab")) this.pane.scrollBy(this.pane.keyRows());
 
-    this._scrollAnswer(input);
+    // 質問を変えたら、答えは先頭から読み直す（DetailPane が key の変化で先頭へ戻す）
+    this.list.handleInput(input);
   };
 
-  /** 答えの送り。Q/E とホイール（↑↓は一覧が使っている） */
-  HelpScene.prototype._scrollAnswer = function (input) {
-    var lines = this._answerLines();
-    var visible = this.layout.answer ? (this.layout.answer.visibleLines || 14) : 14;
-    var maxTop = Math.max(0, lines.length - visible);
-    if (maxTop === 0) { this.answerTop = 0; return; }
+  /** 選んでいる質問のid（答えを先頭へ戻す目印） */
+  HelpScene.prototype._answerKey = function () {
+    var selected = this.list.getSelected();
+    return selected ? selected.value : null;
+  };
 
-    var step = 0;
-    if (input.isPressed("prevTab")) step = -1;
-    if (input.isPressed("nextTab")) step = 1;
+  /** 右の答えの中身（DetailPane の { head, lines }） */
+  HelpScene.prototype._answerContent = function () {
+    var selected = this.list.getSelected();
+    if (!selected) return null;
+    var entry = (this.help.entries || {})[selected.value];
+    if (!entry) return null;
+    var t = this.theme;
+    var category = (this.help.categories || {})[entry.category] || {};
 
-    if (input.getPointer) {
-      var pointer = input.getPointer();
-      if (pointer.wheel && pointer.inside && this.layout.detail
-          && NS.Panel.containsPoint(this.layout.detail, pointer)) {
-        step = pointer.wheel > 0 ? 1 : -1;
-      }
+    // その分類の何問目か（一覧に出ているものだけで数える）
+    var rows = this.list.rows || [];
+    var n = 0, total = 0;
+    for (var r = 0; r < rows.length; r++) {
+      if (rows[r].type !== "entry") continue;
+      var other = (this.help.entries || {})[rows[r].value];
+      if (!other || other.category !== entry.category) continue;
+      total++;
+      if (rows[r].value === entry.id) n = total;
     }
-    if (step === 0) return;
 
-    this.answerTop = Math.max(0, Math.min(maxTop, this.answerTop + step));
+    var head = { mark: "？", name: category.name || "", nameColor: category.color || t.textColor,
+                 sub: fill(this.texts.position || "{n} / {total} 問目", { n: n, total: total }) };
+    var lines = [];
+    var perLine = (this.layout.answer && this.layout.answer.charsPerLine) || 26;
+    var question = wrapText(entry.question, perLine - 2);
+    for (var q = 0; q < question.length; q++) lines.push({ heading: true, text: question[q], font: t.font });
+    lines.push({});
+    var answer = this._answerLines();
+    for (var i = 0; i < answer.length; i++) lines.push({ text: answer[i] });
+    return { head: head, lines: lines };
   };
 
   /** いま選んでいる質問の答えを、折り返した行の配列にする */
@@ -203,62 +228,19 @@
     this.backButton.render();
   };
 
+  /** 右：答え（DetailPane） */
   HelpScene.prototype._renderAnswer = function () {
-    var rect = this.layout.detail;
-    if (!rect) return;
-
-    this.panel.drawBox(rect);
-
-    var selected = this.list.getSelected();
-    if (!selected) return;
-
-    var entry = (this.help.entries || {})[selected.value];
-    if (!entry) return;
-
-    var t = this.theme;
-    var a = this.layout.answer || {};
-    var origin = this.panel.innerOrigin(rect);
-    var lh = a.lineHeight || 20;
-    var y = origin.y + 18;
-
-    // 質問そのものを見出しとして出す。一覧から目を戻さなくて済むように
-    var head = wrapText(entry.question, (a.charsPerLine || 20) - 2);
-    for (var h = 0; h < head.length; h++) {
-      this.panel.drawText(head[h], origin.x, y, { color: t.cursorColor });
-      y += lh;
-    }
-    y += 6;
-
-    var lines = this._answerLines();
-    var visible = a.visibleLines || 14;
-    var end = Math.min(lines.length, this.answerTop + visible);
-
-    for (var i = this.answerTop; i < end; i++) {
-      this.panel.drawText(lines[i], origin.x, y,
-        { font: t.smallFont, color: t.subTextColor });
-      y += lh;
-    }
-
-    this._renderAnswerMark(rect, lines.length, visible, t);
-  };
-
-  /** 答えに続きがあることを示す印 */
-  HelpScene.prototype._renderAnswerMark = function (rect, total, visible, t) {
-    if (this.answerTop > 0) {
-      this.panel.drawText("▲", rect.x + rect.w - 18, rect.y + 20,
-        { font: t.smallFont, color: t.hintColor });
-    }
-    if (this.answerTop + visible < total) {
-      this.panel.drawText("▼", rect.x + rect.w - 18, rect.y + rect.h - 10,
-        { font: t.smallFont, color: t.hintColor });
-    }
+    if (!this.layout.detail) return;
+    this.pane.setContent(this._answerContent(), this._answerKey());
+    this.pane.render("");
   };
 
   HelpScene.prototype._renderHint = function () {
     var hint = this.layout.hint;
     if (!hint) return;
 
-    this.panel.drawText(this.texts.hint || "", hint.x, hint.y,
+    // 答えが入りきらないときだけ「Q/E・ホイール: 答えを送る」（v1.4.0）
+    this.panel.drawText(fill(this.texts.hint || "", { extra: this.pane.canScroll() ? (this.texts.hintScroll || "") : "" }), hint.x, hint.y,
       { font: this.theme.smallFont, color: this.theme.hintColor });
   };
 
@@ -271,6 +253,14 @@
   // 切れ目の次が句読点なら前の行へ送る作りは、もとはこの画面だけにあった（2026-11-10 に全画面へ広げた）
   function wrapText(text, charsPerLine) {
     return NS.wrapText(text, charsPerLine);
+  }
+
+  /** テンプレートの {key} を置き換える */
+  function fill(template, values) {
+    if (!template) return "";
+    return template.replace(/\{(\w+)\}/g, function (match, key) {
+      return (values[key] !== undefined) ? values[key] : match;
+    });
   }
 
   NS.HelpScene = HelpScene;

@@ -75,7 +75,8 @@
     ["effects.shapes.*.hitSe", "se"],
     // 道具・特性
     ["items.*.category", "itemCategory"],
-    ["items.*.from", "dungeons"],
+    // ダンジョンでない小見出し（data/categories.js の materialSource。恒常素材）も書ける
+    ["items.*.from", "dungeons", { allow: ["staple"] }],
     ["items.*.equip.slot", "equipSlot"],
     ["abilities.*.category", "abilityCategory"],
     // ダンジョン・主・穴

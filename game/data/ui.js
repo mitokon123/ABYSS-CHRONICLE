@@ -182,8 +182,22 @@
       subtitle: { x: 400, y: 258, font: "13px monospace", color: "#55638c" },
 
       // 「新しく始める」「続きから」の2つ。
-      // 項目の左に絵が付くので、以前より横幅を広げてある
-      menu: { x: 288, y: 340, w: 224, h: 74, lineHeight: 32, iconSize: 20 },
+      // メニュー（v1.4.0 案A）。style "plain" は枠なし・真ん中そろえ・選んでいる項目が光って両脇に◆
+      //   （TitleScene._renderMenu）。style を消すと、今までの枠と絵のついたメニューに戻る
+      menu: { x: 240, y: 318, w: 320, h: 80, lineHeight: 40, iconSize: 20,
+              style: "plain", font: "17px monospace", selectedFont: "20px monospace",
+              color: "#8d9bc4", selectedColor: "#ffe9a8", glowColor: "#ffd75e", glowBlur: 14,
+              markColor: "#ffd75e", markGap: 22 },
+      // メニューの下の「前回：スロット1 アルト ・ 12時間3分」（クリアの数は出さない）
+      lastPlayed: { gapBelow: 22, font: "12px monospace", color: "#7f8db8" },
+
+      // 穴の底から上がる光（v1.4.0 案A）。rays 本の筋を rayStart から rayStep ずつ扇に開く（ラジアン）
+      lightShaft: { x: 400, y: 640, glowRadius: 420, glowColor: "rgba(110,150,255,0.30)",
+                    rays: 7, rayStart: -0.55, rayStep: 0.18, rayHalfWidth: 0.03, rayLength: 700,
+                    rayColor: "#7fa4ff", rayAlpha: 0.022, rayAlphaStep: 0.012,
+                    swayAmount: 0.03, swaySpeed: 0.0004 },
+      // 世界名の両脇の飾り線
+      ornament: { y: 222.5, gap: 18, length: 80, lineColor: "#4a6ba8", diamondColor: "#8fb0ff", diamond: 4 },
 
       /**
        * バージョン表記の隣に置く、パッチノートを開くボタン。
@@ -301,6 +315,14 @@
       // 選んでいる技・道具の内容（メッセージ欄の左側に出す）
       //   kindOffsetX … 技の種類（[共鳴] など）を出す位置。属性の札の右
       skillInfo: { charsPerLine: 16, elementOffsetX: 110, kindOffsetX: 150 },
+
+      // v1.4.0：技の範囲の札（威力の行の右端）・効き目の札（敵の欄の下）・戦闘のログの窓
+      rangeChip: { h: 16, marginRight: 10,
+                   colors: { enemy: "#e8a07a", allEnemies: "#ff8a5e", ally: "#7fd0a0", allAllies: "#5fd18c", self: "#b8a8f0" } },
+      effectMark: { gap: 4, h: 18, fill: "rgba(10,14,26,0.88)",
+                    colors: { weak: "#ffb84a", resist: "#8d9bc4", immune: "#e8542a" } },
+      log: { x: 40, y: 36, w: 720, h: 520, lineHeight: 20, charsPerLine: 46,
+             veil: "rgba(4,6,12,0.78)", headingColor: "#ffd75e" },
 
       /**
        * 「状態を見る」の欄（メッセージ欄に重ねて出す）。
@@ -462,6 +484,9 @@
       // lineHeight で項目の間隔を広げ、拠点らしい落ち着いた見た目にする
       //   iconSize を書くと、項目の左に絵がつく（0や未指定なら文字だけ）
       menu:   { x: 48, y: 122, w: 280, h: 372, lineHeight: 36, iconSize: 22 },
+      // メニューの下の2行（選んでいる項目のひと言と、いまの様子。v1.4.0）。
+      // たき火を囲む仲間（camp.seats。いちばん左は x 406 のあたり）にかからない幅で書く
+      description: { x: 48, y: 518, lineHeight: 20 },
       // 右側の手持ち一覧（最大6体）。RC-1 で PP・経験値のバー、装備の絵、愛情度の印を足した
       //   1行目：名前とLv・愛情度の印（affectionIcon）・右端に装備の絵4つ（equipIcon。空きの枠は薄い四角）
       //   その下：HP（4px）・PP（3px）・次のレベルまでの経験値（3px）の細いバーと、右に小さな数字（barFont）
@@ -494,8 +519,9 @@
       title:    { x: 48, y: 62, font: "26px monospace", color: "#e6ecff" },
       subtitle: { x: 48, y: 88, font: "13px monospace", color: "#7f8db8" },
 
-      list:   { x: 48, y: 122, w: 400, h: 372, rowHeight: 26, visibleRows: 12 },
-      detail: { x: 470, y: 122, w: 290, h: 372 },
+      // v1.4.0 で右を広げた（工房・お店と同じ幅。説明は共通の部品 DetailPane）
+      list:   { x: 48, y: 122, w: 330, h: 372, rowHeight: 26, visibleRows: 12 },
+      detail: { x: 392, y: 122, w: 368, h: 372, charsPerLine: 26, lineHeight: 17, wheelRows: 1, keyRows: 3 },
 
       notice: { x: 400, y: 526 },
       hint:   { x: 48, y: 570 }
@@ -623,14 +649,29 @@
       title:    { x: 32, y: 52, font: "26px monospace", color: "#e6ecff" },
       subtitle: { x: 32, y: 78, font: "13px monospace", color: "#7f8db8" },
 
+      /**
+       * 左の姿（v1.4.0）。floorY は台の真ん中（足が乗る所）、stage は台と後ろの光、
+       * facing は向きの札（↓ ← ↑ → 自動）、nameY・profileY は名前と「男性・一人称「私」」、
+       * map は「冒険中の大きさ」（地図と同じ 36px の姿）の上端。y・size・labelY は古い 32×32 の絵のとき
+       */
       preview: { boxX: 32, boxY: 100, boxW: 216, boxH: 429,
-                 x: 140, y: 290, size: 176, labelY: 486 },
+                 x: 140, y: 290, size: 176, labelY: 486,
+                 floorY: 346,
+                 stage: { rx: 74, ry: 15, glowRadius: 120, glowColor: "rgba(90,130,220,0.22)",
+                          floorColor: "rgba(74,107,168,0.42)", rimColor: "rgba(140,170,240,0.35)" },
+                 facing: { y: 370, w: 26, autoW: 40, h: 20, gap: 4 },
+                 nameY: 426, nameFont: "18px monospace", profileY: 448,
+                 map: { y: 478 } },
 
-      rows:   { x: 264, y: 100, w: 504, h: 38, gap: 5 },
+      // 右の欄。「あなた」「見た目」の見出しを挟む（sections.h ずつ下へずれる）
+      rows:     { x: 264, y: 100, w: 504, h: 34, gap: 5 },
+      sections: { h: 18, baseline: 6, color: "#7f8db8" },
       swatch: { x: 352, size: 26, gap: 8 },
       chip:   { x: 352, w: 40, h: 26, gap: 5, padX: 7, font: "12px monospace",
                 cursorFill: "rgba(255,215,94,0.18)" },   // 飾りの欄で、いま指している札の地
-      done:   { h: 42 },
+      done:   { h: 40 },
+      // 選んでいる欄のひと言（何が変わるのか）
+      description: { x: 32, y: 552, font: "13px monospace", color: "#9aa4c0" },
 
       /**
        * 色を自分で作る窓（ふく・髪・ズボンの「じぶんで」の見本で決定を押すと開く）。
@@ -649,7 +690,7 @@
         repeatDelayMs: 320, repeatMs: 45
       },
 
-      hint:   { x: 32, y: 570 }
+      hint:   { x: 32, y: 578 }
     },
 
     /**
@@ -670,6 +711,8 @@
       iconName: "iconSlot",
       textPadding: 10,
       lineHeight: 22,
+      // 2行目に並べる仲間の絵の大きさ（v1.4.0）
+      memberSize: 22,
 
       // 確認の窓。後ろを暗く落としてから出す。
       // ★ menu が box の下端に触れないよう、box は menu より 28px ぶん長くしてある
@@ -750,8 +793,9 @@
       subtitle: { x: 48, y: 88, font: "13px monospace", color: "#7f8db8" },
 
       list:   { x: 48, y: 122, w: 330, h: 372, rowHeight: 26, visibleRows: 13 },
-      detail: { x: 398, y: 122, w: 362, h: 372 },
-      answer: { charsPerLine: 24, lineHeight: 20, visibleLines: 14 },
+      // 右の答え（v1.4.0。共通の DetailPane）。lineHeight・keyRows（Q/E で送る行数）・wheelRows も書ける
+      detail: { x: 398, y: 122, w: 362, h: 372, lineHeight: 20, keyRows: 3, wheelRows: 1 },
+      answer: { charsPerLine: 26 },
 
       hint:   { x: 48, y: 570 }
     },
@@ -775,24 +819,51 @@
       hint:    { x: 400, y: 408, align: "center", lineHeight: 18 }
     },
 
+    /**
+     * 図鑑。画面ぜんぶが「開いた本」（v1.4.0。見本は dex-mockups.html の案 B）。
+     *   book   … 本の位置と色。左のページは x〜まんなか、右のページはまんなか〜右端
+     *              paper … 説明と記録の文／gold … 見出しと番号／dim … まだ読めない所（？）／ink … 能力の数字と特性
+     *              charsPerLine・lineHeight … 左のページの文を折り返す文字数と、行の高さ（px）
+     *              spriteSize … 台座に立つ絵の大きさ。種族の sizeScale を掛けるが、spriteMaxScale で頭打ち
+     *              statRadius … 能力の五角形の半径
+     *   tabs   … 栞（表の切り替え。モンスター／アイテム／特性／技／性格／加護）。本の上から出ている
+     *   strip  … モンスターの表の、下の帯（前後の相手の絵）。x はまんなかの絵の左端・pitch は絵の間隔・side は片側に並べる数
+     *   repeat … ←→・↑↓ を押しっぱなしにしたとき、送り始めるまで（delay）と送る間隔（interval）。ms
+     *   list / detail … ほかの表。左のページに一覧、右のページに説明
+     */
     dex: {
-      background: "#0a0f1c",
-      title:    { x: 48, y: 62, font: "26px monospace", color: "#e6ecff" },
-      subtitle: { x: 48, y: 88, font: "13px monospace", color: "#7f8db8" },
+      background: "#07090f",
 
-      // タブは6つ（モンスター／アイテム／特性／技／性格／加護）
-      // 幅は 48 + 112×6 + 6×5 = 750 で、右端に余白が残るようにしてある
-      tabs:   { x: 48, y: 108, w: 112, h: 30, gap: 6 },
-      list:   { x: 48, y: 152, w: 400, h: 342, rowHeight: 26, visibleRows: 11 },
-      // 右の詳細欄。入りきらない説明は決定キーでスクロールして読む
+      book: {
+        x: 24, y: 44, w: 752, h: 452,
+        cover: "#2a2014", pageLeft: "#101626", pageRight: "#0f1524", frame: "#3a3020",
+        paper: "#c9c0a8", gold: "#b89a5a", dim: "#5a4e36", ink: "#e0d6bc", name: "#f0e6cc",
+        nameFont: "22px monospace", statFont: "11px monospace", unknownFont: "64px monospace",
+        charsPerLine: 26, lineHeight: 17,
+        spriteSize: 104, spriteMaxScale: 1.15,
+        pedestal: "rgba(184,154,90,0.12)", pedestalLine: "rgba(184,154,90,0.4)",
+        statRadius: 64, grid: "rgba(184,154,90,0.25)", statFill: "rgba(255,215,94,0.28)",
+        resistBg: "rgba(79,140,232,0.18)", resistText: "#8fb8ff",
+        weakBg: "rgba(232,84,42,0.2)", weakText: "#ff9a7a",
+        dropText: "#d8ceb4",
+        stripBg: "#0e1424", stripCurrent: "rgba(255,215,94,0.12)", stripUnknown: "#4a5578"
+      },
+
+      tabs:   { x: 64, y: 18, w: 84, h: 30, gap: 8, bg: "#1f2740", activeBg: "#7a5a1e", activeText: "#ffe9a8" },
+      strip:  { x: 330, y: 508, pitch: 66, w: 56, h: 44, side: 4 },
+      repeat: { delay: 380, interval: 90 },
+
+      // ほかの表：左のページの一覧（枠は本のページが代わり）
+      list:   { x: 40, y: 60, w: 340, h: 416, rowHeight: 26, visibleRows: 16, frame: false },
+      // 右のページの説明。入りきらない説明は決定キーでスクロールして読む
       //   charsPerLine … 説明文を折り返す文字数
-      detail: { x: 470, y: 152, w: 290, h: 342, spriteSize: 72, charsPerLine: 18 },
+      detail: { x: 418, y: 56, w: 344, h: 428, charsPerLine: 25 },
 
-      // 収集数。タブが5つに増えて重なったため、タブの上（副題の行）へ移した
-      progress: { x: 760, y: 88 },
-      // 技の表の並べ方の札（技の表のときだけ。押すと次の並びに変わる）
-      sort:     { x: 470, y: 88 },
-      hint:     { x: 48, y: 570 }
+      // 集めた数（右上。栞の右）
+      progress: { x: 772, y: 37 },
+      // 並べ方の札（モンスター・アイテム・技の表。右下。x は札の右端。押すと次の並びに変わる）
+      sort:     { x: 772, y: 529 },
+      hint:     { x: 48, y: 584 }
     },
 
     /**
@@ -830,9 +901,12 @@
       title:    { y: 96,  font: "24px monospace", color: "#e6ecff" },
       subtitle: { y: 126, font: "13px monospace", color: "#7f8db8" },
 
-      card:  { x: 150, y: 170, w: 500, h: 84, gap: 98 },
-      owned: { x: 400, y: 500 },
-      hint:  { x: 400, y: 560 }
+      card:  { x: 150, y: 164, w: 500, h: 84, gap: 96 },
+      // 候補の枠の中（v1.4.0）。左に加護の絵
+      cardInner: { icon: "iconBlessing", iconSize: 40 },
+      // いま受けている加護の枠（v1.4.0）。絵と名前の札を並べ、rows 段まで折り返す
+      ownedBox: { x: 150, y: 462, w: 500, h: 80, rowHeight: 24, rows: 2 },
+      hint:  { x: 400, y: 566 }
     },
 
     /**
@@ -847,10 +921,14 @@
       // 上段：店の切り替え（開いている店だけ並ぶ）
       //   Q/E または左右キーの上段で切り替える
       shopTabs: { x: 48, y: 100, w: 130, h: 28, gap: 6 },
-      // 下段：買う / 売る
-      tabs:     { x: 48, y: 136, w: 160, h: 28, gap: 8 },
-      list:     { x: 48, y: 176, w: 400, h: 318, rowHeight: 26, visibleRows: 10 },
-      detail:   { x: 470, y: 176, w: 290, h: 318, charsPerLine: 18 },
+      // 下段：買う / 売る（v1.4.0 で右に絞り込みの札を置くため 160 → 84。いちばん長い札「≡ 素材・千年樹の根底」と重ならない幅）
+      tabs:     { x: 48, y: 136, w: 84, h: 28, gap: 8 },
+      // 絞り込みの札（v1.4.0）。right は文字の右端（一覧の右端にそろえる）、y は文字の下の線
+      filter:   { right: 370, y: 155 },
+      // v1.4.0 で右を広げた（装備の「仲間がつけると」を並べるため。工房と同じ幅）。
+      //   入りきらない説明は右のバー・ホイールで送る（Q/E は店の切り替えなので使わない）
+      list:     { x: 48, y: 176, w: 330, h: 318, rowHeight: 26, visibleRows: 10 },
+      detail:   { x: 392, y: 176, w: 368, h: 318, charsPerLine: 26, lineHeight: 17, wheelRows: 1 },
 
       // 店主。詳細欄の右上に立たせる（動きは data/shop.js の keeperMotion）
       keeper: { x: 684, y: 88, size: 80 },
@@ -872,6 +950,9 @@
 
     /**
      * 工房。左に作れるものの一覧、右に必要な素材と説明を出す。
+     * v1.4.0 で右を広げた（足りない素材の手に入る場所を、その素材の下に並べるため）。
+     *   detail.lineHeight … 右の行の高さ。入りきらない分は Q/E・ホイールで送る
+     *   detail.wheelRows / keyRows … ホイール1段・Q/E 1回で送る行の数
      */
     craft: {
       background: "#0a0f1c",
@@ -879,10 +960,10 @@
       subtitle: { x: 48, y: 88, font: "13px monospace", color: "#7f8db8" },
       gold:     { x: 760, y: 66, font: "16px monospace", color: "#ffd75e" },
 
-      list:   { x: 48, y: 122, w: 400, h: 372, rowHeight: 26, visibleRows: 12 },
-      detail: { x: 470, y: 122, w: 290, h: 372, charsPerLine: 18 },
+      list:   { x: 48, y: 122, w: 330, h: 372, rowHeight: 26, visibleRows: 12 },
+      detail: { x: 392, y: 122, w: 368, h: 372, charsPerLine: 26, lineHeight: 17, wheelRows: 1, keyRows: 3 },
       // 絞り込みの札（2026-11-09）。right は札の文字の右端（一覧の右端にそろえる）、y は文字の下の線
-      filter: { right: 442, y: 110 },
+      filter: { right: 372, y: 110 },
 
       confirmMenu: { x: 560, y: 400, w: 190, h: 80, lineHeight: 26 },
       notice: { x: 400, y: 526 },
@@ -899,12 +980,12 @@
       subtitle: { x: 48, y: 88, font: "13px monospace", color: "#7f8db8" },
       count:    { x: 760, y: 66, font: "16px monospace", color: "#e6ecff" },
 
-      list:   { x: 48, y: 122, w: 400, h: 372, rowHeight: 26, visibleRows: 12 },
-      detail: { x: 470, y: 122, w: 290, h: 372, charsPerLine: 18 },
-
-      // 等級ごとの編成数。詳細欄の下半分に、いつも同じ場所で出す。
-      //   0個の等級があると選択肢の枠が1つ空くので、ここが実質の要
-      tierSummary: { x: 482, y: 330, lineHeight: 18 },
+      // v1.4.0 で右を広げた（工房・お店と同じ。説明は共通の部品 DetailPane）。
+      //   等級ごとの編成数は説明の最後に出す（0個の等級があると選択肢の枠が1つ空くので、ここが実質の要）
+      list:   { x: 48, y: 122, w: 330, h: 372, rowHeight: 26, visibleRows: 12 },
+      detail: { x: 392, y: 122, w: 368, h: 372, charsPerLine: 26, lineHeight: 18, wheelRows: 1, keyRows: 3 },
+      // 絞り込みの札（v1.4.0）。right は文字の右端（一覧の右端にそろえる）、y は文字の下の線
+      filter: { right: 370, y: 112 },
 
       notice: { x: 400, y: 526 },
       hint:   { x: 48, y: 570 }
@@ -918,8 +999,8 @@
       title:    { x: 48, y: 62, font: "26px monospace", color: "#e6ecff" },
       subtitle: { x: 48, y: 88, font: "13px monospace", color: "#7f8db8" },
 
-      // 一覧の1件分。2件目以降は rowHeight ずつ下にずれる
-      list:   { x: 48, y: 122, w: 400, h: 78, rowHeight: 90 },
+      // 一覧の1件分。2件目以降は rowHeight ずつ下にずれる（v1.4.0 で右の説明を広げるため 400 → 330）
+      list:   { x: 48, y: 122, w: 330, h: 78, rowHeight: 90 },
 
       // 場所の雰囲気を色で示す（data/dungeonThemes.js の色をそのまま使う）
       //   themeBar   … 一覧の左端に出す帯
@@ -929,13 +1010,14 @@
       // 推奨レベルに、連れている仲間の最高レベルが届いていないときの色
       underLevelColor: "#e8896a",
 
-      // 右の詳細欄。説明・出現モンスター・手に入るものを縦に並べる
+      // 右の説明（v1.4.0。共通の DetailPane。枠はこの画面が描くので noBox）
       //   charsPerLine … 説明文を折り返す文字数
-      //   columns / columnWidth … モンスター名などを何列で並べるか
-      //   banner … 上部に出す、その場所の色の帯
-      detail: { x: 470, y: 122, w: 290, h: 400,
-                lineHeight: 18, charsPerLine: 20, columns: 2, columnWidth: 132,
-                banner: { height: 44 } },
+      //   banner … 上の欄の後ろに敷く、その場所の色の帯（height・alpha）
+      //   previewRows … 出現するモンスター・手に入るものを、はじめに何行出すか（残りは「▶ ほかに〇体を見る」・C で開く）
+      //   h・lineHeight … はじめ（2つずつ）の区画の説明が、送らずに1画面に収まる大きさ（check.html で確かめる）
+      detail: { x: 392, y: 122, w: 368, h: 420, noBox: true,
+                lineHeight: 19, charsPerLine: 26, wheelRows: 1, keyRows: 4, previewRows: 2,
+                banner: { height: 84, alpha: 0.9 } },
 
       hint: { x: 48, y: 570 }
     },
@@ -952,7 +1034,9 @@
       // 副題と所持金のあいだに置く（出ない挑戦のほうが多いので、間が空くだけ）
       savedNote:{ x: 400, y: 148, font: "12px monospace", color: "#5fd18c", align: "center" },
       gold:     { x: 400, y: 168, font: "18px monospace", color: "#ffd75e", align: "center" },
-      list:     { x: 230, y: 196, w: 340, h: 300, rowHeight: 26, visibleRows: 10 },
+      // 左：持ち帰ったもの（v1.4.0 で真ん中から左へ）。右：仲間・仲間になった相手・受けていた加護（DetailPane）
+      list:     { x: 48, y: 196, w: 340, h: 300, rowHeight: 26, visibleRows: 10 },
+      detail:   { x: 404, y: 196, w: 348, h: 300, lineHeight: 22, wheelRows: 1 },
       // マウスだけでも先へ進めるようにするボタン
       homeButton: { x: 330, y: 512, w: 140, h: 32 },
       hint:     { x: 48, y: 570 },
@@ -977,13 +1061,17 @@
       // h は最低の高さで、項目が増えたぶんは SettingsScene が自動で伸ばす
       // ※ 項目は7つまでは右の枠と同じ高さに収まる。8つ以上にするときは
       //   rowHeight を詰めるか、右のキー一覧のように送れるようにすること
-      items: { x: 48, y: 122, w: 340, h: 240, rowHeight: 44, barWidth: 150, barHeight: 8 },
+      //   labelWidth … 項目名の幅（横棒はその右から。v1.4.0 で「エフェクトの濃さ」が棒に重なっていたのを直した）
+      items: { x: 48, y: 122, w: 360, h: 240, rowHeight: 36, labelWidth: 146, barWidth: 92, barHeight: 8 },
+      // 左の下：選んでいる項目の説明（v1.4.0）。y は書かない（項目の枠のすぐ下に gap だけ空けて置く）
+      about: { gap: 10, h: 84, charsPerLine: 27, lineHeight: 17 },
 
       // 右：操作キーの一覧。入りきらないぶんはホイール・右端のバー・Q/E で送る
       //   visibleRows … 一度に出す行数（これを超えるとスクロールバーが出る）
-      keys:  { x: 412, y: 122, w: 348, h: 372, rowHeight: 30, visibleRows: 10 },
+      //   キーは枠つきの札で出す（v1.4.0。capHeight は札の高さ）
+      keys:  { x: 420, y: 122, w: 340, h: 416, rowHeight: 30, visibleRows: 12, capHeight: 20 },
 
-      notice: { x: 400, y: 526 },
+      notice: { x: 400, y: 550 },
       hint:   { x: 48, y: 570 }
     },
 
@@ -1040,15 +1128,14 @@
       //   visible … 画面に同時に出す行数（預かり所はこれより多く入るので、枠の中でスクロールする。
       //             右端にスクロールバーが出る。動かし方は持ち物・図鑑の一覧と同じ）
       //   cursorSpace … 行の左に出す「▶」の幅（枠の左へはみ出して描く分）
-      list: { x: 32, y: 58, w: 480, h: 62, rowHeight: 70, visible: 6, cursorSpace: 22 },
+      list: { x: 32, y: 58, w: 420, h: 62, rowHeight: 70, visible: 6, cursorSpace: 22 },   // v1.4.0 で右を広げるため 480 → 420
       spriteSize: 48,
       hpBarWidth: 220,
       // 先頭から何体が戦闘に出るかを示す線
       fieldDivider: { color: "#ffd75e", label: "出撃" },
-      // 選択中の個体の詳細
+      // 選択中の個体の詳細（v1.4.0 から共通の部品 DetailPane。入りきらなければバー・Q/E・ホイールで送る）
       // 下端は「戻る」ボタン（theme.backButton の y 552）の少し上まで。
-      // 中身が多い仲間は行間を詰めて収める（PartyScene._detailLineHeight）
-      detail: { x: 540, y: 58, w: 228, h: 484 },
+      detail: { x: 466, y: 58, w: 302, h: 484, lineHeight: 17, keyRows: 3, wheelRows: 1 },
       /**
        * 装備の画面（v1.3.0。画面ぜんぶを使う。js/scenes/PartyScene.js の _renderEquipScreen）
        *   monster … 左上の ◀ 絵・名前 ▶（spriteSize は絵の大きさ）
@@ -1075,7 +1162,7 @@
         party:  { x: 32, y: 58, w: 170, h: 306, rowHeight: 46, spriteSize: 32 },
         grid:   { x: 214, y: 58, w: 326, h: 306, headHeight: 34, cols: 6, cell: 50, gap: 2, spriteSize: 36 },
         footer: { x: 32, y: 374, w: 508, h: 168, lineHeight: 26 },
-        detail: { x: 552, y: 58, w: 216, h: 484 },
+        detail: { x: 552, y: 58, w: 216, h: 484, lineHeight: 17, wheelRows: 1 },
         filter: { x: 250, y: 110, w: 300, h: 340, rowHeight: 24 },
         cellColor: "#121a2e",
         markColor: "#e86a8a",
@@ -1123,6 +1210,10 @@
         //   abilityGap … 技の一覧と特性の間。abilityLineHeight … 特性の説明の行の高さ
         skills: { x: 268, y: 104, lineHeight: 22, minLineHeight: 16, font: "14px monospace",
                   elementX: 150, kindX: 186, statsX: 256, abilityGap: 14, abilityLineHeight: 18 },
+        // 技・特性／モンスター説明のページの右側（v1.4.0 から DetailPane。枠は描かない）
+        pane:   { x: 252, y: 76, w: 508, h: 434, lineHeight: 20, keyRows: 4, wheelRows: 1, noBox: true, font: "14px monospace" },
+        // ステータスのページの性格の棒（v1.4.0）。装備の下に続ける。barX は棒の左（x からのずれ）
+        nature: { gap: 12, lineHeight: 20, barX: 64, barW: 110 },
         sprite: { x: 150, y: 160, size: 128 },
         name:   { y: 246 },
         left:   { x: 64, y: 316, lineHeight: 20 },

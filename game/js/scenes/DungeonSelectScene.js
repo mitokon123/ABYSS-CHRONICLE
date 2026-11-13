@@ -9,6 +9,13 @@
  * まだ開いていない穴・区画は選べず、開く条件を表示する。
  * 区画が1つも無い穴は「準備中」と出て入れない。
  *
+ * 右の説明は共通の部品 NS.DetailPane（v1.4.0・2026-11-12 作者「ダンジョンを選ぶ画面もアップグレード」）。
+ *   上の欄 … その場所の床と壁の小さな絵・名前・札（推奨Lv・クリア済・未開放・準備中）・最深階
+ *   下の行 … 説明 → 出現するモンスター（絵つき・1行に1体）→ 手に入るもの（絵つき）→ 主
+ *            モンスターと手に入るものは、はじめは先頭の2つだけ（detail.previewRows）。
+ *            「▶ ほかに〇体を見る」を押すか C で残りが開く（2026-11-12 作者「最初の2体は表示して、あとから任意で」）
+ *   入りきらなければ Q/E・ホイール・バーで送る。上の欄の後ろに、その場所の色の帯を敷く
+ *
  * 一覧の中身は data/regions.js と data/dungeons.js、解放判定は DungeonCatalog が持つ。
  * 配置は data/ui.js の dungeonSelect、文言は data/messages.js の dungeonSelect。
  */
@@ -31,6 +38,8 @@
     this.panel = new NS.Panel(game.ctx, this.theme);
     this.renderer = new NS.Renderer(game.ctx);
     this.backButton = new NS.BackButton(this.panel, game.data);
+    this.sprites = new NS.SpriteRenderer(game.ctx, game.assets);
+    this.pane = new NS.DetailPane(this.panel, this.sprites, this.layout.detail || { x: 0, y: 0, w: 0, h: 0 });
 
     this.phase = "region";
     this.regions = NS.DungeonCatalog.listRegions(game.data);
@@ -110,6 +119,16 @@
       this._back();
       return;
     }
+
+    // 右の説明（バー・ホイール・Q/E）。バーを触っている間はほかの操作を見ない（v1.4.0）
+    this.pane.setContent(this._detailContent(), this._detailKey());
+    var paneResult = this.pane.handleInput(input);
+    if (paneResult && paneResult.bar) return;
+    if (paneResult && paneResult.toggle) { this._toggleList(paneResult.toggle); return; }
+    if (input.isPressed("prevTab")) this.pane.scrollBy(-this.pane.keyRows());
+    if (input.isPressed("nextTab")) this.pane.scrollBy(this.pane.keyRows());
+    // C：モンスターと手に入るものの残りを、まとめて開け閉め（区画の段だけ）
+    if (input.isPressed("menu") && this.phase === "dungeon") { this._toggleAllLists(); return; }
 
     var count = this._rowCount();
     var current = this._currentIndex();
@@ -224,11 +243,10 @@
 
     if (this.phase === "region") {
       for (var r = 0; r < this.regions.length; r++) this._renderRegionRow(this.regions[r], r);
-      this._renderRegionDetail();
     } else {
       for (var i = 0; i < this.dungeons.length; i++) this._renderRow(this.dungeons[i], i);
-      this._renderDetail();
     }
+    this._renderDetail();
     this._renderHint();
     this.backButton.render();
   };
@@ -301,54 +319,6 @@
 
     var subtitle = unlocked ? (region.subtitle || "") : (this.texts.unknownName || "");
     this.panel.drawText(subtitle, origin.x, origin.y + 40, { font: t.smallFont, color: t.subTextColor });
-  };
-
-  /** 右側：選んでいる穴の詳細（ひと言と区画の一覧。開いていなければ条件だけ） */
-  DungeonSelectScene.prototype._renderRegionDetail = function () {
-    var rect = this.layout.detail;
-    var region = this.getSelectedRegion();
-    if (!rect || !region) return;
-
-    this.panel.drawBox(rect);
-    var t = this.theme;
-    var origin = this.panel.innerOrigin(rect);
-    var lh = rect.lineHeight || t.lineHeight || 18;
-    var unlocked = this.isRegionUnlocked(region);
-    var name = unlocked ? region.name : (this.texts.unknownName || "？？？");
-
-    var y = this._renderBanner(rect, this._regionTheme(region, unlocked), name, unlocked) + lh + 6;
-
-    if (!unlocked) {
-      this._renderLines(wrapText(this._regionLockedHint(region), rect.charsPerLine || 15),
-        origin.x, y, t.hintColor, lh);
-      return;
-    }
-
-    if (region.subtitle) {
-      y = this._renderLines(splitDescription(region.subtitle, rect.charsPerLine || 15),
-        origin.x, y, t.subTextColor, lh) + lh;
-    }
-
-    var dungeons = this._dungeonsOf(region);
-    if (dungeons.length === 0) {
-      this._renderLines(wrapText(this.texts.comingSoonHint || "", rect.charsPerLine || 15),
-        origin.x, y, t.hintColor, lh);
-      return;
-    }
-
-    // 区画の一覧。開いていない区画は名前を伏せる
-    this.panel.drawText(this.texts.sectionsLabel || "", origin.x, y, { font: t.smallFont, color: t.hintColor });
-    y += lh;
-    for (var i = 0; i < dungeons.length; i++) {
-      var d = dungeons[i];
-      var open = this.isUnlocked(d);
-      var cleared = this.game.isDungeonCleared(d.id);
-      var mark = cleared ? (this.texts.cleared || "") : (isPreparing(d) ? (this.texts.comingSoon || "") : "");
-      this.panel.drawText((open ? d.name : (this.texts.unknownName || "？？？")) +
-        (mark ? "  " + mark : ""),
-        origin.x, y, { font: t.smallFont, color: !open ? t.hintColor : (cleared ? t.cursorColor : t.textColor) });
-      y += lh;
-    }
   };
 
   /** 「揺籃の穴 の主を4体記録すると開く」 */
@@ -467,9 +437,7 @@
    */
   DungeonSelectScene.prototype._recommendedColor = function (dungeon) {
     var t = this.theme;
-    var members = (this.game.party && this.game.party.getMembers) ? this.game.party.getMembers() : [];
-    var best = 0;
-    for (var i = 0; i < members.length; i++) best = Math.max(best, members[i].level || 0);
+    var best = this._bestLevel();
     return (best >= dungeon.recommendedLevel) ? t.subTextColor : (this.layout.underLevelColor || "#e8896a");
   };
 
@@ -501,211 +469,388 @@
     ctx.restore();
   };
 
-  /**
-   * 右側：選んでいる場所の詳細。
-   * 上から順に 説明 → 出現するモンスター → 手に入るもの → 主 を縦に流し込む。
-   */
+  // --- 右の説明（v1.4.0。共通の DetailPane） ---
+
+  /** 右の説明の中身。穴の段と区画の段で作り分ける */
+  DungeonSelectScene.prototype._detailContent = function () {
+    return (this.phase === "region") ? this._regionContent() : this._dungeonContent();
+  };
+
+  /** 選ぶものが変わったら、説明を先頭へ戻す */
+  DungeonSelectScene.prototype._detailKey = function () {
+    var chosen = (this.phase === "region") ? this.getSelectedRegion() : this.getSelected();
+    return this.phase + ":" + (chosen ? chosen.id : "");
+  };
+
+  /** いま説明している場所の色（帯と小さな絵）。まだ行けない場所は null */
+  DungeonSelectScene.prototype._detailTheme = function () {
+    if (this.phase === "region") {
+      var region = this.getSelectedRegion();
+      return region ? this._regionTheme(region, this.isRegionUnlocked(region)) : null;
+    }
+    var dungeon = this.getSelected();
+    return dungeon ? this._themeOf(dungeon, this.isUnlocked(dungeon)) : null;
+  };
+
+  /** 右側：枠 → 色の帯 → 説明（DetailPane。枠は自分で描くので rect.noBox） */
   DungeonSelectScene.prototype._renderDetail = function () {
     var rect = this.layout.detail;
     if (!rect) return;
-
     this.panel.drawBox(rect);
-
-    var dungeon = this.getSelected();
-    if (!dungeon) return;
-
-    var t = this.theme;
-    var origin = this.panel.innerOrigin(rect);
-    var lh = rect.lineHeight || t.lineHeight || 18;
-    var unlocked = this.isUnlocked(dungeon);
-
-    // 帯の下端から少し離して書き始める（帯と文章がくっつくと読みにくい）
-    var y = this._renderDetailBanner(rect, dungeon, unlocked) + lh + 6;
-
-    // 解放されていなければ、必要な条件だけを出す
-    if (!unlocked) {
-      var required = this._requiredNameShown(dungeon.unlockedBy);
-      var hint = (this.texts.lockedHint || "").replace("{name}", required || "");
-      this._renderLines(wrapText(hint, rect.charsPerLine || 15),
-        origin.x, y, t.hintColor, lh);
-      return;
-    }
-
-    // 準備中の区画は、中身がまだ無いことだけを出す
-    if (isPreparing(dungeon)) {
-      this._renderLines(wrapText(this.texts.sectionComingSoonHint || this.texts.comingSoonHint || "",
-        rect.charsPerLine || 15), origin.x, y, t.hintColor, lh);
-      return;
-    }
-
-    y = this._renderLines(
-      splitDescription(dungeon.description || "", rect.charsPerLine || 15),
-      origin.x, y, t.subTextColor, lh);
-
-    y += lh;
-    y = this._renderSection(this.texts.monstersLabel,
-      this._monsterEntries(dungeon), origin.x, y, rect, lh);
-
-    y += lh - 4;
-    y = this._renderSection(this.texts.dropsLabel,
-      this._itemEntries(dungeon), origin.x, y, rect, lh);
-
-    // 最深階に待つ相手。クリア済みなら名前を出す
-    var boss = (this.game.data.bosses || {})[dungeon.boss];
-    if (!boss) return;
-
-    y += lh - 4;
-    var known = this.game.isDungeonCleared(dungeon.id);
-    this.panel.drawText(
-      (this.texts.bossLabel || "") + " " +
-      (known ? (boss.title || "") : (this.texts.unknownBoss || "")),
-      origin.x, y, { font: t.smallFont, color: t.cursorColor });
+    this._renderBanner(rect, this._detailTheme());
+    this.pane.setContent(this._detailContent(), this._detailKey());
+    this.pane.render("");
   };
 
   /**
-   * 詳細欄の上部に、その場所の色の帯と名前を出す。
-   * 帯の色は実際のダンジョンの壁と床の色なので、潜る前に雰囲気が伝わる。
-   *
-   * 帯は下へ行くほど枠の色へ溶けるようにして、下端に線を引かない。
-   * 線を引くと文章のすぐ上に横線が走って、窮屈に見えるため。
-   *
-   * @returns {number} 帯の下端のy（続きはここから離して書く）
+   * 上の欄の後ろに敷く、その場所の色の帯。色は実際のダンジョンの壁と床の色なので、
+   * 潜る前に雰囲気が伝わる。下へ行くほど透明にして、下端に線を作らない。
+   * まだ行けない場所は一律の暗い色
    */
-  DungeonSelectScene.prototype._renderDetailBanner = function (rect, dungeon, unlocked) {
-    return this._renderBanner(rect, this._themeOf(dungeon, unlocked), this._nameOf(dungeon, unlocked), unlocked);
-  };
-
-  /** 詳細欄の上部の帯と名前（穴の詳細と区画の詳細で共通）。帯の下端のyを返す */
-  DungeonSelectScene.prototype._renderBanner = function (rect, theme, name, unlocked) {
-    var origin = this.panel.innerOrigin(rect);
+  DungeonSelectScene.prototype._renderBanner = function (rect, theme) {
     var banner = rect.banner;
-
-    if (!banner || !banner.height) {
-      var plainY = origin.y + 20;
-      this.panel.drawText(name, origin.x, plainY);
-      return plainY;
-    }
-
+    if (!banner || !banner.height) return;
     var tiles = (theme && theme.tiles) || {};
     var locked = this.layout.lockedColor || "#242a3a";
-
     var ctx = this.game.ctx;
     var top = rect.y + 2;
-    var bottom = top + banner.height;
-
-    // 上は壁の色、下は枠の色。境目が出ないよう、下端は透明にして溶かす
-    var gradient = ctx.createLinearGradient(0, top, 0, bottom);
+    var gradient = ctx.createLinearGradient(0, top, 0, top + banner.height);
     gradient.addColorStop(0, tiles.wall || locked);
-    gradient.addColorStop(0.55, (theme && theme.background) || locked);
+    gradient.addColorStop(0.5, (theme && theme.background) || locked);
     gradient.addColorStop(1, "rgba(0,0,0,0)");
-
     ctx.save();
+    ctx.globalAlpha = (typeof banner.alpha === "number") ? banner.alpha : 1;
     ctx.fillStyle = gradient;
     ctx.fillRect(rect.x + 2, top, rect.w - 4, banner.height);
     ctx.restore();
-
-    // 名前は帯の上寄りに置く（下は溶けているので、そこに文字を置くと沈んで見える）
-    this.panel.drawText(name,
-      origin.x, top + Math.floor(banner.height * 0.42) + 6,
-      { color: unlocked ? this.theme.textColor : this.theme.hintColor });
-
-    return bottom;
-  };
-
-  /** 文字列の配列を1行ずつ描き、次の描画位置を返す */
-  DungeonSelectScene.prototype._renderLines = function (lines, x, y, color, lh) {
-    for (var i = 0; i < lines.length; i++) {
-      this.panel.drawText(lines[i], x, y, { font: this.theme.smallFont, color: color });
-      y += lh;
-    }
-    return y;
   };
 
   /**
-   * 見出し＋名前の一覧を、指定の列数で並べる。
-   * @param {string} label 見出し
-   * @param {object[]} entries [{ text, color }]
-   * @returns {number} 次の描画位置
+   * 上の欄の絵：その場所の床と壁を、6×6 マスの小さな見取り図にしたもの（階段つき）。
+   * DetailPane の head.drawPicture に渡す
    */
-  DungeonSelectScene.prototype._renderSection = function (label, entries, x, y, rect, lh) {
+  var SWATCH = ["WWWWWW", "WFFFFW", "WFFWFW", "WFSFFW", "WFFFFW", "WWWWWW"];
+  DungeonSelectScene.prototype._swatchDrawer = function (theme) {
+    var ctx = this.game.ctx;
+    var tiles = (theme && theme.tiles) || {};
+    return function (x, y, size) {
+      var cell = size / SWATCH.length;
+      ctx.save();
+      for (var r = 0; r < SWATCH.length; r++) {
+        for (var c = 0; c < SWATCH[r].length; c++) {
+          var kind = SWATCH[r].charAt(c);
+          ctx.fillStyle = kind === "W" ? (tiles.wall || "#3a4266") : kind === "S" ? (tiles.stairs || tiles.wall || "#3a4266") : (tiles.floor || "#141820");
+          ctx.fillRect(Math.round(x + c * cell), Math.round(y + r * cell), Math.ceil(cell), Math.ceil(cell));
+          if (kind === "S") {
+            // 階段：明るい段を2本
+            ctx.fillStyle = "rgba(255,255,255,0.35)";
+            ctx.fillRect(Math.round(x + c * cell + 1), Math.round(y + r * cell + cell * 0.3), Math.ceil(cell - 2), 1);
+            ctx.fillRect(Math.round(x + c * cell + 1), Math.round(y + r * cell + cell * 0.7), Math.ceil(cell - 2), 1);
+          }
+        }
+      }
+      ctx.strokeStyle = "rgba(0,0,0,0.5)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5, size - 1, size - 1);
+      ctx.restore();
+    };
+  };
+
+  /** 文を折り返して行に足す（style は color / dim など、どの行にも付ける値） */
+  function pushWrapped(lines, text, charsPerLine, style) {
+    var wrapped = splitDescription(text || "", charsPerLine);
+    for (var i = 0; i < wrapped.length; i++) {
+      var line = { text: wrapped[i] };
+      for (var key in style) if (Object.prototype.hasOwnProperty.call(style, key)) line[key] = style[key];
+      lines.push(line);
+    }
+  }
+
+  DungeonSelectScene.prototype._charsPerLine = function () {
+    return (this.layout.detail || {}).charsPerLine || 26;
+  };
+
+  /** 連れている仲間でいちばん高いレベル */
+  DungeonSelectScene.prototype._bestLevel = function () {
+    var members = (this.game.party && this.game.party.getMembers) ? this.game.party.getMembers() : [];
+    var best = 0;
+    for (var i = 0; i < members.length; i++) best = Math.max(best, members[i].level || 0);
+    return best;
+  };
+
+  /** 穴の説明：絵・名前・進み具合／ひと言／区画の一覧（主の絵・状態） */
+  DungeonSelectScene.prototype._regionContent = function () {
+    var region = this.getSelectedRegion();
+    if (!region) return null;
     var t = this.theme;
-    var columns = rect.columns || 2;
-    var columnWidth = rect.columnWidth || 130;
+    var T = this.texts;
+    var unlocked = this.isRegionUnlocked(region);
+    var theme = this._regionTheme(region, unlocked);
+    var head = { name: unlocked ? region.name : (T.unknownName || "？？？"),
+                 nameColor: unlocked ? t.textColor : t.hintColor, chips: [] };
+    if (theme) head.drawPicture = this._swatchDrawer(theme);
+    else head.mark = "？";
+    var lines = [];
 
-    this.panel.drawText(label || "", x, y, { font: t.smallFont, color: t.hintColor });
-    y += lh;
-
-    for (var i = 0; i < entries.length; i++) {
-      var col = i % columns;
-      this.panel.drawText(entries[i].text, x + columnWidth * col, y,
-        { font: t.smallFont, color: entries[i].color || t.textColor });
-      if (col === columns - 1) y += lh;
+    if (!unlocked) {
+      head.chips.push({ label: T.locked || "", color: t.hintColor });
+      pushWrapped(lines, this._regionLockedHint(region), this._charsPerLine(), { dim: true });
+      return { head: head, lines: lines };
     }
-    // 最後の行が埋まりきらなかった場合も1行ぶん進める
-    if (entries.length % columns !== 0) y += lh;
-    return y;
+
+    var state = this._regionState(region, true);
+    head.chips.push({ label: state.text, color: state.color });
+    var dungeons = this._dungeonsOf(region);
+    var range = this._levelRange(dungeons);
+    if (range) {
+      head.sub = fill(range.min === range.max ? (T.recommendedLabel || "推奨Lv{level}") : (T.regionLevelRange || "推奨Lv{min}〜{max}"),
+        { level: range.min, min: range.min, max: range.max });
+    }
+
+    if (region.subtitle) pushWrapped(lines, region.subtitle, this._charsPerLine(), {});
+    if (dungeons.length === 0) {
+      lines.push({ text: "" });
+      pushWrapped(lines, T.comingSoonHint || "", this._charsPerLine(), { dim: true });
+      return { head: head, lines: lines };
+    }
+
+    var progress = NS.DungeonCatalog.regionProgress(this.game.data, region.id, this.game.clearedDungeons);
+    lines.push({ text: "" });
+    lines.push({ heading: true, text: T.sectionsLabel || "", right: fill(T.countLabel || "{n}/{total}", { n: progress.cleared, total: progress.total }),
+                 rightColor: progress.cleared >= progress.total ? t.cursorColor : t.hintColor });
+    for (var i = 0; i < dungeons.length; i++) {
+      lines.push(this._sectionLine(dungeons[i]));
+      // その下に、最深階と主の有無（開いていて準備中でない区画だけ）
+      var detail = this._sectionDetail(dungeons[i]);
+      if (detail) lines.push({ indent: 24, text: detail, dim: true });
+    }
+    return { head: head, lines: lines };
+  };
+
+  /** 推奨レベルの幅（準備中・未開放の区画は数えない）。無ければ null */
+  DungeonSelectScene.prototype._levelRange = function (dungeons) {
+    var min = 0, max = 0;
+    for (var i = 0; i < dungeons.length; i++) {
+      var d = dungeons[i];
+      if (isPreparing(d) || !this.isUnlocked(d) || !d.recommendedLevel) continue;
+      if (!min || d.recommendedLevel < min) min = d.recommendedLevel;
+      if (d.recommendedLevel > max) max = d.recommendedLevel;
+    }
+    return min ? { min: min, max: max } : null;
+  };
+
+  /** 穴の説明の区画1行：クリア済みなら主の絵、右に状態（クリア済・推奨Lv・未開放・準備中） */
+  DungeonSelectScene.prototype._sectionLine = function (dungeon) {
+    var t = this.theme;
+    var T = this.texts;
+    var open = this.isUnlocked(dungeon);
+    var cleared = this.game.isDungeonCleared(dungeon.id);
+    var line = { text: open ? dungeon.name : (T.unknownName || "？？？"),
+                 color: !open ? t.hintColor : (cleared ? t.cursorColor : t.textColor) };
+    // 絵はクリアした区画の主。主のいない区画（蔦這う回廊）は絵の場所を空けるだけ
+    var bossSpecies = cleared ? this._bossSpecies(dungeon) : null;
+    if (bossSpecies) line.sprite = bossSpecies.sprite;
+    else if (open && !dungeon.boss) line.indent = 24;
+    else line.unknownSprite = true;
+    if (cleared) { line.right = T.cleared || ""; line.rightColor = t.cursorColor; }
+    else if (!open) { line.right = T.locked || ""; line.rightColor = t.hintColor; }
+    else if (isPreparing(dungeon)) { line.right = T.comingSoon || ""; line.rightColor = t.hintColor; }
+    else if (dungeon.recommendedLevel) { line.right = this._recommendedText(dungeon); line.rightColor = this._recommendedColor(dungeon); }
+    return line;
+  };
+
+  /** 穴の説明の区画の2行目「最深 B5F ・ 主なし」。未開放・準備中は null */
+  DungeonSelectScene.prototype._sectionDetail = function (dungeon) {
+    if (!this.isUnlocked(dungeon) || isPreparing(dungeon)) return null;
+    var parts = [(this.texts.floorsLabel || "").replace("{floors}", dungeon.floors)];
+    if (!dungeon.boss) parts.push(this.texts.noBoss || "主なし");
+    return parts.join(this.texts.joiner || " ・ ");
+  };
+
+  /** その区画の主の種族（data/monsters.js）。主がいなければ null */
+  DungeonSelectScene.prototype._bossSpecies = function (dungeon) {
+    var boss = (this.game.data.bosses || {})[dungeon && dungeon.boss];
+    return boss ? ((this.game.data.monsters || {})[boss.species] || null) : null;
+  };
+
+  /** 区画の説明：絵・名前・推奨Lv・状態・最深階／説明／モンスター／手に入るもの／主 */
+  DungeonSelectScene.prototype._dungeonContent = function () {
+    var dungeon = this.getSelected();
+    if (!dungeon) return null;
+    var t = this.theme;
+    var T = this.texts;
+    var unlocked = this.isUnlocked(dungeon);
+    var preparing = isPreparing(dungeon);
+    var cleared = this.game.isDungeonCleared(dungeon.id);
+    var theme = this._themeOf(dungeon, unlocked);
+    var cpl = this._charsPerLine();
+    var head = { name: this._nameOf(dungeon, unlocked), nameColor: unlocked ? t.textColor : t.hintColor, chips: [] };
+    if (theme) head.drawPicture = this._swatchDrawer(theme);
+    else head.mark = "？";
+    var lines = [];
+
+    // 解放されていなければ、開く条件だけ
+    if (!unlocked) {
+      head.chips.push({ label: T.locked || "", color: t.hintColor });
+      var required = this._requiredNameShown(dungeon.unlockedBy);
+      pushWrapped(lines, (T.lockedHint || "").replace("{name}", required || ""), cpl, { dim: true });
+      return { head: head, lines: lines };
+    }
+    // 準備中の区画は、中身がまだ無いことだけ（階数と推奨レベルは作っている途中で変わるので出さない）
+    if (preparing) {
+      head.chips.push({ label: T.comingSoon || "", color: t.hintColor });
+      pushWrapped(lines, T.sectionComingSoonHint || T.comingSoonHint || "", cpl, { dim: true });
+      return { head: head, lines: lines };
+    }
+
+    if (dungeon.recommendedLevel) head.chips.push({ label: this._recommendedText(dungeon), color: this._recommendedColor(dungeon) });
+    if (cleared) head.chips.push({ label: T.cleared || "", color: t.cursorColor });
+    head.sub = (T.floorsLabel || "").replace("{floors}", dungeon.floors);
+
+    // 仲間の最高レベルが推奨に届いていなければ、上の欄の最深階の横に、あといくつかを添える（注意の色）
+    var best = this._bestLevel();
+    if (dungeon.recommendedLevel && best > 0 && best < dungeon.recommendedLevel) {
+      head.sub += fill(T.underLevel || "　仲間の最高Lv{best}（あと{diff}）", { best: best, diff: dungeon.recommendedLevel - best });
+      head.subColor = this.layout.underLevelColor || "#e8896a";
+    }
+
+    pushWrapped(lines, dungeon.description || "", cpl, {});
+
+    var monsters = this._monsterLines(dungeon);
+    lines.push({ text: "" });
+    lines.push({ heading: true, text: T.monstersLabel || "", right: monsters.count, rightColor: t.hintColor });
+    this._pushFolded(lines, monsters.lines, "monsters", T.moreMonsters);
+
+    var items = this._itemLines(dungeon, cleared);
+    lines.push({ text: "" });
+    lines.push({ heading: true, text: T.dropsLabel || "", right: items.count, rightColor: t.hintColor });
+    this._pushFolded(lines, items.lines, "items", T.moreItems);
+
+    // 最深階に待つ相手。クリア済みなら絵と名前とレベル
+    var boss = (this.game.data.bosses || {})[dungeon.boss];
+    if (boss) {
+      lines.push({ text: "" });
+      lines.push({ heading: true, text: T.bossLabel || "" });
+      var species = cleared ? this._bossSpecies(dungeon) : null;
+      if (cleared) {
+        lines.push({ sprite: species ? species.sprite : null, unknownSprite: !species,
+                     text: (boss.title || "") + (species ? "  " + species.name : ""), color: t.textColor,
+                     right: "Lv" + boss.level, rightColor: t.subTextColor });
+      } else {
+        lines.push({ unknownSprite: true, text: T.unknownBoss || "？？？", dim: true });
+      }
+    }
+    return { head: head, lines: lines };
   };
 
   /**
-   * 出現するモンスター（名前を属性の色で出す）。
-   * 一度も戦っていない種族は「？？？」（2026-10-27 作者の指定）。
-   * 戦ったかどうかは図鑑と同じ記録（discovery の monstersSeen。戦闘が始まった時点で付く）
+   * 先頭の previewRows 行だけ並べ、残りがあれば「▶ ほかに〇体を見る」（押すか C で開く）。
+   * 開いているときは全部並べ、最後に「▼ たたむ」。開け閉めは game.dungeonListsOpen に覚える
+   * （区画を変えても、画面を閉じても残る。セーブはしない。工房の「手に入る場所」と同じ）
    */
-  DungeonSelectScene.prototype._monsterEntries = function (dungeon) {
+  DungeonSelectScene.prototype._pushFolded = function (lines, entries, key, moreText) {
+    var t = this.theme;
+    var preview = (this.layout.detail || {}).previewRows || 2;
+    if (entries.length <= preview) { lines.push.apply(lines, entries); return; }
+    var open = !!this._openLists()[key];
+    lines.push.apply(lines, open ? entries : entries.slice(0, preview));
+    lines.push({ indent: 24, toggle: key, color: open ? t.cursorColor : t.subTextColor,
+                 text: open ? (this.texts.foldLabel || "▼ たたむ")
+                            : fill(moreText || "▶ ほかに{n}つを見る", { n: entries.length - preview }) });
+  };
+
+  DungeonSelectScene.prototype._openLists = function () {
+    if (!this.game.dungeonListsOpen) this.game.dungeonListsOpen = {};
+    return this.game.dungeonListsOpen;
+  };
+
+  DungeonSelectScene.prototype._toggleList = function (key) {
+    var open = this._openLists();
+    open[key] = !open[key];
+  };
+
+  /** C：どちらかが閉じていれば両方開く。両方開いていれば両方たたむ */
+  DungeonSelectScene.prototype._toggleAllLists = function () {
+    if (!this._hasFolded()) return;
+    var open = this._openLists();
+    var next = !(open.monsters && open.items);
+    open.monsters = next;
+    open.items = next;
+  };
+
+  /** いま選んでいる区画に、たためる一覧（先頭の2つより多い）があるか */
+  DungeonSelectScene.prototype._hasFolded = function () {
+    var dungeon = this.getSelected();
+    if (this.phase !== "dungeon" || !dungeon || !this.isUnlocked(dungeon) || isPreparing(dungeon)) return false;
+    var preview = (this.layout.detail || {}).previewRows || 2;
+    return this._monsterLines(dungeon).lines.length > preview ||
+           this._itemLines(dungeon, this.game.isDungeonCleared(dungeon.id)).lines.length > preview;
+  };
+
+  /**
+   * 出現するモンスター（1行に1体。絵と、名前を属性の色で。右に「仲間にした」）。
+   * 一度も戦っていない種族は「？」の絵と「？？？」（2026-10-27 作者の指定）。
+   * 戦ったかどうかは図鑑と同じ記録（discovery の monstersSeen。戦闘が始まった時点で付く）
+   * @returns {{ lines: object[], count: string }} count は「見た数/全部」
+   */
+  DungeonSelectScene.prototype._monsterLines = function (dungeon) {
     var data = this.game.data;
     var discovery = this.game.discovery;
+    var t = this.theme;
     var species = NS.DungeonCatalog.getSpecies(data, dungeon);
-    var entries = [];
+    var lines = [];
+    var seen = 0;
 
     for (var i = 0; i < species.length; i++) {
       if (discovery && !discovery.isMonsterSeen(species[i].id)) {
-        entries.push({ text: this.texts.unknownEntry || "？？？", color: this.theme.hintColor });
+        lines.push({ unknownSprite: true, text: this.texts.unknownEntry || "？？？", dim: true });
         continue;
       }
+      seen++;
       var element = (data.elements || {})[species[i].element];
-      entries.push({
-        text: species[i].name,
-        color: (element && element.color) || this.theme.textColor
-      });
+      var caught = discovery && discovery.isMonsterCaught && discovery.isMonsterCaught(species[i].id);
+      lines.push({ sprite: species[i].sprite, text: species[i].name,
+                   color: (element && element.color) || t.textColor,
+                   right: caught ? (this.texts.caughtMark || "") : "", rightColor: t.hintColor });
     }
-    return entries;
+    return { lines: lines, count: fill(this.texts.countLabel || "{n}/{total}", { n: seen, total: species.length }) };
   };
 
   /**
-   * 手に入るもの（名前を分類の色で出す。ボスの分はクリア後に出る）。
-   * 一度も手に入れていないものは「？？？」（2026-10-27 作者の指定）。
+   * 手に入るもの（1行に1つ。絵と、名前を分類の色で。ボスの分はクリア後に出る）。
+   * 一度も手に入れていないものは「？」と「？？？」（2026-10-27 作者の指定）。
    * 入手したかどうかは図鑑と同じ記録（discovery の itemsObtained。Game.giveItem で付く）
    */
-  DungeonSelectScene.prototype._itemEntries = function (dungeon) {
+  DungeonSelectScene.prototype._itemLines = function (dungeon, cleared) {
     var data = this.game.data;
     var discovery = this.game.discovery;
-    var cleared = this.game.isDungeonCleared(dungeon.id);
     var items = NS.DungeonCatalog.getDropItems(data, dungeon, cleared);
     var categories = (data.categories || {}).item || {};
-    var entries = [];
+    var lines = [];
+    var got = 0;
 
     for (var i = 0; i < items.length; i++) {
       if (discovery && !discovery.isItemObtained(items[i].id)) {
-        entries.push({ text: this.texts.unknownEntry || "？？？", color: this.theme.hintColor });
+        lines.push({ unknownSprite: true, text: this.texts.unknownEntry || "？？？", dim: true });
         continue;
       }
+      got++;
       var category = categories[items[i].category];
-      entries.push({
-        text: items[i].name,
-        color: (category && category.color) || this.theme.textColor
-      });
+      lines.push({ icon: items[i].icon, text: items[i].name,
+                   color: (category && category.color) || this.theme.textColor });
     }
-    if (entries.length === 0) {
-      entries.push({ text: this.texts.noDrops || "", color: this.theme.hintColor });
-    }
-    return entries;
+    if (lines.length === 0) lines.push({ text: this.texts.noDrops || "", dim: true });
+    return { lines: lines, count: fill(this.texts.countLabel || "{n}/{total}", { n: got, total: items.length }) };
   };
 
   DungeonSelectScene.prototype._renderHint = function () {
     var pos = this.layout.hint || { x: 48, y: 570 };
     var text = (this.phase === "region") ? (this.texts.regionHint || this.texts.hint)
              : (this.singleRegion ? (this.texts.hintSingle || this.texts.hint) : this.texts.hint);
-    this.panel.drawText(text || "", pos.x, pos.y,
+    // たためる一覧があれば「C: ほかも見る」、右の説明が入りきらないときだけ「Q/E: 送る」（v1.4.0）
+    var extra = (this._hasFolded() ? (this.texts.hintMore || "") : "") + (this.pane.canScroll() ? (this.texts.hintScroll || "") : "");
+    text = fill(text || "", { extra: extra });
+    this.panel.drawText(text, pos.x, pos.y,
       { font: this.theme.smallFont, color: this.theme.hintColor });
   };
 
@@ -719,6 +864,14 @@
       for (var j = 0; j < lines.length; j++) result.push(lines[j]);
     }
     return result;
+  }
+
+  /** テンプレートの {key} を置き換える */
+  function fill(template, values) {
+    if (!template) return "";
+    return template.replace(/\{(\w+)\}/g, function (match, key) {
+      return (values[key] !== undefined) ? values[key] : match;
+    });
   }
 
   /** 文字数で折り返す（等幅フォント前提の簡易処理） */

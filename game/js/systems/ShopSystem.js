@@ -110,18 +110,26 @@
     return a.listed - b.listed;
   };
 
+  /**
+   * 手に入る場所の定義。ダンジョンか、ダンジョンでない小見出し（data/categories.js の materialSource。恒常素材など）
+   */
+  ShopSystem.prototype._fromDef = function (from) {
+    if (!from) return null;
+    return (this.data.dungeons || {})[from] || (((this.data.categories || {}).materialSource) || {})[from] || null;
+  };
+
   /** 手に入る場所の並び（ダンジョンの order）。書いていなければ先頭 */
   ShopSystem.prototype._fromOrder = function (from) {
     if (!from) return -1;
-    var dungeon = (this.data.dungeons || {})[from];
-    return (dungeon && typeof dungeon.order === "number") ? dungeon.order : 999;
+    var def = this._fromDef(from);
+    return (def && typeof def.order === "number") ? def.order : 999;
   };
 
   /** 手に入る場所の名前（見出しに使う）。書いていなければ null */
   ShopSystem.prototype.getFromName = function (from) {
     if (!from) return null;
-    var dungeon = (this.data.dungeons || {})[from];
-    return (dungeon && dungeon.name) || from;
+    var def = this._fromDef(from);
+    return (def && def.name) || from;
   };
 
   ShopSystem.prototype._categoryOrder = function (item) {

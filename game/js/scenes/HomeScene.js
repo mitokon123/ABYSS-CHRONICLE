@@ -7,6 +7,10 @@
  * 選ぶと「じゅんびちゅう」と表示する。実装できたら MENU_ITEMS の
  * ready を true にして、_openFeature に処理を足すだけでよい。
  *
+ * ▼ 選んでいる項目のひと言（v1.4.0・2026-11-12）
+ *   メニューの下に2行：何ができるか（messages.home.descriptions）と、いまの様子
+ *   （次に潜る区画・作れるものの数・編成の数など。_menuInfo）。使えない項目は開く条件
+ *
  * 配置・配色は data/ui.js の home、文言は data/messages.js の home で管理する。
  */
 (function (NS) {
@@ -228,6 +232,8 @@
     this._ensureParty();
     // 戻ってくるたびに組み直す（クリアして使えるようになった項目を反映するため）
     this._buildMenu();
+    // ひと言の「いまの様子」も作り直す（作れるもの・持ち物の数は戻るたびに変わる）
+    this._infoCache = {};
 
     // 帰還時の知らせ（失ったものなど）は、開いたときに一度だけ出す
     if (this._pendingNotice) {
@@ -540,6 +546,7 @@
     this._renderHeading(ctx);
     this._renderGold();
     this.menu.render(this.game.clock);
+    this._renderMenuDescription();
     this._renderPartyStatus();
     this._renderNotice(ctx);
     // 操作説明は暗幕より上に出す（確認中の操作が読めるように）
@@ -828,6 +835,95 @@
     ctx.fillText(this.notice.getText(), pos.x, pos.y);
     ctx.restore();
   };
+
+  /** メニューの下：選んでいる項目のひと言と、いまの様子（v1.4.0） */
+  HomeScene.prototype._renderMenuDescription = function () {
+    var pos = this.layout.description;
+    var item = this.menu.getSelected ? this.menu.getSelected() : null;
+    if (!pos || !item || this.confirming) return;
+    var t = this.theme;
+    var lh = pos.lineHeight || 20;
+    var descriptions = this.texts.descriptions || {};
+    if (item.locked) {
+      this.panel.drawText(this._lockedMessage(item), pos.x, pos.y, { font: t.smallFont, color: t.hintColor });
+      return;
+    }
+    this.panel.drawText(descriptions[item.value] || "", pos.x, pos.y, { font: t.smallFont, color: t.subTextColor });
+    var info = this._menuInfo(item.value);
+    if (info) this.panel.drawText(info, pos.x, pos.y + lh, { font: t.smallFont, color: t.cursorColor });
+  };
+
+  /**
+   * いまの様子（1行）。無い項目は空。重い計算（作れるものの数など）もあるので、拠点に戻るたびに1回だけ作る
+   */
+  HomeScene.prototype._menuInfo = function (value) {
+    if (!this._infoCache) this._infoCache = {};
+    if (Object.prototype.hasOwnProperty.call(this._infoCache, value)) return this._infoCache[value];
+    var info = "";
+    try { info = this._buildMenuInfo(value); } catch (e) { info = ""; }
+    this._infoCache[value] = info;
+    return info;
+  };
+
+  HomeScene.prototype._buildMenuInfo = function (value) {
+    var game = this.game;
+    var data = game.data;
+    var T = this.texts.info || {};
+    if (value === "dungeon") {
+      // まだクリアしていない、開いている区画のうち最初のもの
+      var regions = NS.DungeonCatalog.listRegions(data);
+      for (var r = 0; r < regions.length; r++) {
+        if (!NS.DungeonCatalog.isRegionUnlocked(regions[r], game.clearedDungeons, data)) continue;
+        var list = NS.DungeonCatalog.dungeonsInRegion(data, regions[r].id);
+        for (var d = 0; d < list.length; d++) {
+          var dungeon = list[d];
+          if (dungeon.ready === false || game.clearedDungeons[dungeon.id]) continue;
+          if (!NS.DungeonCatalog.isUnlocked(dungeon, game.clearedDungeons, data)) continue;
+          return fill(dungeon.recommendedLevel ? T.nextDungeon : T.nextDungeonNoLevel,
+            { name: dungeon.name, level: dungeon.recommendedLevel });
+        }
+      }
+      return T.allCleared || "";
+    }
+    if (value === "party") {
+      var partySize = game.party ? game.party.getMembers().length : 0;
+      var max = (game.party && game.party.maxSize) || 6;
+      return fill(T.party, { n: partySize, max: max, stored: game.storage ? game.storage.size() : 0 });
+    }
+    if (value === "craft") {
+      var craft = new NS.CraftSystem(data);
+      var recipes = craft.getRecipes(game.clearedDungeons);
+      var can = 0;
+      for (var i = 0; i < recipes.length; i++) if (craft.canCraft(game, recipes[i]).ok) can++;
+      return can > 0 ? fill(T.craft, { n: can, total: recipes.length }) : fill(T.craftNone, { total: recipes.length });
+    }
+    if (value === "shop") {
+      var badges = this._menuBadges();
+      return badges.shop ? (T.shopNew || "") : "";
+    }
+    if (value === "blessing") {
+      return fill(T.blessing, { active: game.countActiveBlessings(), max: game.getBlessingActiveMax() });
+    }
+    if (value === "items") {
+      return fill(T.items, { n: game.inventory && game.inventory.slotCount ? game.inventory.slotCount() : 0 });
+    }
+    if (value === "dex") {
+      var discovery = game.discovery;
+      return discovery ? fill(T.dex, { seen: discovery.countMonstersSeen(), caught: discovery.countMonstersCaught() }) : "";
+    }
+    if (value === "save") {
+      return game.getSaveSlot ? fill(T.save, { n: game.getSaveSlot() }) : "";
+    }
+    return "";
+  };
+
+  /** テンプレートの {key} を置き換える */
+  function fill(template, values) {
+    if (!template) return "";
+    return template.replace(/\{(\w+)\}/g, function (match, key) {
+      return (values[key] !== undefined) ? values[key] : match;
+    });
+  }
 
   HomeScene.prototype._renderHint = function (ctx) {
     var pos = this.layout.hint || { x: 48, y: 570 };

@@ -8,7 +8,16 @@
  * ▼ 操作
  *   ↑↓   … 作るものを選ぶ
  *   ←→/F … 絞り込み（すべて・作れるもの・道具・武器・防具・アクセサリー。2026-11-09）
+ *   Q/E・右の上でホイール・右のバー … 右の説明を送る（入りきらないときだけ。v1.4.0）
+ *   C・「▶ 手に入る場所」を押す … 足りない素材の手に入る場所を開く／閉じる（v1.4.0）
  *   決定   … 「作りますか?」のはい／いいえへ
+ *
+ * ▼ 右の説明（v1.4.0）
+ *   上の欄（絵・名前・分類の札・所持数）は動かさず、その下の行だけを送る。
+ *   行は 説明 → 効果（装備） → 必要な素材 → 費用。足りない素材の下には「▶ 手に入る場所」の行があり、
+ *   開くと図鑑のアイテムのページと同じ中身を並べる（DexScene.itemSources。伏せ方も同じ）。
+ *   はじめは閉じている（作者 2026-11-12「任意でプレイヤーが開けるように」）。
+ *   開いた素材は game.craftOpenSources に覚え、工房を閉じても残る（セーブはしない。絞り込みと同じ）
  *   Esc    … 1つ前へ戻る（一覧なら拠点へ）
  */
 (function (NS) {
@@ -40,6 +49,10 @@
 
     this.phase = "list";   // "list" | "confirm"
     this.notice = new NS.Notice(this.theme.notice);
+    // 右の説明欄（共通の部品 NS.DetailPane。js/ui/Panel.js）
+    this.pane = new NS.DetailPane(this.panel, this.sprites, this.layout.detail || { x: 0, y: 0, w: 0, h: 0 });
+    this._detailRecipe = null;  // 右に出しているレシピ（変わったら作り直す）
+    this._detailCache = null;   // 右の中身（一覧を作り直したら作り直す）
 
     this._rebuildList();
   }
@@ -122,6 +135,8 @@
       }
     }
     this.list.setRows(rows);
+    // 作ったあとは素材の数が変わるので、右の中身も作り直す
+    this._detailCache = null;
   };
 
   // --- 絞り込み（2026-11-09 作者の依頼） ---
@@ -203,6 +218,19 @@
     if (input.isPressed("filter") || input.isPressed("right")) { this._changeFilter(1); return; }
     if (input.isPressed("left")) { this._changeFilter(-1); return; }
     if (this._clickedFilterLabel(input)) { this._changeFilter(1); return; }
+
+    // 右の説明欄：バー・ホイール・押せる行（「▶ 手に入る場所」）。バーを触っている間はほかの操作を見ない
+    this._detailContent();
+    var paneResult = this.pane.handleInput(input);
+    if (paneResult && paneResult.bar) return;
+    if (paneResult && paneResult.toggle) { this._toggleSource(paneResult.toggle); return; }
+
+    // 手に入る場所を開く／閉じる：C（いまのレシピの足りない素材をまとめて）
+    if (input.isPressed("menu")) { this._toggleAllSources(); return; }
+
+    // 右の説明を送る：Q/E（v1.4.0）
+    if (input.isPressed("prevTab")) this.pane.scrollBy(-this.pane.keyRows());
+    if (input.isPressed("nextTab")) this.pane.scrollBy(this.pane.keyRows());
 
     // ScrollList が扱うのは上下移動だけ。決定・取消はここで見る
     this.list.handleInput(input);
@@ -334,87 +362,152 @@
     this.panel.drawText(text, x, pos.y, { font: t.smallFont, color: t.cursorColor });
   };
 
-  /**
-   * 右側：必要な素材と、できるものの説明。
-   * 足りていない素材は色を変えて、ひと目で分かるようにする。
-   */
-  CraftScene.prototype._renderDetail = function () {
-    var rect = this.layout.detail;
-    if (!rect) return;
+  // --- 右の説明（v1.4.0） ---
 
-    this.panel.drawBox(rect);
-
+  /** 選んでいるレシピの説明。{ head, lines }。レシピが変わったら送りを先頭に戻す */
+  CraftScene.prototype._detailContent = function () {
     var recipe = this._selectedRecipe();
-    if (!recipe) {
-      // 絞り込んで何も残らなかったときは、そう書く（「まだ作れるものがない」と区別する）
-      var emptyText = (this._currentFilter() !== "all" && this.texts.emptyFiltered) || this.texts.empty || "";
-      this.panel.drawText(emptyText, rect.x + (this.theme.padding || 8),
-        rect.y + 30, { font: this.theme.smallFont, color: this.theme.hintColor });
-      return;
+    if (recipe !== this._detailRecipe) {
+      this._detailRecipe = recipe;
+      this._detailCache = null;
     }
+    if (recipe && !this._detailCache) this._detailCache = this._buildDetail(recipe);
+    var content = recipe ? this._detailCache : null;
+    this.pane.setContent(content, recipe);
+    return content;
+  };
 
+  /**
+   * 右の中身を作る。行の形は図鑑の右のページと同じ
+   * （{ text, heading, dim, icon, sprite, unknownSprite, right, rightColor, indent }）
+   */
+  CraftScene.prototype._buildDetail = function (recipe) {
+    var game = this.game;
+    var data = game.data;
     var t = this.theme;
-    var origin = this.panel.innerOrigin(rect);
-    var lh = t.lineHeight || 18;
-    var y = origin.y + 20;
+    var texts = this.texts;
+    var rect = this.layout.detail || {};
+    var red = t.hpBarLow || "#e8542a";
+    var item = data.getItem(recipe.result.item) || {};
+    var count = recipe.result.count || 1;
+    var lines = [];
     var i;
 
-    var item = this.game.data.getItem(recipe.result.item);
-    var count = recipe.result.count || 1;
+    // 上の欄
+    var category = ((data.categories || {}).item || {})[item.category] || { name: item.category || "" };
+    var chipLabel = category.name + (item.equip ? "・" + NS.EffectSystem.slotName(item, data) : "");
+    var owned = game.inventory ? game.inventory.getCount(item.id) : 0;
+    var head = {
+      icon: item.icon,
+      name: (item.name || "") + (count > 1 ? (" ×" + count) : ""),
+      chips: chipLabel ? [{ label: chipLabel, color: category.color }] : [],
+      sub: fill(texts.ownedLabel || "所持 {count}", { count: owned })
+    };
 
-    // 左上に絵を大きく出し、名前はその右に並べる
-    var indent = NS.StatusMarks.drawItemIcon(this.sprites, item, origin.x, origin.y + 4, t);
-    this.panel.drawText(item.name + (count > 1 ? (" ×" + count) : ""), origin.x + indent, y);
-    y += lh + 6;
-    if (indent > 0) y = Math.max(y, origin.y + 4 + NS.StatusMarks.itemIconSize(t) + 16);
+    // できるものの説明
+    var desc = wrapText(item.description || "", rect.charsPerLine || 26);
+    for (i = 0; i < desc.length; i++) lines.push({ text: desc[i] });
 
-    // 必要な素材
-    this.panel.drawText(this.texts.materialLabel || "", origin.x, y,
-      { font: t.smallFont, color: t.cursorColor });
-    y += lh;
+    // 装備なら効果も
+    if (item.equip) {
+      lines.push({});
+      lines.push({ text: texts.effectLabel || "", heading: true });
+      var effects = item.equip.effects || [];
+      for (i = 0; i < effects.length; i++) lines.push({ text: "・" + this._describeEffect(effects[i]) });
+    }
 
-    var status = this.craftSystem.getMaterialStatus(this.game, recipe);
+    // 必要な素材。足りないものは数を赤くし、その下に手に入る場所を並べる
+    lines.push({});
+    lines.push({ text: texts.materialLabel || "", heading: true });
+    var status = this.craftSystem.getMaterialStatus(game, recipe);
     for (i = 0; i < status.length; i++) {
-      var line = "・" + status[i].item.name + "  " + status[i].owned + "/" + status[i].need;
-      this.panel.drawText(line, origin.x, y,
-        { font: t.smallFont, color: status[i].enough ? t.subTextColor : (t.hpBarLow || "#e8542a") });
-      y += lh;
+      var material = status[i].item || {};
+      lines.push({ icon: material.icon, text: material.name || "",
+                   right: status[i].owned + "/" + status[i].need,
+                   rightColor: status[i].enough ? null : red,
+                   toggle: status[i].enough ? null : material.id });
+      if (status[i].enough) continue;
+
+      // 「▶ 手に入る場所」。押す（か C）と開く
+      var open = !!this._openSources()[material.id];
+      lines.push({ indent: 22, text: (open ? "▼ " : "▶ ") + (texts.sourcesLabel || ""),
+                   color: open ? t.cursorColor : t.subTextColor, toggle: material.id });
+      if (!open) continue;
+      var sources = (NS.DexScene && NS.DexScene.itemSources) ? NS.DexScene.itemSources(game, material.id, { reveal: true }) : [];
+      if (sources.length === 0) lines.push({ indent: 22, text: texts.sourceNone || "", dim: true });
+      for (var k = 0; k < sources.length; k++) {
+        var line = {};
+        for (var key in sources[k]) {
+          if (Object.prototype.hasOwnProperty.call(sources[k], key)) line[key] = sources[k][key];
+        }
+        line.indent = (line.indent || 0) + 22;
+        lines.push(line);
+      }
     }
 
     // 費用（無料のレシピでは行そのものを出さない）
     var gold = recipe.gold || 0;
     if (gold > 0) {
-      y += 4;
-      this.panel.drawText(this.texts.costLabel || "", origin.x, y, { font: t.smallFont });
-      this.panel.drawText(gold + "G", rect.x + rect.w - (t.padding || 8), y,
-        { align: "right", font: t.smallFont,
-          color: this.game.canAfford(gold) ? t.subTextColor : (t.hpBarLow || "#e8542a") });
-      y += lh;
-    }
-    y += 8;
-
-    // できるものの説明
-    var lines = wrapText(item.description || "", rect.charsPerLine || 18);
-    for (i = 0; i < lines.length; i++) {
-      this.panel.drawText(lines[i], origin.x, y, { font: t.smallFont, color: t.subTextColor });
-      y += lh;
+      lines.push({ text: texts.costLabel || "", right: gold + "G",
+                   rightColor: game.canAfford(gold) ? null : red });
     }
 
-    // 装備なら枠と効果も出す
-    if (!item.equip) return;
+    return { head: head, lines: lines };
+  };
 
-    y += 6;
-    this.panel.drawText((this.texts.effectLabel || "")
-        + "（" + NS.EffectSystem.slotName(item, this.game.data) + "）",
-      origin.x, y, { font: t.smallFont, color: t.cursorColor });
-    y += lh;
+  /** 右の説明がどこまで送れるか（0 なら入りきっている） */
+  CraftScene.prototype._maxDetailScroll = function () {
+    if (!this.layout.detail) return 0;
+    this._detailContent();
+    return this.pane.maxScroll();
+  };
 
-    var effects = item.equip.effects || [];
-    for (var k = 0; k < effects.length; k++) {
-      this.panel.drawText("・" + this._describeEffect(effects[k]), origin.x, y,
-        { font: t.smallFont, color: t.subTextColor });
-      y += lh;
+  CraftScene.prototype._renderDetail = function () {
+    if (!this.layout.detail) return;
+    this._detailContent();
+    // 絞り込んで何も残らなかったときは、そう書く（「まだ作れるものがない」と区別する）
+    var emptyText = (this._currentFilter() !== "all" && this.texts.emptyFiltered) || this.texts.empty || "";
+    this.pane.render(emptyText);
+  };
+
+  // --- 手に入る場所を開く／閉じる（v1.4.0） ---
+
+  /** 開いている素材 { 素材のid: true }。工房を閉じても覚えておく（セーブはしない） */
+  CraftScene.prototype._openSources = function () {
+    if (!this.game.craftOpenSources) this.game.craftOpenSources = {};
+    return this.game.craftOpenSources;
+  };
+
+  CraftScene.prototype._toggleSource = function (materialId) {
+    var opened = this._openSources();
+    if (opened[materialId]) delete opened[materialId];
+    else opened[materialId] = true;
+    this._detailCache = null;
+  };
+
+  /** いまのレシピの足りない素材を、1つでも閉じていればぜんぶ開く。ぜんぶ開いていればぜんぶ閉じる */
+  CraftScene.prototype._toggleAllSources = function () {
+    var recipe = this._selectedRecipe();
+    if (!recipe) return;
+    var missing = this.craftSystem.getMaterialStatus(this.game, recipe)
+      .filter(function (st) { return !st.enough; })
+      .map(function (st) { return st.item.id; });
+    if (missing.length === 0) return;
+
+    var opened = this._openSources();
+    var allOpen = missing.every(function (id) { return opened[id]; });
+    for (var i = 0; i < missing.length; i++) {
+      if (allOpen) delete opened[missing[i]];
+      else opened[missing[i]] = true;
     }
+    this._detailCache = null;
+  };
+
+  /** いまのレシピに足りない素材があるか（下の案内に「C: 手に入る場所」を出すか） */
+  CraftScene.prototype._hasMissing = function () {
+    var recipe = this._selectedRecipe();
+    if (!recipe) return false;
+    return this.craftSystem.getMaterialStatus(this.game, recipe).some(function (st) { return !st.enough; });
   };
 
   /** 装備の効果1つを文章にする（組み立ては EffectSystem に任せる） */
@@ -436,7 +529,15 @@
 
   CraftScene.prototype._renderHint = function () {
     var pos = this.layout.hint || { x: 48, y: 570 };
-    var hint = (this.phase === "confirm") ? this.texts.hintConfirm : this.texts.hint;
+    var texts = this.texts;
+    var hint;
+    if (this.phase === "confirm") hint = texts.hintConfirm;
+    else {
+      // 足りない素材があれば「C: 手に入る場所」、入りきらなければ「Q/E: 送る」を足す
+      var extra = (this._hasMissing() ? (texts.hintSources || "") : "")
+                + (this._maxDetailScroll() > 0 ? (texts.hintScroll || "") : "");
+      hint = fill(texts.hint || "", { extra: extra });
+    }
 
     this.panel.drawText(hint || "", pos.x, pos.y,
       { font: this.theme.smallFont, color: this.theme.hintColor });

@@ -24,6 +24,11 @@
  *   上書きも読み込みも取り返しがつかないため。
  *   既定は「いいえ」に置いてある（誤って決定を連打しても消えない）。
  *
+ * ▼ 見た目（v1.4.0・2026-11-12）
+ *   1行目 … スロットの絵・番号・主人公の名前　　　　　　右にプレイ時間
+ *   2行目 … 連れている仲間の絵（最大6体）・先頭の名前とLv　右に場所（中断中は黄色）
+ *   3行目 … 所持金・クリアした区画「クリア 5/7」と進み具合の棒　右に保存した日時
+ *
  * 配置は data/ui.js の saveSlot、文言は data/messages.js の saveSlot。
  */
 (function (NS) {
@@ -745,9 +750,14 @@
     }
     var labelX = x + (icon.size ? icon.size + 10 : 0);
 
-    this.panel.drawText(
-      (this.texts.slotLabel || "スロット{n}").replace("{n}", slot.slot),
-      labelX, y, { color: nameColor });
+    var slotLabel = (this.texts.slotLabel || "スロット{n}").replace("{n}", slot.slot);
+    this.panel.drawText(slotLabel, labelX, y, { color: nameColor });
+    // 番号の横に主人公の名前（決めていない古いセーブでは出ない）
+    if (slot.exists && !slot.broken && slot.playerName) {
+      this.panel.ctx.font = t.font || "14px monospace";
+      this.panel.drawText(slot.playerName, labelX + this.panel.ctx.measureText(slotLabel).width + 16, y,
+        { color: selectable ? t.textColor : t.hintColor });
+    }
 
     // 名前と同じ行の右端に、そのファイルの合計プレイ時間
     if (slot.exists && !slot.broken) {
@@ -776,16 +786,28 @@
       return;
     }
 
-    var line1 = (this.texts.party || "{name} Lv{level}  ほか{rest}体")
+    // 2行目：連れている仲間の絵を並べ、続けて先頭の名前とLv（v1.4.0）
+    var spriteSize = L.memberSize || 22;
+    var mx = labelX;
+    var members = (slot.members || []).slice(0, 6);
+    var ctx2 = this.panel.ctx;
+    for (var mi = 0; mi < members.length; mi++) {
+      var sp = this.game.data.getMonsterData ? this.game.data.getMonsterData(members[mi].speciesId) : null;
+      if (sp && sp.sprite) {
+        if (!selectable) { ctx2.save(); ctx2.globalAlpha = 0.45; }
+        this.sprites.draw(firstFrame(sp.sprite), mx, y + lh - spriteSize + 5, spriteSize, spriteSize);
+        if (!selectable) ctx2.restore();
+      }
+      mx += spriteSize + 3;
+    }
+    var line1 = (this.texts.party || "{name} Lv{level}")
       .replace("{name}", slot.leadName)
       .replace("{level}", slot.level)
       .replace("{rest}", Math.max(0, slot.partyCount - 1));
+    this.panel.drawText(line1, mx + (members.length ? 8 : 0), y + lh, { font: t.smallFont, color: bodyColor });
 
-    var line2 = (this.texts.status || "{gold}G   クリア {cleared}")
-      .replace("{gold}", slot.gold)
-      .replace("{cleared}", slot.cleared);
-
-    this.panel.drawText(line1, labelX, y + lh, { font: t.smallFont, color: bodyColor });
+    // 3行目：所持金。クリアした区画の数は出さない（作者の指定 2026-11-13）
+    var line2 = (this.texts.status || "{gold}G").replace("{gold}", slot.gold);
     this.panel.drawText(line2, labelX, y + lh * 2, { font: t.smallFont, color: bodyColor });
 
     // 右端：どこで保存したか・いつ保存したか。
@@ -809,6 +831,11 @@
     this.panel.drawText(formatDate(slot.savedAt), right, y + lh * 2,
       { align: "right", font: t.smallFont, color: t.hintColor });
   };
+
+  /** 絵が何枚かの組（動く絵）なら最初の1枚 */
+  function firstFrame(sprite) {
+    return (Object.prototype.toString.call(sprite) === "[object Array]") ? sprite[0] : sprite;
+  }
 
   /** 「はい / いいえ」。上書きになる場合は、そう分かる文にする */
   SaveSlotScene.prototype._renderConfirm = function (ctx) {

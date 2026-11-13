@@ -16,6 +16,11 @@
  *   バージョン表記の隣に書のアイコンを置き、そこから開く。
  *   押せることが分かるよう、カーソルを乗せると明るくなる。
  *
+ * ▼ v1.4.0（2026-11-13・作者が見本の案 A「深淵の光」を選んだ）
+ *   穴の底から光の筋が上がる（_renderLightShaft）・世界名の両脇に飾り線（_renderOrnament）・
+ *   メニューは枠をなくし、選んでいる項目が光って両脇に◆（_renderMenu）・その下に前回遊んだファイルの1行。
+ *   前回の1行に、クリアした区画の数は出さない（作者の指定）。
+ *
  * 配置・配色は data/ui.js の title、文言は data/messages.js の title で管理する。
  * ゲーム名と世界名は data/config.js から取得する。
  */
@@ -80,11 +85,29 @@
     this.game.audio.playBgm("title");
     // 中断の有無は探索から戻るたびに変わるので、開くたびに組み直す
     this._buildMenu();
+    this._lastPlayed = this._findLastPlayed();
 
     if (this._introPlayed) return;
     this._introPlayed = true;
     this.elapsed = 0;
     this._introTimer = (this.layout.intro || {}).duration || 0;
+  };
+
+
+  /**
+   * 前回遊んだファイル（保存した日時がいちばん新しいもの）。無ければ null。
+   * 開くたびに読み直す（探索から戻ると変わっている）
+   */
+  TitleScene.prototype._findLastPlayed = function () {
+    var list;
+    try { list = this.saveManager.peekAll(); } catch (e) { return null; }
+    var best = null;
+    for (var i = 0; i < list.length; i++) {
+      var s = list[i];
+      if (!s.exists || s.broken || !s.savedAt) continue;
+      if (!best || String(s.savedAt) > String(best.savedAt)) best = s;
+    }
+    return best;
   };
 
   /** 明転の進み具合（0=まだ真っ暗 〜 1=終わり） */
@@ -167,6 +190,7 @@
 
     this._renderBackground(ctx, w, h);
     this._renderAbyss(ctx);
+    this._renderLightShaft(ctx, w, h);
 
     for (var i = 0; i < this.particleLayers.length; i++) {
       this.particleLayers[i].render(ctx);
@@ -174,7 +198,9 @@
 
     this._renderVignette(ctx, w, h);
     this._renderLogo(ctx);
-    this.menu.render(this.game.clock);
+    this._renderOrnament(ctx);
+    if ((this.layout.menu || {}).style === "plain") this._renderMenu(ctx);
+    else this.menu.render(this.game.clock);
 
     this._renderNotice(ctx);
     this._renderFooter(ctx, w, h);
@@ -267,6 +293,117 @@
       ctx.arc(a.centerX, a.centerY, radius, 0, Math.PI * 2);
       ctx.stroke();
     }
+    ctx.restore();
+  };
+
+  /**
+   * 穴の底から上がる光（v1.4.0 案A）。下の真ん中のぼんやりした明かりと、扇に広がる細い光の筋。
+   * 筋はゆっくり揺れる。足し合わせ（lighter）で重ねるので、粒子が通ると少し明るく見える
+   */
+  TitleScene.prototype._renderLightShaft = function (ctx, w, h) {
+    var S = this.layout.lightShaft;
+    if (!S) return;
+    var progress = this._introProgress();
+
+    ctx.save();
+    ctx.globalAlpha = progress;
+    var glow = ctx.createRadialGradient(S.x, S.y, 20, S.x, S.y, S.glowRadius || 420);
+    glow.addColorStop(0, S.glowColor || "rgba(110,150,255,0.3)");
+    glow.addColorStop(1, "rgba(110,150,255,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.globalCompositeOperation = "lighter";
+    ctx.fillStyle = S.rayColor || "#7fa4ff";
+    var len = S.rayLength || 700, half = S.rayHalfWidth || 0.03;
+    for (var i = 0; i < (S.rays || 0); i++) {
+      var a = (S.rayStart || -0.55) + i * (S.rayStep || 0.18) +
+        Math.sin(this.elapsed * (S.swaySpeed || 0.0004) + i) * (S.swayAmount || 0.03);
+      ctx.globalAlpha = progress * ((S.rayAlpha || 0.022) + (i % 3) * (S.rayAlphaStep || 0.012));
+      ctx.beginPath();
+      ctx.moveTo(S.x, S.y);
+      ctx.lineTo(S.x + Math.sin(a - half) * len, S.y - Math.cos(a - half) * len);
+      ctx.lineTo(S.x + Math.sin(a + half) * len, S.y - Math.cos(a + half) * len);
+      ctx.fill();
+    }
+    ctx.restore();
+  };
+
+  /** 世界名の両脇の飾り線（外の端に小さなひし形） */
+  TitleScene.prototype._renderOrnament = function (ctx) {
+    var O = this.layout.ornament, world = this.layout.world || {};
+    if (!O) return;
+    var config = this.game.data.config || {};
+    ctx.save();
+    ctx.font = world.font || "14px monospace";
+    var half = ctx.measureText("- " + (config.worldName || "") + " -").width / 2 + (O.gap || 16);
+    var len = O.length || 80, d = O.diamond || 4, y = O.y;
+    ctx.globalAlpha = this._introProgress();
+    ctx.strokeStyle = O.lineColor || "#4a6ba8";
+    ctx.fillStyle = O.diamondColor || "#8fb0ff";
+    ctx.lineWidth = 1;
+    [-1, 1].forEach(function (side) {
+      var inner = world.x + side * half, outer = inner + side * len;
+      ctx.beginPath();
+      ctx.moveTo(inner, y);
+      ctx.lineTo(outer, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(outer, y - d);
+      ctx.lineTo(outer + side * d, y);
+      ctx.lineTo(outer, y + d);
+      ctx.lineTo(outer - side * d, y);
+      ctx.fill();
+    });
+    ctx.restore();
+  };
+
+  /**
+   * 枠のないメニュー（layout.menu.style "plain"）。選んでいる項目は大きく光り、両脇に◆。
+   * 当たり判定は CommandMenu のまま（_itemRect の行に、文字を真ん中そろえで置く）。
+   * その下に前回遊んだファイルの1行
+   */
+  TitleScene.prototype._renderMenu = function (ctx) {
+    var M = this.layout.menu, t = this.theme;
+    var items = this.menu.items;
+    var cx = M.x + M.w / 2;
+    var pulse = 0.75 + 0.25 * Math.sin((this.game.clock || 0) * 0.004);
+    var bottom = M.y;
+    for (var i = 0; i < items.length; i++) {
+      var r = this.menu._itemRect(i);
+      var y = r.y + r.h / 2 + 6;
+      var on = (i === this.menu.index);
+      bottom = r.y + r.h;
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = on ? (M.selectedFont || "20px monospace") : (M.font || "17px monospace");
+      ctx.fillStyle = on ? (M.selectedColor || "#ffe9a8") : (M.color || "#8d9bc4");
+      if (on) { ctx.shadowColor = M.glowColor || t.cursorColor; ctx.shadowBlur = (M.glowBlur || 14) * pulse; }
+      ctx.fillText(items[i].label, cx, y);
+      if (on) {
+        var mark = (ctx.measureText(items[i].label).width / 2) + (M.markGap || 22);
+        ctx.shadowBlur = 0;
+        ctx.font = "12px monospace";
+        ctx.fillStyle = M.markColor || t.cursorColor || "#ffd75e";
+        ctx.fillText("◆", cx - mark, y - 3);
+        ctx.fillText("◆", cx + mark, y - 3);
+      }
+      ctx.restore();
+    }
+
+    var last = this._lastPlayed, L = this.layout.lastPlayed;
+    if (!last || !L) return;
+    var playTime = NS.SaveSlotScene.prototype._playTimeText.call(
+      { texts: (this.game.data.messages || {}).saveSlot || {} }, last.playTime);
+    var text = (this.texts.lastPlayed || "前回：スロット{slot}  {name}  ・  {time}")
+      .replace("{slot}", last.slot)
+      .replace("{name}", last.playerName || last.leadName || "")
+      .replace("{time}", playTime);
+    ctx.save();
+    ctx.font = L.font || t.smallFont || "12px monospace";
+    ctx.fillStyle = L.color || t.subTextColor;
+    ctx.textAlign = "center";
+    ctx.fillText(text, cx, bottom + (L.gapBelow || 26));
     ctx.restore();
   };
 

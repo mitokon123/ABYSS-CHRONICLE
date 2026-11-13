@@ -21,7 +21,13 @@
     this.gainedGold = 0;      // そのランで得たゴールド（全滅しても失わない）
     this.blessings = [];      // 階を降りるたびに選んだ加護（data/blessings.js の定義）
     this.deepestFloor = 1;    // いちばん深く潜った階
+    this.startLevels = [];    // 始めたときの仲間とレベル [{ monster, level }]（結果画面で「Lv20 → Lv23」。v1.4.0）
   }
+
+  /** 始めたときの仲間とレベルを覚える（Game.beginRun から） */
+  RunSession.prototype.recordStartParty = function (members) {
+    this.startLevels = (members || []).map(function (m) { return { monster: m, level: m.level }; });
+  };
 
   /** そのランで得たゴールドを記録する */
   RunSession.prototype.recordGold = function (amount) {
@@ -44,7 +50,9 @@
       floor: this.deepestFloor,
       gold: this.gainedGold,
       items: this.getGainedItems(),
-      monsters: this.gainedMonsters.slice()
+      monsters: this.gainedMonsters.slice(),
+      blessings: this.blessings.slice(),
+      startLevels: this.startLevels.slice()
     };
   };
 

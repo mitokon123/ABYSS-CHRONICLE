@@ -1291,13 +1291,14 @@
     /**
      * 陽だまりの結晶・そよ風の結晶（2026-11-10 作者の案）。光・風の耐性の装備の材料。
      * 毒沼をクリアすると店に並ぶ（店でしか手に入らない。落とすモンスター・宝箱は無い）。
-     * from は店に並ぶ区画にそろえて毒沼（店と図鑑で、毒沼の素材の見出しの下に出る）
+     * from は "staple"（恒常素材。2026-11-12 作者の指定）。店と図鑑で「恒常素材」の見出しの下に出る。
+     * 見出しの名前と並びは data/categories.js の materialSource
      */
     sunCrystal: {
       id: "sunCrystal",
       name: "陽だまりの結晶",
       icon: "iconItemSunCrystal",
-      from: "venomMarsh",
+      from: "staple",
       category: "material",
       description: "日向の温もりが残った結晶。",
       maxStack: 99,
@@ -1309,7 +1310,7 @@
       id: "breezeCrystal",
       name: "そよ風の結晶",
       icon: "iconItemBreezeCrystal",
-      from: "venomMarsh",
+      from: "staple",
       category: "material",
       description: "握るとひんやりと風が通る。",
       maxStack: 99,

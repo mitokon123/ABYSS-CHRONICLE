@@ -72,6 +72,21 @@
   };
 
   /** 画面に出す技の属性の名前。2つあれば「火・地」（skills.js の element2）。無属性でも "無"。分からなければ null */
+  /**
+   * 技の属性を1つずつ（v1.4.0）。烈火崩地斬なら [火, 地]。混合属性を「火・地」とまとめず、
+   * 属性ごとの色と絵で分けて出すときに使う（図鑑・戦闘の技の欄・様子を見る）
+   * @returns {object[]} data/elements.js の定義（無属性も含む。無い技は []）
+   */
+  GameData.prototype.getSkillElements = function (skill) {
+    var result = [];
+    if (!skill) return result;
+    var first = this.elements[skill.element];
+    if (first) result.push(first);
+    var second = skill.element2 ? this.elements[skill.element2] : null;
+    if (second) result.push(second);
+    return result;
+  };
+
   GameData.prototype.getSkillElementName = function (skill) {
     var first = skill ? this.elements[skill.element] : null;
     if (!first) return null;

@@ -11,6 +11,7 @@
  *   default  : 初期値
  *   unit     : 表示につける単位（省略可）
  *   valueLabels : 値ごとの表示名（min の値から順に対応）。指定すると数値の代わりに表示する
+ *   description : 選んでいるとき、一覧の下の欄に出す説明（v1.4.0）
  *
  * ★ 設定項目を増やすときは items に1エントリ足すだけでよい。
  *   （音量は音声システムの実装後に実際の再生音量へつながる）
@@ -27,7 +28,8 @@
        * ★ 数値ではないので、横棒ではなく「いまの中身」が右に出る。
        *   開く先を増やすときは、SettingsScene._activate に1行 case を足す。
        */
-      { id: "playerLook", label: "名前と見た目", type: "action", action: "playerSetup" },
+      { id: "playerLook", label: "名前と見た目", type: "action", action: "playerSetup",
+        description: "主人公の名前・髪型・髪の色・服などを変える。決定か、行を押すと開く。" },
 
       // 戦闘の演出の速さ。1が最も遅く、8が最速。
       // 実際の倍率は data/ui.js の battle.animation.speedTable で決まる。
@@ -36,7 +38,8 @@
       { id: "battleSpeed", label: "戦闘速度", type: "range",
         min: 1, max: 8, step: 1, default: 4,
         valueLabels: ["最も遅い", "遅い", "やや遅い", "標準",
-                      "やや速い", "速い", "とても速い", "最速"] },
+                      "やや速い", "速い", "とても速い", "最速"],
+        description: "戦闘の演出と、文が進む速さ。「標準」は文を読み切れる速さ。" },
 
       // 技の演出と、画面の揺れ・発光の濃さ。
       // 実際の倍率は data/ui.js の battle.animation.effectScale で決まる。
@@ -44,13 +47,15 @@
       // 光の点滅が苦手な人でも遊べる。
       { id: "effectLevel", label: "エフェクトの濃さ", type: "range",
         min: 0, max: 3, step: 1, default: 2,
-        valueLabels: ["全くなし", "薄め", "標準", "濃いめ"] },
+        valueLabels: ["全くなし", "薄め", "標準", "濃いめ"],
+        description: "技の演出・画面の揺れ・光の強さ。「全くなし」にすると演出を出さない（光の点滅が苦手なとき）。" },
 
       // マウスのホイールを1段回したときに動く行数。
       // 一覧の選択にも、図鑑の説明のスクロールにも同じだけ効く。
       { id: "scrollSpeed", label: "スクロール速度", type: "range",
         min: 1, max: 5, step: 1, default: 1,
-        valueLabels: ["1行ずつ", "2行ずつ", "3行ずつ", "4行ずつ", "5行ずつ"] },
+        valueLabels: ["1行ずつ", "2行ずつ", "3行ずつ", "4行ずつ", "5行ずつ"],
+        description: "マウスのホイールを1段回したときに動く行数。一覧にも、右の説明にも効く。" },
 
       // 初めての場面で出る説明を出すか。
       //   ふきだしの Esc を押すと、ここが「出さない」に変わる。
@@ -58,14 +63,18 @@
       //   ★ 0/1 の2択なので range のまま作れる。専用の型は要らない
       { id: "tutorial", label: "チュートリアル", type: "range",
         min: 0, max: 1, step: 1, default: 1,
-        valueLabels: ["出さない", "出す"] },
+        valueLabels: ["出さない", "出す"],
+        description: "初めての場面で出る説明。「出す」に戻すと、まだ見ていない説明がまた出る。" },
 
       { id: "masterVolume", label: "全体音量", type: "range",
-        min: 0, max: 100, step: 10, default: 70, unit: "%" },
+        min: 0, max: 100, step: 10, default: 70, unit: "%",
+        description: "音ぜんぶの大きさ。BGM と効果音の音量に、さらに掛かる。" },
       { id: "bgmVolume",    label: "BGM音量",  type: "range",
-        min: 0, max: 100, step: 10, default: 70, unit: "%" },
+        min: 0, max: 100, step: 10, default: 70, unit: "%",
+        description: "曲の大きさ。変えるとすぐ聞こえる。" },
       { id: "seVolume",     label: "効果音量", type: "range",
-        min: 0, max: 100, step: 10, default: 80, unit: "%" }
+        min: 0, max: 100, step: 10, default: 80, unit: "%",
+        description: "効果音の大きさ。←→ を押したときの音で、その場で確かめられる。" }
     ]
   };
 })(window.MyGame);

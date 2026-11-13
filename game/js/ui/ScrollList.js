@@ -3,7 +3,7 @@
  * 縦に長い一覧を、枠の中でスクロールさせて表示するUI部品。
  *
  * 中身は「行の配列」で渡す。行は次の2種類。
- *   { type:"header", label }            … 分類の見出し（選択できない）
+ *   { type:"header", label, right? }    … 分類の見出し（選択できない。right は右端の補助表示）
  *   { type:"entry",  label, value, ... } … 選択できる項目
  *
  * entry には right（右端の補助表示）と rightColor（その色）を付けられる。
@@ -458,6 +458,11 @@
       if (row.type === "header") {
         this.panel.drawText(row.label, origin.x, y,
           { font: t.smallFont, color: row.color || t.subTextColor });
+        // 見出しにも右端の補助表示を付けられる（加護を選ぶの「3/5」。v1.4.0）
+        if (row.right) {
+          this.panel.drawText(row.right, textRight, y,
+            { align: "right", font: t.smallFont, color: row.rightColor || row.color || t.subTextColor });
+        }
         continue;
       }
 
@@ -467,9 +472,15 @@
       // 右端の補助表示があるときは、名前がそこへ重ならないよう「…」で縮める
       // （仲間の名前は8文字まで付けられ、HPは4桁まであるため）
       var label = row.label;
-      if (row.right) {
+      var markWidth = 0;
+      if (row.mark) {
+        // 右の文字のさらに左の小さな印（戦闘の技の一覧の「◎」。v1.4.0）
         ctx.font = t.smallFont || t.font || "14px monospace";
-        var rightWidth = ctx.measureText(row.right).width;
+        markWidth = ctx.measureText(row.mark).width + 8;
+      }
+      if (row.right || row.mark) {
+        ctx.font = t.smallFont || t.font || "14px monospace";
+        var rightWidth = (row.right ? ctx.measureText(row.right).width : 0) + markWidth;
         ctx.font = t.font || "14px monospace";
         label = clipToWidth(ctx, label, textRight - rightWidth - 10 - labelX);
       }
@@ -482,6 +493,12 @@
         var rightColor = selected ? t.cursorColor : (row.rightColor || t.subTextColor);
         this.panel.drawText(row.right, textRight, y,
           { align: "right", font: t.smallFont, color: rightColor });
+      }
+      if (row.mark) {
+        ctx.font = t.smallFont || t.font || "14px monospace";
+        var markRight = textRight - (row.right ? ctx.measureText(row.right).width + 8 : 0);
+        this.panel.drawText(row.mark, markRight, y,
+          { align: "right", font: t.smallFont, color: row.markColor || t.cursorColor });
       }
     }
     ctx.restore();

@@ -8,6 +8,12 @@
  *   "target" … 使う相手（パーティ）を選ぶ。使ったあともその道具が残っていればここに留まり、
  *              続けて使える（2026-11-09 作者の依頼）。使い切るか Esc で一覧へ
  *
+ * ▼ 右の説明（v1.4.0）
+ *   共通の部品 NS.DetailPane（js/ui/Panel.js）。上の欄（絵・名前・分類・所持数と売値）は動かさず、
+ *   その下を右のバー・Q/E・ホイールで送る。
+ *   使う道具は「使うと」（何が起きるか）と使える所、装備は効果と「仲間がつけると」（お店と同じ）、
+ *   素材は「使い道（工房）」。どれも最後に「▶ 手に入る場所」（押すか C で開く。工房と同じ）
+ *
  * 配置は data/ui.js の items、文言は data/messages.js の items で管理する。
  */
 (function (NS) {
@@ -42,6 +48,10 @@
     this.list = new NS.ScrollList(this.panel, this.layout.list, { sprites: this.sprites });
     this.backButton = new NS.BackButton(this.panel, game.data);
     this.usage = new NS.ItemUsage(game.data);
+    // 右の説明欄（v1.4.0）
+    this.pane = new NS.DetailPane(this.panel, this.sprites, this.layout.detail || { x: 0, y: 0, w: 0, h: 0 });
+    this._detailKey = null;
+    this._detailCache = null;
 
     this.phase = "list";
     this.targetIndex = 0;
@@ -79,6 +89,8 @@
   };
 
   ItemScene.prototype._buildRows = function () {
+    // 使うと個数が変わるので、右の説明も作り直す
+    this._detailCache = null;
     var inventory = this.game.inventory;
     var data = this.game.data;
     var slotDefs = (data.categories || {}).equipSlot || {};
@@ -143,6 +155,16 @@
       this.game.scenes.change(this.returnScene);
       return;
     }
+
+    // 右の説明欄：バー・ホイール・「▶ 手に入る場所」。バーを触っている間はほかの操作を見ない（v1.4.0）
+    this._detailContent();
+    var paneResult = this.pane.handleInput(input);
+    if (paneResult && paneResult.bar) return;
+    if (paneResult && paneResult.toggle) { this._toggleSource(paneResult.toggle); return; }
+    var current = this.list.getSelected();
+    if (input.isPressed("menu") && current) { this._toggleSource(current.value); return; }
+    if (input.isPressed("prevTab")) this.pane.scrollBy(-this.pane.keyRows());
+    if (input.isPressed("nextTab")) this.pane.scrollBy(this.pane.keyRows());
 
     this.list.handleInput(input);
 
@@ -304,50 +326,148 @@
       { font: subtitle.font, color: subtitle.color });
   };
 
-  /** 右側：選択中アイテムの説明 */
+  /** 右側：選択中アイテムの説明（v1.4.0。枠・バーは DetailPane が描く） */
   ItemScene.prototype._renderDetail = function () {
-    var rect = this.layout.detail;
-    if (!rect) return;
+    if (!this.layout.detail) return;
+    this._detailContent();
+    this.pane.render("");
+  };
 
-    var t = this.theme;
-    this.panel.drawBox(rect);
-
+  /** 選んでいる道具の説明 { head, lines }。選ぶもの・個数・開け閉めが変わったら作り直す */
+  ItemScene.prototype._detailContent = function () {
     var selected = this.list.getSelected();
-    if (!selected) return;
-
-    var item = this.game.data.getItem(selected.value);
-    if (!item) return;
-
-    var origin = this.panel.innerOrigin(rect);
-    var lh = t.lineHeight || 18;
-    var y = origin.y + 16;
-
-    // 左上に絵を大きく出し、名前と分類はその右に並べる
-    var indent = NS.StatusMarks.drawItemIcon(this.sprites, item, origin.x, origin.y + 2, t);
-    this.panel.drawText(item.name, origin.x + indent, y);
-    y += lh;
-
-    var category = ((this.game.data.categories || {}).item || {})[item.category];
-    if (category) {
-      this.panel.drawText(category.name, origin.x + indent, y,
-        { font: t.smallFont, color: category.color });
-      y += lh;
+    var key = selected ? selected.value : null;
+    if (key !== this._detailKey) {
+      this._detailKey = key;
+      this._detailCache = null;
     }
-    // 分類の無いアイテムでも、次の行が絵に食い込まないようにする
-    if (indent > 0) y = Math.max(y, origin.y + 2 + NS.StatusMarks.itemIconSize(t) + 16);
+    if (key && !this._detailCache) this._detailCache = this._buildDetail(key);
+    var content = key ? this._detailCache : null;
+    this.pane.setContent(content, key);
+    return content;
+  };
 
-    this.panel.drawText(
-      (this.texts.countLabel || "") + " " + this.game.inventory.getCount(item.id),
-      origin.x, y, { font: t.smallFont, color: t.subTextColor });
-    y += lh + 6;
+  ItemScene.prototype._buildDetail = function (itemId) {
+    var game = this.game;
+    var data = game.data;
+    var item = data.getItem(itemId);
+    if (!item) return null;
 
-    // 説明文は枠の幅に合わせて折り返す
-    var lines = wrapText(item.description || "", 16);
-    for (var i = 0; i < lines.length; i++) {
-      this.panel.drawText(lines[i], origin.x, y,
-        { font: t.smallFont, color: t.subTextColor });
-      y += lh;
+    var texts = this.texts;
+    var t = this.theme;
+    var rect = this.layout.detail || {};
+    var lines = [];
+    var i;
+
+    var category = ((data.categories || {}).item || {})[item.category] || { name: item.category || "" };
+    var chipLabel = category.name + (item.equip ? "・" + NS.EffectSystem.slotName(item, data) : "");
+    var chips = chipLabel ? [{ label: chipLabel, color: category.color }] : [];
+    var count = game.inventory ? game.inventory.getCount(item.id) : 0;
+    var sub = fill(texts.ownedLabel || "所持 {count}", { count: count });
+    var shop = NS.ShopSystem ? new NS.ShopSystem(data) : null;
+    if (shop && shop.canSell(item)) sub += fill(texts.sellLabel || "　売値 {price}G", { price: shop.getSellPrice(item) });
+
+    var desc = wrapText(item.description || "", rect.charsPerLine || 26);
+    for (i = 0; i < desc.length; i++) lines.push({ text: desc[i] });
+
+    // 使う道具：何が起きるか・どこで使えるか
+    if (item.effect) {
+      var effectText = this._describeUse(item.effect);
+      if (effectText) {
+        lines.push({});
+        lines.push({ text: texts.useLabel || "", heading: true });
+        lines.push({ text: "・" + effectText });
+      }
+      var scenes = item.usableIn || [];
+      var names = texts.sceneNames || {};
+      if (scenes.length > 0) {
+        var where = scenes.map(function (sc) { return names[sc] || sc; }).join("・");
+        var here = this.usage.isUsableIn(item.id, this.useScene);
+        lines.push({ text: fill(texts.usableInLabel || "使える所：{where}", { where: where }),
+                     right: here ? (texts.usableHere || "") : (texts.notUsableHere || ""),
+                     rightColor: here ? (t.hpBarHigh || "#5fd18c") : t.hintColor });
+      }
     }
+
+    // 装備：効果と、連れている仲間がつけたときの変わり方（お店と同じ）
+    if (item.equip) {
+      lines.push({});
+      lines.push({ text: texts.effectLabel || "", heading: true });
+      var effects = item.equip.effects || [];
+      for (i = 0; i < effects.length; i++) lines.push({ text: "・" + NS.EffectSystem.describeEffect(effects[i], data) });
+      if (NS.ShopScene && NS.ShopScene.compareLines) {
+        var compare = NS.ShopScene.compareLines(game, item);
+        if (compare.length > 0) {
+          lines.push({});
+          lines.push({ text: texts.compareLabel || "", heading: true });
+          for (i = 0; i < compare.length; i++) lines.push(compare[i]);
+        }
+      }
+    }
+
+    // 素材など：工房での使い道（いま並んでいるレシピ）
+    if (!item.equip && !item.effect && NS.DexScene && NS.DexScene.itemUses) {
+      var uses = NS.DexScene.itemUses(game, item.id, { reveal: true });
+      if (uses.length > 0) {
+        lines.push({});
+        lines.push({ text: texts.usedInLabel || "", heading: true });
+        for (i = 0; i < uses.length; i++) lines.push(uses[i]);
+      }
+    }
+
+    // 手に入る場所（押すか C で開く。工房と同じ）
+    if (NS.DexScene && NS.DexScene.itemSources) {
+      var open = !!this._openSources()[item.id];
+      lines.push({});
+      lines.push({ text: (open ? "▼ " : "▶ ") + (texts.sourcesLabel || ""),
+                   color: open ? t.cursorColor : t.subTextColor, toggle: item.id });
+      if (open) {
+        var sources = NS.DexScene.itemSources(game, item.id, { reveal: true });
+        if (sources.length === 0) lines.push({ indent: 22, text: texts.sourceNone || "", dim: true });
+        for (i = 0; i < sources.length; i++) {
+          var line = {};
+          for (var key in sources[i]) {
+            if (Object.prototype.hasOwnProperty.call(sources[i], key)) line[key] = sources[i][key];
+          }
+          line.indent = (line.indent || 0) + 22;
+          lines.push(line);
+        }
+      }
+    }
+
+    return { head: { icon: item.icon, name: item.name, chips: chips, sub: sub }, lines: lines };
+  };
+
+  /** 使ったときに起きること（data/items.js の effect）を1行の文にする */
+  ItemScene.prototype._describeUse = function (effect) {
+    var texts = this.texts.useTexts || {};
+    var data = this.game.data;
+    switch (effect.type) {
+      case "healHp": return fill(texts.healHp, { value: effect.value });
+      case "healPp": return fill(texts.healPp, { value: effect.value });
+      case "revive":  return fill(texts.revive, { percent: Math.round((effect.hpRatio || 0) * 100) });
+      case "escape":  return texts.escape || "";
+      case "cureStatus":
+        var names = (effect.statuses || []).map(function (id) {
+          var def = (data.statuses || {})[id];
+          return (def && def.name) || id;
+        });
+        return fill(texts.cureStatus, { names: names.join("・") });
+      default: return texts[effect.type] || "";
+    }
+  };
+
+  /** 手に入る場所を開いた道具 { id: true }。工房と同じ入れ物を使う（開け閉めがそろう） */
+  ItemScene.prototype._openSources = function () {
+    if (!this.game.craftOpenSources) this.game.craftOpenSources = {};
+    return this.game.craftOpenSources;
+  };
+
+  ItemScene.prototype._toggleSource = function (itemId) {
+    var opened = this._openSources();
+    if (opened[itemId]) delete opened[itemId];
+    else opened[itemId] = true;
+    this._detailCache = null;
   };
 
   /** 使う相手（パーティ）の選択 */
@@ -431,10 +551,19 @@
 
   ItemScene.prototype._renderHint = function () {
     var pos = this.layout.hint || { x: 48, y: 570 };
-    var text = (this.phase === "target") ? this.texts.hintTarget : this.texts.hintList;
+    var text = (this.phase === "target") ? this.texts.hintTarget
+      : fill(this.texts.hintList || "", { extra: this.pane.canScroll() ? (this.texts.hintScroll || "") : "" });
     this.panel.drawText(text || "", pos.x, pos.y,
       { font: this.theme.smallFont, color: this.theme.hintColor });
   };
+
+  /** テンプレートの {key} を置き換える */
+  function fill(template, values) {
+    if (!template) return "";
+    return template.replace(/\{(\w+)\}/g, function (match, key) {
+      return (values[key] !== undefined) ? values[key] : match;
+    });
+  }
 
   /** 文字数で折り返す（等幅フォント前提の簡易処理） */
   // 折り返しは共通（js/namespace.js の MyGame.wrapText。行の頭に句読点を置かない）

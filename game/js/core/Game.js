@@ -608,6 +608,7 @@
    */
   Game.prototype.beginRun = function (dungeonDef) {
     this.run = new NS.RunSession(dungeonDef);
+    if (this.party && this.party.getMembers) this.run.recordStartParty(this.party.getMembers());
   };
 
   /**

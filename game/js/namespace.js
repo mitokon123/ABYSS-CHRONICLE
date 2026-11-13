@@ -48,6 +48,7 @@ window.MyGame.extend = function (category, entries) {
  *        ・句読点や閉じかっこの後、空白の後、開きかっこの前
  *        ・ひらがなの後に、漢字・カタカナ・英数字が来る所（「鎧を｜着る」「火の｜ブレス」）
  *      漢字どうし・カタカナどうし・漢字の後のひらがな（送りがな）では切らない。
+ *      「Q / E」「買う / 売る」のような「 / 」の両側の空白でも切らない（2026-11-12。キーの名前が2行に割れていた）
  *      いちばん後ろの切れ目で切る。行の3分の1より前にしか無いとき（長い漢字の並びなど）は、
  *      行が短くなりすぎるので文字数で切る（1. は守る）
  *
@@ -77,6 +78,13 @@ window.MyGame.NO_LINE_START = "。、）」』】〉》”’!?！？…・:：;
     return false;
   };
 
+  /** b の前が「 / 」の空白か（「Q / E」を2行に割らない） */
+  function isSlashGap(source, b) {
+    var a = source.charAt(b - 1);
+    if (a !== " " && a !== "　") return false;
+    return source.charAt(b) === "/" || source.charAt(b - 2) === "/";
+  }
+
   NS.wrapText = function (text, charsPerLine) {
     var lines = [];
     var source = String(text || "");
@@ -88,10 +96,11 @@ window.MyGame.NO_LINE_START = "。、）」』】〉》”’!?！？…・:：;
       var cut = -1;
       // 次の行の頭に句読点が来るなら、句読点まで前の行に収める（句読点の後は切れ目）
       var hang = per;
-      while (hang < source.length && BREAK_AFTER.indexOf(source.charAt(hang)) >= 0) hang++;
+      while (hang < source.length && BREAK_AFTER.indexOf(source.charAt(hang)) >= 0 && !isSlashGap(source, hang + 1)) hang++;
       if (hang > per) cut = hang;
       // 行の中で、いちばん後ろの切れ目を探す（行の3分の1まで）
       for (var b = per; cut < 0 && b >= minLen2; b--) {
+        if (isSlashGap(source, b)) continue;
         if (NS.canBreakBetween(source.charAt(b - 1), source.charAt(b))) cut = b;
       }
       // 切れ目が無い：文字数で切る。ただし小さい「っ」や「ー」も行の頭に置かない
