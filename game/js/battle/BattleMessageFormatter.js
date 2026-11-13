@@ -413,6 +413,11 @@
         return fill(t.recoil, { target: this._targetName(event), amount: event.amount });
       case "charge":
         return fill(t.charge, { target: this._targetName(event) });
+      // ちからため の重ねがけ・ためた力が消えた（v1.4.1）
+      case "chargeFailed":
+        return fill(t.chargeFailed || t.charge, { target: this._targetName(event) });
+      case "chargeLost":
+        return fill(t.chargeLost || "", { target: this._targetName(event) });
       case "statusImmune":
         return fill(t.statusImmune, this._statusValues(event));
       case "expGained":

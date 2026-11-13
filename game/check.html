@@ -186,6 +186,12 @@
         run: checkBattleMarks
       },
       {
+        title: "体技・ちからため・即死の見直し",
+        since: "v1.4.1",
+        why: "1.4.1 で体技の式（1体は通常攻撃の倍率・全体は固定）・クリティカルなし・体当たりの盲目・ちからため の乗る技と消えるとき・即死の確率と耐性を変えた。数字が仕様書どおりか確かめる",
+        run: checkSkillReview141
+      },
+      {
         title: "版の名前がそろっている",
         since: "v1.3.1",
         why: "data/config.js の version・パッチノートの先頭・README の「現在のバージョン」が同じ。「開発中」の日付は先頭の版だけ。",
@@ -1719,6 +1725,100 @@
       expect(kept && quiet && start >= 1, "ログに見せた行が残り、「PPが足りない!」のような知らせは残らない");
       expect(hasItem && opened && closed, "ターンの頭に「ログ」があり、C で開いて Esc で戻る");
       lines.unshift("技 " + Object.keys(gd.skills).length + " 個の範囲の札・ログ " + rows.length + " 行を確かめた");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 体技・ちからため・即死の見直し（v1.4.1） ---
+    function checkSkillReview141(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var MID = { next: function () { return 0.5; }, nextInt: function (a) { return a; }, pick: function (x) { return x[0]; } };
+      function copy(o, extra) { var c = {}; for (var k in o) c[k] = o[k]; for (var e in extra) c[e] = extra[e]; return c; }
+      var tackle = gd.skills.tackle, lightning = gd.skills.lightning, normal = gd.skills[gd.battle.normalAttackSkill || "normalAttack"] || gd.skills.normalAttack;
+
+      // 1体の体技 ＝ 同じ倍率の斬撃（クリティカルが出ない乱数で比べる）
+      var a = new NS.MonsterInstance("slime", 40, gd, {}), d = new NS.MonsterInstance("slime", 30, gd, {});
+      var sys = new NS.BattleSystem(gd, MID);
+      sys.start([a], [d]);
+      var asSlash = copy(tackle, { kind: "slash" });
+      var dmgBody = sys.calcDamage(a, d, tackle).damage, dmgSlash = sys.calcDamage(a, d, asSlash).damage;
+      expect(dmgBody === dmgSlash && dmgBody > 0, "体当たり（1.1）＝ 倍率1.1の斬撃：" + dmgBody + " ／ " + dmgSlash);
+
+      // 全体の体技は攻撃力・防御力によらない
+      var weak = new NS.MonsterInstance("slime", 5, gd, {}), strong = new NS.MonsterInstance("slime", 60, gd, {});
+      var hard = new NS.MonsterInstance("slime", 60, gd, {});
+      var f1 = sys.calcDamage(weak, d, lightning).damage, f2 = sys.calcDamage(strong, d, lightning).damage, f3 = sys.calcDamage(strong, hard, lightning).damage;
+      expect(f1 === f2 && f2 === f3, "いなずま（固定50）は使い手・相手のレベルで変わらない：" + [f1, f2, f3].join(" / "));
+      expect(NS.BattleSystem.bodyModeOf(gd.skills.numbPowder) === null && NS.BattleSystem.bodyModeOf(gd.skills.chargeUp) === null,
+        "ダメージの無い体技（しびれ粉・ちからため）は今までどおり");
+      expect(gd.formatSkillPower(gd.skills.armorBreak) === "1.0" && gd.formatSkillPower(lightning) === "50",
+        "威力の見せ方：鎧くずし「" + gd.formatSkillPower(gd.skills.armorBreak) + "」・いなずま「" + gd.formatSkillPower(lightning) + "」");
+
+      // クリティカル：乱数 0 でも体技は出ない（通常攻撃は出る）
+      var sys0 = new NS.BattleSystem(gd, { next: function () { return 0; }, nextInt: function (x) { return x; }, pick: function (x) { return x[0]; } });
+      sys0.start([a], [d]);
+      expect(sys0._rollCritical(tackle, a) === false && sys0._rollCritical(gd.skills.bodyPress, a) === false && sys0._rollCritical(normal, a) === true,
+        "体技はクリティカルが出ない（通常攻撃は出る）");
+
+      // 盲目：体当たりは受けない・ボディプレスは受ける
+      var blindA = new NS.MonsterInstance("slime", 20, gd, {});
+      sys.start([blindA], [d]);
+      blindA.addStatus("blind", MID);
+      var accT = sys._accuracyMultiplier(blindA, tackle), accP = sys._accuracyMultiplier(blindA, gd.skills.bodyPress);
+      expect(accT === 1 && accP < 1, "盲目：体当たり ×" + accT + "・ボディプレス ×" + accP);
+
+      // ちからため：乗る技・重ねがけ・消えるとき
+      expect(sys._chargeApplies(normal) && sys._chargeApplies(tackle) && sys._chargeApplies(gd.skills.bite) &&
+             !sys._chargeApplies(lightning) && !sys._chargeApplies(gd.skills.ember),
+        "ちからため が乗るのは1体の通常攻撃・体技・斬撃だけ（いなずま・ファイアには乗らない）");
+      var hero = new NS.MonsterInstance("slime", 40, gd, {}), foe = new NS.MonsterInstance("kingSlime", 40, gd, {});
+      var tsys = new NS.BattleSystem(gd, MID);
+      tsys.start([hero], [foe]);
+      hero.currentHp = 99999; foe.currentHp = 99999; hero.currentPp = 999;
+      // 相手は動かない（ダメージの比べっこを相手の強化や防御で崩さないため）
+      tsys._chooseEnemyAction = function () { return { type: "skip" }; };
+      function turn(id) {
+        var ev = tsys.takeTurn([{ type: "skill", skillId: id, targetIndex: 0 }]);
+        return ev.filter(function (e) { return e.target === hero || e.actor === hero || e.attacker === hero; }).map(function (e) { return e.type; });
+      }
+      var t1 = turn("chargeUp"), held1 = !!hero._charged;
+      var t2 = turn("chargeUp"), failed = t2.indexOf("chargeFailed") >= 0, lost2 = t2.indexOf("chargeLost") >= 0 && !hero._charged;
+      expect(held1 && t1.indexOf("chargeLost") < 0, "ためた手番のあとは残る");
+      expect(failed && lost2, "ためている間に使うと何も起きず、その手番のあとに消える");
+      turn("chargeUp");
+      var t4 = turn("harden");
+      expect(t4.indexOf("chargeLost") >= 0 && !hero._charged, "次の手番で乗らない技（こうか）を使うと消える");
+      var before = foe.currentHp; turn("tackle"); var plain = before - foe.currentHp;
+      turn("chargeUp");
+      before = foe.currentHp; var t7 = turn("tackle"); var charged = before - foe.currentHp;
+      expect(charged > plain * 1.7 && t7.indexOf("chargeLost") < 0 && !hero._charged,
+        "次の手番の体当たりに乗って使い切る：" + plain + " → " + charged);
+      turn("chargeUp");
+      before = foe.currentHp; turn("lightning"); var allHit = before - foe.currentHp;
+      var noCharge = tsys.calcDamage(hero, foe, lightning).damage;
+      expect(!hero._charged && allHit > 0 && allHit === noCharge, "全体の いなずま には乗らず、ためた力は消える（" + allHit + "。ためていないときと同じ " + noCharge + "）");
+
+      // 眠って動けなかった手番でも消える
+      turn("chargeUp");
+      hero.addStatus("sleep", MID);
+      before = foe.currentHp; var t9 = turn("tackle");
+      var slept = foe.currentHp === before;
+      expect(!slept || (t9.indexOf("chargeLost") >= 0 && !hero._charged), "眠って動けなかった手番のあとに消える" + (slept ? "" : "（目が覚めて体当たりした。確かめられなかった）"));
+
+      // 即死
+      var deathSys = new NS.BattleSystem(gd, MID);
+      function chanceOf(skillId, species) {
+        var m = new NS.MonsterInstance(species, 20, gd, {});
+        return Math.round(gd.skills[skillId].status.chance * deathSys._statusResistMultiplier(m, "instantDeath") * 100);
+      }
+      var table = [chanceOf("death", "sapSlime"), chanceOf("deathra", "sapSlime"), chanceOf("deathDance", "sapSlime"),
+                   chanceOf("death", "glowBug"), chanceOf("death", "slime"), chanceOf("death", "shinigami")];
+      expect(table.join(",") === "90,65,50,63,45,0",
+        "即死の入る確率：耐性0 で デス・デスラ・死の踊り " + table.slice(0, 3).join("・") + "%／耐性3 デス " + table[3] + "%／耐性5 " + table[4] + "%／シニガミ " + table[5] + "%");
+      var want = { glowBug: 3, kodama: 3, gearWarden: 3, magmaBeast: 6, sporin: 0, mossShroom: 0, weaponBot: 0, sapSlime: 0, shinigami: 10, slime: 5, batty: 5, flamin: 5 };
+      var wrong = Object.keys(want).filter(function (id) { return !gd.monsters[id] || gd.monsters[id].statusResist.instantDeath !== want[id]; });
+      expect(wrong.length === 0 && gd.monsters.sporin.statusResist.curse === 2, "種族の即死の耐性（作者の表）とキノコンの呪い 2" + (wrong.length ? "（違う：" + wrong.join("・") + "）" : ""));
       return { ok: ok, lines: lines };
     }
 

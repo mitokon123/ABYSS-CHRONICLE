@@ -77,6 +77,7 @@
    *   _statusWard … 特性「芽吹き」でつけた、状態異常を1回防ぐ守り（v1.0.0）
    *   _tacticSupportNext … 作戦「補助中心」で、次に見る種類（強化・弱体・状態異常の順番。v1.0.0）
    *   _charged / _chargeMul … 「ためる」でためた力／いまの行動に掛かっている倍率
+   *   _chargeFresh … ためたその手番のあいだ true（次の手番の終わりに、乗らなければ消すため。v1.4.1）
    */
   BattleSystem.prototype._resetFieldMarks = function () {
     var i;
@@ -90,6 +91,7 @@
       this.allies[i]._tacticSupportNext = 0;
       this.allies[i]._charged = null;
       this.allies[i]._chargeMul = null;
+      this.allies[i]._chargeFresh = false;
     }
     for (i = 0; i < this.enemies.length; i++) {
       this.enemies[i]._removed = false;
@@ -99,6 +101,7 @@
       this.enemies[i]._statusWard = null;
       this.enemies[i]._charged = null;
       this.enemies[i]._chargeMul = null;
+      this.enemies[i]._chargeFresh = false;
     }
   };
 
@@ -202,8 +205,8 @@
       step.actor._pendingStep = false;
       // 先に倒された者、盤面から取り除かれた者（スカウトされた等）は行動しない
       if (step.actor.isFainted() || step.actor._removed) continue;
-      // ターンの頭で済ませた行動（立ち塞がる）
-      if (step._done) continue;
+      // ターンの頭で済ませた行動（立ち塞がる）。それもその者の手番なので、ためた力はここで消える
+      if (step._done) { this._expireCharge(step.actor, step.side, events); continue; }
 
       // 特性「先手」で先に動いた者は、そうと分かるように名乗る（加護のぶんは上でまとめて出した）
       if (typeof step.firstStrike === "string" && step.firstStrikeKind !== "blessing") {
@@ -211,8 +214,9 @@
       }
 
       this._performAction(step, events);
-      // 「ためる」の倍率は、その行動のあいだだけ
+      // 「ためる」の倍率は、その行動のあいだだけ。乗らない手番だったら、ためた力も消える（麻痺・眠りで動けなかったときも）
       step.actor._chargeMul = null;
+      this._expireCharge(step.actor, step.side, events);
       if (this._checkFinish(events)) return events;
 
       // 1ターンに何度も動く主（data/bosses.js の actionsPerTurn）は、続けてもう一度動く。
@@ -224,6 +228,7 @@
           action: this._chooseEnemyAction(step.actor, this.getFieldAllies()) };
         this._performAction(again, events);
         step.actor._chargeMul = null;
+        this._expireCharge(step.actor, step.side, events);
         if (this._checkFinish(events)) return events;
       }
     }
@@ -1553,7 +1558,8 @@
     var defs = actor && actor.getStatusDefs ? actor.getStatusDefs() : [];
     var total = 1;
 
-    var blindApplies = !skill || this._isPhysicalAction(skill);
+    // ignoreBlind の技（体当たり。v1.4.1）は盲目の効果を受けない。朧羽などの命中の倍率（下）は受ける
+    var blindApplies = !skill || (this._isPhysicalAction(skill) && !skill.ignoreBlind);
     for (var i = 0; i < defs.length && blindApplies; i++) {
       if (typeof defs[i].accuracyMul === "number") total *= defs[i].accuracyMul;
     }
@@ -1570,6 +1576,29 @@
     if (!skill) return false;
     if (skill.id === this.getNormalAttackId()) return true;
     return skill.kind === "body" || skill.kind === "slash";
+  };
+
+  /**
+   * ちからため が乗る技か（v1.4.1・2026-11-12 作者の指定）。
+   * 1体の通常攻撃・体技・斬撃で、ダメージを与えるもの。全体の技には乗らない
+   */
+  BattleSystem.prototype._chargeApplies = function (skill) {
+    if (!skill || !BattleSystem.dealsDamage(skill) || !this._isPhysicalAction(skill)) return false;
+    return (skill.target || "enemy") === "enemy";
+  };
+
+  /**
+   * 手番のあとに、ためた力を消すか決める（v1.4.1）。
+   * ためたその手番なら残す（次の手番まで）。次の手番で乗る技を使っていれば、もう _useSkill で消えている。
+   * それ以外（乗らない技・防御・道具・麻痺や眠りで動けなかった）は、ここで消える
+   */
+  BattleSystem.prototype._expireCharge = function (actor, side, events) {
+    if (!actor || !actor._charged) return;
+    if (actor._chargeFresh) { actor._chargeFresh = false; return; }
+    actor._charged = null;
+    if (!actor.isFainted || !actor.isFainted()) {
+      events.push({ type: "chargeLost", targetSide: side, targetName: actor.getName(), target: actor });
+    }
   };
 
   /**
@@ -2149,10 +2178,11 @@
     var ppCost = this.ppCostOf(actor, skill);
     if (ppCost && actor.payPp) actor.payPp(ppCost);
 
-    // 「ためる」で力をためていれば、この行動のダメージに倍率を掛ける（全体の技なら全員・二段斬りなら2回とも）。
+    // 「ためる」で力をためていれば、この行動のダメージに倍率を掛ける（二段斬りなら2回とも）。
     // 倍率はこの行動のあいだだけ（takeTurn が行動のあとに外す）。
-    // 効くのは通常攻撃・体技・斬撃だけ（2026-11-03 作者の指定）。共鳴・ブレス・踊りを出しても、ためた力は残る
-    if (actor._charged && BattleSystem.dealsDamage(skill) && this._isPhysicalAction(skill)) {
+    // 乗るのは1体の通常攻撃・体技・斬撃だけ（v1.4.1。全体の技には乗らない）。
+    // 乗らない技を出したときは、行動のあとに消える（_expireCharge）
+    if (actor._charged && this._chargeApplies(skill)) {
       var c = actor._charged;
       actor._chargeMul = c.min + this.random.next() * ((c.max || c.min) - c.min);
       actor._charged = null;
@@ -2193,9 +2223,15 @@
       return;
     }
 
-    // 力をためる技（ためる）。次にダメージを与える行動まで残る
+    // 力をためる技（ちからため）。次の自分の手番まで残る（v1.4.1）。
+    // ためている間にもう一度使っても何も起きない（重ねがけはできない）。その手番で乗る技を出していないので、行動のあとに消える
     if (skill.charge) {
+      if (actor._charged) {
+        events.push({ type: "chargeFailed", targetSide: side, targetName: actor.getName(), target: actor });
+        return;
+      }
       actor._charged = skill.charge;
+      actor._chargeFresh = true;
       events.push({ type: "charge", targetSide: side, targetName: actor.getName(), target: actor, se: "buff" });
       return;
     }
@@ -2935,8 +2971,12 @@
     var calcKind = skill.damageKind || skill.kind;
     // 斬撃は「通常攻撃の基礎 × 倍率」（2026-10-22 作者の指定）。斬撃の技の power は倍率（噛みつく＝1.15）。
     // 死神の鎌（踊りで damageKind が斬撃）は今までどおり、下の種類ごとの係数で計算する
-    var slashRate = (!isNormal && skill.kind === "slash" && !skill.damageKind)
+    // 1体の体技も同じ形（v1.4.1・2026-11-12 作者の指定。クリティカルは categories.js の体技の決まりで出ない）。
+    // 全体の体技は威力そのものが基礎（固定ダメージ。攻撃力・防御力は効かない。BattleSystem.bodyModeOf）
+    var bodyMode = isNormal ? null : BattleSystem.bodyModeOf(skill);
+    var slashRate = (!isNormal && ((skill.kind === "slash" && !skill.damageKind) || bodyMode === "rate"))
       ? numberOr(skill.power, 1) : null;
+    var fixedBase = (bodyMode === "fixed") ? Math.max(0, numberOr(skill.power, 0)) : null;
     var useNormal = isNormal || slashRate !== null;
     var factors = useNormal
       ? config.normal
@@ -2970,6 +3010,8 @@
              - (ignoreDefense ? 0 : defender.getDefense() * defenseFactor);
     base = Math.max(0, base);
     if (slashRate !== null) base *= slashRate;
+    // 全体の体技：威力がそのまま基礎（属性・乱数・防御コマンド・特性と装備はこのあと掛かる）
+    if (fixedBase !== null) base = fixedBase;
 
     var elementMultiplier = this._elementMultiplier(defender, elementId);
     // 倍率は技の種類ごと（共鳴だけ 2.0）。無ければ共通の multiplier
@@ -2998,7 +3040,7 @@
                             : randomMin + this.random.next() * (randomMax - randomMin);
     // 「ためる」の倍率（この行動のあいだだけ。見積もりでは、ためていれば真ん中の値）
     if (estimate) {
-      if (attacker._charged && this._isPhysicalAction(skill)) abilityMultiplier *=(attacker._charged.min + (attacker._charged.max || attacker._charged.min)) / 2;
+      if (attacker._charged && this._chargeApplies(skill)) abilityMultiplier *= (attacker._charged.min + (attacker._charged.max || attacker._charged.min)) / 2;
     } else if (attacker._chargeMul) {
       abilityMultiplier *= attacker._chargeMul;
     }
@@ -3455,6 +3497,19 @@
 
   BattleSystem.isRaising = function (skill) {
     return !!(skill && skill.modifier) && isRaising(skill.modifier);
+  };
+
+  /**
+   * 体技の計算の分け方（v1.4.1・2026-11-12 作者の指定）。
+   *   "rate"  … 1体の体技：通常攻撃の基礎 × 威力（倍率）。斬撃からクリティカルを抜いたもの
+   *   "fixed" … 全体の体技：威力がそのまま基礎（固定ダメージ。攻撃力・防御力は効かない）
+   *   null    … 体技でない・ダメージの無い体技・計算だけ別の種類の技（damageKind）
+   */
+  BattleSystem.bodyModeOf = function (skill) {
+    if (!skill || skill.kind !== "body" || skill.damageKind || !skill.power) return null;
+    var target = skill.target || "enemy";
+    if (target === "allEnemies" || target === "allAllies") return "fixed";
+    return (target === "enemy") ? "rate" : null;
   };
 
   BattleSystem.dealsDamage = function (skill) {

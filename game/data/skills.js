@@ -8,8 +8,11 @@
  *                 種類で決まるもの：計算の係数（battle.js の damage.byKind）・
  *                 ブレスの「よけられない・クリティカルなし」（skillKind の rules）・封印で止まるか（共鳴だけ）
  * power         : 威力（0 なら通常攻撃と同じ計算になる）
- *                 ★ 斬撃（kind: "slash"）だけは「通常攻撃の基礎に掛ける倍率」（噛みつく＝1.15。2026-10-22 作者の指定）。
+ *                 ★ 斬撃（kind: "slash"）は「通常攻撃の基礎に掛ける倍率」（噛みつく＝1.15。2026-10-22 作者の指定）。
  *                   画面にもそのまま「威力 1.15」と出る。死神の鎌（踊りで damageKind が斬撃）は今までどおり威力の数
+ *                 ★ 体技（v1.4.1・2026-11-12 作者の指定。クリティカルは出ない）：
+ *                   1体の体技は斬撃と同じく倍率（体当たり＝1.1）。全体の体技は威力がそのままダメージの基礎（固定。攻撃力・防御力は効かない）。
+ *                   分け方は BattleSystem.bodyModeOf
  *                 ★ ただし heal / modifier / status のどれかを持つ技は、威力0だと
  *                   「掛けるだけでダメージを与えない技」になる。
  *                   その技は図鑑・戦闘の説明に「威力」の行が出ない（BattleSystem.dealsDamage）
@@ -113,8 +116,10 @@
       id: "tackle",
       name: "体当たり",
       kind: "body",
-      // α-10 で 10 → 7。最序盤に通常攻撃の7倍出ていたため（通常攻撃にも威力3を足した。data/battle.js）
-      power: 7,
+      // v1.4.1（作者の指定）：1体の体技は倍率になったので 7 → 1.1（通常攻撃の1.1倍）。
+      // 盲目の効果を受けない（ignoreBlind）。朧羽などの命中の倍率は受ける
+      power: 1.1,
+      ignoreBlind: true,
       pp: 1,
       accuracy: 1.0,
       target: "enemy",
@@ -253,8 +258,9 @@
       id: "bodyPress",
       name: "ボディプレス",
       kind: "body",
-      power: 20,
-      pp: 4,
+      // v1.4.1（作者の指定）：威力20 → 倍率1.35・PP 4 → 3
+      power: 1.35,
+      pp: 3,
       accuracy: 1.0,
       target: "enemy",
       element: "none",
@@ -939,7 +945,8 @@
 
     // B. 弱体（相手に掛ける。主など弱体の耐性を持つ相手には入らないことがある）
     armorBreak: {
-      id: "armorBreak", name: "鎧くずし", kind: "body", power: 10, pp: 6, accuracy: 1.0,
+      // v1.4.1（作者の指定）：威力10 → 倍率1.0（通常攻撃と同じ）
+      id: "armorBreak", name: "鎧くずし", kind: "body", power: 1.0, pp: 6, accuracy: 1.0,
       target: "enemy", element: "none", effect: "shatter",
       modifier: { duration: 3, message: "{target} の 守りが 崩れた!",
         effects: [ { type: "statMultiplier", stat: "defense", value: 0.5 } ] },
@@ -1054,8 +1061,8 @@
 
     // E. 攻撃に何かが付く技（新しい仕組み。BattleSystem の _applyRecoil・_applyCharge・hits）
     recklessTackle: {
-      // 2026-10-20 作者の指定で 威力40 → 35・反動 1/4 → 与えたダメージそのまま
-      id: "recklessTackle", name: "捨て身の体当たり", kind: "body", power: 35, pp: 4, accuracy: 1.0,
+      // 2026-10-20 作者の指定で 威力40 → 35・反動 1/4 → 与えたダメージそのまま。v1.4.1 で倍率1.65（作者の指定）
+      id: "recklessTackle", name: "捨て身の体当たり", kind: "body", power: 1.65, pp: 4, accuracy: 1.0,
       target: "enemy", element: "none", effect: "crash",
       recoil: 1.0,
       description: "捨て身でぶつかる。威力が高いが、与えたダメージと同じだけ自分も受ける。"
@@ -1064,9 +1071,9 @@
       id: "chargeUp", name: "ちからため", kind: "body", power: 0, pp: 0, accuracy: 1.0,
       target: "self", element: "none", effect: "gather",
       charge: { min: 1.85, max: 2.25 },
-      // 効くのは通常攻撃・体技・斬撃だけ（2026-11-03 作者の指定。BattleSystem._isPhysicalAction）。
-      // 共鳴・ブレス・踊りを出しても、ためた力は次の攻撃まで残る
-      description: "力をためる。次の攻撃・体技・斬撃のダメージが、1.85〜2.25倍になる。"
+      // 乗るのは1体の通常攻撃・体技・斬撃だけ（v1.4.1 作者の指定。BattleSystem._chargeApplies）。
+      // 次の自分の手番で乗る技を使わなければ消える（動けなかったときも）。ためている間に使っても何も起きない
+      description: "力をためる。次の手番の、1体への攻撃・体技・斬撃のダメージが1.85〜2.25倍になる。"
     },
     doubleSlash: {
       // 2026-10-20 作者の指定で 威力12 → 10・1回のダメージ上限200（斬撃は攻撃力がよく効き、2回ぶん伸びるので終盤に強すぎた）。
@@ -1152,7 +1159,8 @@
       id: "rootSpike",
       name: "ルートスパイク",
       kind: "body",
-      power: 20,
+      // v1.4.1（作者の指定）：全体の体技は固定ダメージ。20 → 40
+      power: 40,
       pp: 7,
       accuracy: 1.0,
       target: "allEnemies",
@@ -1163,14 +1171,14 @@
       description: "根を伸ばして、相手全体を下から突き上げる。"
     },
 
-    // しんくうは（2026-10-22 作者の指定：体技・風・全体・威力20・PP5）。
+    // しんくうは（2026-10-22 作者の指定：体技・風・全体・威力20・PP5。v1.4.1 で固定ダメージ40）。
     // 全体技だがよけられる。ダメージを与える全体の体技はよけられる、という作者の決め（ルートスパイクも同じ）。
     // クリティカルは出ない。覚えるのはツリガネ（Lv30）
     vacuumWave: {
       id: "vacuumWave",
       name: "しんくうは",
       kind: "body",
-      power: 20,
+      power: 40,
       pp: 5,
       accuracy: 1.0,
       target: "allEnemies",
@@ -1182,13 +1190,13 @@
       description: "真空の刃を飛ばして、相手全体を切り裂く。"
     },
 
-    // いなずま（2026-10-26 作者の指定：体技・雷・全体・威力25・PP8）。しんくうはと同じく、全体の体技なのでよけられる。
+    // いなずま（2026-10-26 作者の指定：体技・雷・全体・威力25・PP8。v1.4.1 で固定ダメージ50）。しんくうはと同じく、全体の体技なのでよけられる。
     // クリティカルは出ない。覚えるのはザンガルド（Lv27）。演出はボルトと同じ型を、太く速くしたもの（data/effects.js の lightning）
     lightning: {
       id: "lightning",
       name: "いなずま",
       kind: "body",
-      power: 25,
+      power: 50,
       pp: 8,
       accuracy: 1.0,
       target: "allEnemies",
@@ -1265,24 +1273,24 @@
       id: "deathDance", name: "死の踊り", kind: "dance", power: 0, pp: 10, accuracy: 1.0,
       target: "allEnemies", element: "none", effect: "deathMark",
       evadable: false, canCritical: false,
-      status: { id: "instantDeath", chance: 0.25 },
+      status: { id: "instantDeath", chance: 0.5 },   // v1.4.1：25% → 50%
       description: "死を招く踊りで、相手全体を即死させることがある。"
     },
 
-    // デス。相手1体に即死を 35%
+    // デス。相手1体に即死を 90%（v1.4.1：35% → 90%。耐性3で63%・5で45%）
     death: {
       id: "death", name: "デス", kind: "resonance", power: 0, pp: 6, accuracy: 1.0,
       target: "enemy", element: "none", effect: "deathMark",
-      status: { id: "instantDeath", chance: 0.35 },
+      status: { id: "instantDeath", chance: 0.9 },
       description: "死の響きで、相手1体を即死させることがある。"
     },
 
-    // デスラ。相手全体に即死を 25%。全体の技の決まりどおり、よけられない・クリティカルなし
+    // デスラ。相手全体に即死を 65%（v1.4.1：25% → 65%）。全体の技の決まりどおり、よけられない・クリティカルなし
     deathra: {
       id: "deathra", name: "デスラ", kind: "resonance", power: 0, pp: 12, accuracy: 1.0,
       target: "allEnemies", element: "none", effect: "deathMark",
       evadable: false, canCritical: false,
-      status: { id: "instantDeath", chance: 0.25 },
+      status: { id: "instantDeath", chance: 0.65 },
       description: "死の響きで、相手全体を即死させることがある。"
     },
 

@@ -80,6 +80,9 @@
       // 反動（捨て身の体当たり）・力をためる（ちからため）
       recoil:        "{target} は 反動で {amount} のダメージを受けた!", // target, amount
       charge:        "{target} は 力をためた!",                // target
+      // v1.4.1：ためている間にもう一度ためた・次の手番で乗る技を使わずに消えた
+      chargeFailed:  "しかし {target} は もう力をためている",   // target
+      chargeLost:    "{target} の ためた力が 消えた",           // target
       statusImmune:  "{target} には {status} が効かない",      // target, status
       // 与えたダメージの一部を自分のHPに変える技（data/skills.js の drain）
       drained:      "{target} は {amount} 吸い取った!",      // target, amount

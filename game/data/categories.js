@@ -85,7 +85,10 @@
                    rules: { evadable: false, canCritical: false },
                    note: "よけられない・クリティカルなし" },
       // 攻撃力も大きく関わる。属性技・強化／弱体の技がそろう
-      body:      { id: "body",      name: "体技", order: 3, color: "#e8a86a" },
+      // v1.4.1（作者の指定）：クリティカルは出ない。1体の技は「通常攻撃の基礎 × 威力（倍率）」、全体の技は威力がそのまま（固定）
+      body:      { id: "body",      name: "体技", order: 3, color: "#e8a86a",
+                   rules: { canCritical: false },
+                   note: "クリティカルなし" },
       // 攻撃力に大きく頼る。属性技や全体技もある
       slash:     { id: "slash",     name: "斬撃", order: 4, color: "#e8542a" },
       // 特殊効果が多く、攻め方もいろいろ

@@ -94,7 +94,9 @@
       byKind: {
         resonance: { attackFactor: 0.25, powerFactor: 1.50, defenseFactor: 0.15 },  // 共鳴：攻撃力にあまり頼らず、威力が効く
         breath:    { attackFactor: 0.30, powerFactor: 1.35, defenseFactor: 0.15 },  // ブレス：全体・状態異常のぶん控えめ
-        body:      { attackFactor: 0.55, powerFactor: 1.25 },  // 体技：攻撃力も威力もよく効く
+        // 体技：v1.4.1 から体技の技はこの係数を使わない（作者の指定。1体＝通常攻撃の基礎 × 倍率・全体＝威力そのまま。
+        // BattleSystem.bodyModeOf）。残しているのは、計算だけ体技の技（damageKind）が出てきたときのため
+        body:      { attackFactor: 0.55, powerFactor: 1.25 },
         // 斬撃：2026-10-22 から斬撃の技は「通常攻撃の基礎 × 倍率（技の power）」で、この係数は使わない（BattleSystem.calcDamage）。
         // 残しているのは、踊りで計算だけ斬撃の死神の鎌（damageKind: "slash"）のため
         slash:     { attackFactor: 0.65, powerFactor: 1.10 },

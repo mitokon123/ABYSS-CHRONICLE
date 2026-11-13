@@ -47,6 +47,8 @@
  *     growthRate: { hp: 0.12, attack: 0.06, default: 0.08 }
  *   段階の配列で書くと、レベルで成長率が変わる（何段階でも。α-10。詳しくは data/growth.js）：
  *     growthRate: { hp: [{ from: 1, rate: 0.16 }, { from: 22, rate: 0.20 }], attack: 0.16 }
+ *   ★ PP は v1.4.2 で、全種（ヨミリュウとシニガミを除く）の Lv40 から先の成長率を2倍にした（作者の指定 2026-11-13）。
+ *     段階の区切りが 41 の種族は 41 から、40・41 に区切りの無い種族は 40 に区切りを足した。数字はもう2倍にした後の値
  *     切り替わっても、それまでに伸びた分はそのまま。Lv22 以降で切り替えれば第一章の主は変わらない
  * description : 図鑑での説明文。**主人公が書いた記録**として書く（ストーリー構成.md の 2）。
  *   認定試験の記録なので、危険を見たとおりに書く、警戒した事務的な書き方で揃える。
@@ -161,12 +163,14 @@
       // 上限99の3種のうちの1体。強さで抜けるのではなく、長く付き合える枠
       maxLevel: 99,
       // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      // v1.4.2（2026-11-13 作者の表）：個体値0・素直で Lv25 111/25/28/15/24・Lv30 155/35/49/26/34・Lv40 243/56/96/56/62・Lv50 333/84/148/99/140・Lv60 463/119/209/132/212・Lv99 742/241/375/208/501（HP/攻/防/速/PP）に
+      //   ちょうどなるよう、防御・素早さ・PP の成長率を逆算した。Lv25 で違う能力は Lv22 から変えた（第一章の Lv21 までは前のまま）
       growthRate: {
         hp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.40 }, { from: 50, rate: 0.50 }, { from: 55, rate: 0.65 }, { from: 61, rate: 0.35 }, { from: 80, rate: 0.30 }],
         attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.40 }, { from: 40, rate: 0.55 }, { from: 50, rate: 0.70 }, { from: 71, rate: 0.60 }],
-        defense: [{ from: 1, rate: 0.18 }, { from: 25, rate: 1.00 }, { from: 40, rate: 1.30 }, { from: 50, rate: 1.60 }, { from: 61, rate: 0.85 }],
-        speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.55 }, { from: 40, rate: 0.74 }, { from: 50, rate: 0.93 }, { from: 61, rate: 0.66 }],
-        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.40 }, { from: 40, rate: 1.20 }, { from: 50, rate: 0.90 }, { from: 91, rate: 1.10 }]
+        defense: [{ from: 1, rate: 0.18 }, { from: 22, rate: 0.63 }, { from: 26, rate: 1.05 }, { from: 31, rate: 1.18 }, { from: 41, rate: 1.30 }, { from: 51, rate: 1.52 }, { from: 61, rate: 1.064 }],
+        speed:   [{ from: 1, rate: 0.13 }, { from: 22, rate: 0.39 }, { from: 26, rate: 0.73 }, { from: 31, rate: 1.00 }, { from: 41, rate: 1.44 }, { from: 51, rate: 1.10 }, { from: 61, rate: 0.65 }],
+        pp:      [{ from: 1, rate: 0.10 }, { from: 22, rate: 0.78 }, { from: 26, rate: 0.50 }, { from: 31, rate: 0.70 }, { from: 41, rate: 1.95 }, { from: 51, rate: 1.80 }, { from: 61, rate: 1.85 }]
       },
       description: "水属性。柔らかい体は打撃を吸い込み、傷もすぐに塞がる。見た目よりずっとしぶとい。動きは遅いが、人を襲う可能性はある。近づくときは注意すること。闇と雷に弱い。",
       baseHp: 22,
@@ -239,7 +243,7 @@
       bondReward: { skill: "hazyWing" },
       family: "beastKind",
       element: "dark",
-      resistances: { dark: 3, earth: 3, fire: -2, thunder: -2 },
+      resistances: { dark: 3, earth: 3, fire: -1, light: -1 },   // v1.4.2（作者の指定）：火 -2 → -1・雷 -2 → 0・光 0 → -1
       immunities: [],
       // 超音波で「見て」いるので盲目がほとんど効かない。闇の眷属なので呪いにも強い
       statusResist: { poison: 0, paralysis: 0, sleep: 5, seal: 0,
@@ -248,13 +252,15 @@
       maxLevel: 99,
       // ステータスごとに成長率を変える例：素早さだけ伸びやすい
       // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      // v1.4.2（2026-11-13 作者の表）：個体値0・素直で Lv25 64/44/13/47/17・Lv30 102/62/20/77/30・Lv40 162/98/40/143/60・Lv50 225/146/89/243/127・Lv60 379/219/122/331/205・Lv99 747/343/232/537/389（HP/攻/防/速/PP）に
+      //   ちょうどなるよう、HP・攻撃・防御 の成長率を逆算した。Lv25 で違う能力は Lv22 から変えた（第一章の Lv21 までは前のまま）
       growthRate: {
-        hp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.28 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.40 }, { from: 61, rate: 0.75 }],
+        hp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.28 }, { from: 26, rate: 0.47 }, { from: 31, rate: 0.377 }, { from: 41, rate: 0.393 }, { from: 51, rate: 0.96 }, { from: 61, rate: 0.59 }],
         // Lv50 から +0.10（2026-10-20 作者の指定。Lv99 で攻撃 293 → 333。前は 50:0.60・61:0.35）
-        attack:  [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.45 }, { from: 50, rate: 0.70 }, { from: 61, rate: 0.45 }],
-        defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.70 }, { from: 40, rate: 0.90 }, { from: 50, rate: 1.25 }, { from: 61, rate: 0.60 }],
+        attack:  [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.45 }, { from: 41, rate: 0.60 }, { from: 51, rate: 0.91 }, { from: 61, rate: 0.397 }],
+        defense: [{ from: 1, rate: 0.14 }, { from: 22, rate: 0.74 }, { from: 31, rate: 0.98 }, { from: 41, rate: 2.45 }, { from: 51, rate: 1.65 }, { from: 61, rate: 1.41 }],
         speed:   [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.75 }, { from: 40, rate: 1.50 }, { from: 45, rate: 1.10 }, { from: 61, rate: 0.66 }],
-        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.65 }, { from: 40, rate: 0.82 }, { from: 50, rate: 0.98 }, { from: 61, rate: 0.59 }]
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.65 }, { from: 40, rate: 1.64 }, { from: 50, rate: 1.96 }, { from: 61, rate: 1.18 }]
       },
       description: "闇属性。暗がりを好み、素早く飛び回る。気づいたときには背後にいる。明かりを絶やさないこと。火に弱い。",
       baseHp: 16,
@@ -334,7 +340,7 @@
         attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.76 }, { from: 31, rate: 0.68 }, { from: 41, rate: 0.60 }, { from: 51, rate: 0.85 }, { from: 61, rate: 0.77 }],
         defense: [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.84 }, { from: 31, rate: 0.80 }, { from: 41, rate: 0.70 }, { from: 51, rate: 0.60 }, { from: 61, rate: 0.63 }],
         speed:   [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.60 }, { from: 31, rate: 0.46 }, { from: 41, rate: 0.58 }, { from: 51, rate: 0.52 }, { from: 61, rate: 0.42 }],
-        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.55 }, { from: 31, rate: 0.70 }, { from: 41, rate: 0.55 }, { from: 51, rate: 0.28 }, { from: 61, rate: 0.30 }]
+        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.55 }, { from: 31, rate: 0.70 }, { from: 41, rate: 1.10 }, { from: 51, rate: 0.56 }, { from: 61, rate: 0.60 }]
       },
       description: "地属性。背に苔を生やした小型の獣。坑道の壁を走り回り、足元から来る。小さいからと油断しないこと。火に弱い。",
       baseHp: 17,
@@ -391,7 +397,7 @@
         attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.41 }, { from: 31, rate: 0.43 }, { from: 41, rate: 0.54 }, { from: 51, rate: 0.61 }, { from: 61, rate: 0.64 }],
         defense: [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.37 }, { from: 31, rate: 0.46 }, { from: 41, rate: 0.75 }, { from: 51, rate: 0.90 }, { from: 61, rate: 0.85 }],
         speed:   [{ from: 1, rate: 0.06 }, { from: 25, rate: 0.31 }, { from: 31, rate: 0.25 }, { from: 41, rate: 0.35 }, { from: 51, rate: 0.30 }, { from: 61, rate: 0.35 }],
-        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.26 }, { from: 31, rate: 0.25 }, { from: 41, rate: 0.33 }, { from: 51, rate: 0.35 }, { from: 61, rate: 0.35 }]
+        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.26 }, { from: 31, rate: 0.25 }, { from: 41, rate: 0.66 }, { from: 51, rate: 0.70 }, { from: 61, rate: 0.70 }]
       },
       description: "地属性。岩が動いているとしか思えない。硬く、攻撃が通りにくいが移動は遅い。水に弱い。",
       baseHp: 25,
@@ -449,17 +455,19 @@
       immunities: [],
       // 自ら光るので盲目が効かず、光は呪いを弾く。虫なので体そのものは脆い
       statusResist: { poison: 0, paralysis: 0, sleep: 0, seal: 5,
-                      blind: 0, curse: 0, instantDeath: 5 },
+                      blind: 0, curse: 0, instantDeath: 3 },
       // 深層のヨミリュウへの答えを担うので、坑道の雑魚だが上限は高くしてある
       maxLevel: 80,
       // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      // v1.4.2（2026-11-13 作者の表）：個体値0・素直で Lv25 84/41/15/45/32・Lv30 129/61/25/75/59・Lv40 219/100/55/125/119・Lv50 308/162/95/155/238・Lv60 380/202/134/202/337・Lv80 515/323/190/305/479（HP/攻/防/速/PP）に
+      //   ちょうどなるよう、攻撃・防御・素早さ・PP の成長率を逆算した。Lv25 で違う能力は Lv22 から変えた（第一章の Lv21 までは前のまま）
       growthRate: {
         hp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.50 }, { from: 50, rate: 0.40 }, { from: 71, rate: 0.35 }],
         // Lv51 から +0.18（2026-10-20 作者の判断。上限で攻撃300。前は 61:0.18・75:1.50 で256）
-        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.50 }, { from: 40, rate: 0.40 }, { from: 51, rate: 0.58 }, { from: 61, rate: 0.36 }, { from: 75, rate: 1.68 }],
-        defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.65 }, { from: 50, rate: 0.81 }, { from: 61, rate: 0.45 }],
-        speed:   [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.50 }, { from: 40, rate: 0.49 }, { from: 50, rate: 0.59 }, { from: 61, rate: 0.35 }],
-        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.90 }, { from: 40, rate: 0.99 }, { from: 61, rate: 0.55 }]
+        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.50 }, { from: 40, rate: 0.40 }, { from: 41, rate: 0.77 }, { from: 51, rate: 0.50 }, { from: 61, rate: 0.76 }],
+        defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.65 }, { from: 31, rate: 0.99 }, { from: 41, rate: 1.32 }, { from: 61, rate: 0.93 }],
+        speed:   [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.50 }, { from: 26, rate: 0.76 }, { from: 31, rate: 0.62 }, { from: 41, rate: 0.38 }, { from: 51, rate: 0.59 }, { from: 61, rate: 0.64 }],
+        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.90 }, { from: 40, rate: 1.98 }, { from: 51, rate: 1.65 }, { from: 61, rate: 1.184 }]
       },
       description: "光属性。尾を光らせて飛ぶ虫。暗い坑道では道しるべになるが、その光に別のモンスターが寄ってくるかもしれない。闇に弱い。",
       baseHp: 18,
@@ -515,7 +523,7 @@
       immunities: [],
       // 自分が闇の胞子（毒）を撒く側なので毒に強い。目を持たず、闇にも近い
       statusResist: { poison: 10, paralysis: 0, sleep: 0, seal: 0,
-                      blind: 0, curse: 0, instantDeath: 3 },
+                      blind: 0, curse: 2, instantDeath: 0 },
       maxLevel: 70,
       // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
       growthRate: {
@@ -524,7 +532,7 @@
         attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.40 }, { from: 50, rate: 0.60 }, { from: 51, rate: 0.83 }],
         defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.65 }, { from: 61, rate: 0.45 }],
         speed:   [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.21 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.51 }, { from: 61, rate: 0.41 }],
-        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.41 }, { from: 40, rate: 0.68 }, { from: 50, rate: 0.99 }, { from: 61, rate: 0.79 }]
+        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.41 }, { from: 40, rate: 1.36 }, { from: 50, rate: 1.98 }, { from: 61, rate: 1.58 }]
       },
       description: "闇属性。坑道の湿った隅に生えるキノコのモンスター。近づくと胞子を撒く。光に弱い。",
       baseHp: 24,
@@ -590,7 +598,7 @@
         attack:  [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.45 }, { from: 31, rate: 0.46 }, { from: 41, rate: 0.55 }, { from: 51, rate: 0.55 }, { from: 61, rate: 0.57 }],
         defense: [{ from: 1, rate: 0.19 }, { from: 25, rate: 0.19 }, { from: 31, rate: 0.28 }, { from: 41, rate: 0.55 }, { from: 51, rate: 0.68 }, { from: 61, rate: 0.59 }],
         speed:   [{ from: 1, rate: 0.07 }, { from: 25, rate: 0.26 }, { from: 31, rate: 0.27 }, { from: 41, rate: 0.23 }, { from: 51, rate: 0.20 }, { from: 61, rate: 0.23 }],
-        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.30 }, { from: 31, rate: 0.30 }, { from: 41, rate: 0.48 }, { from: 51, rate: 0.47 }, { from: 61, rate: 0.50 }]
+        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.30 }, { from: 31, rate: 0.30 }, { from: 41, rate: 0.96 }, { from: 51, rate: 0.94 }, { from: 61, rate: 1.00 }]
       },
       description: "地属性。探索者の間では坑道の主と呼ばれている。苔に覆われた石の巨人で、坑道の奥で長く眠っていたらしい。一撃が重い。光に弱い。",
       // 基礎値は「仲間にしたとき」の強さ。在来種の最強格（ヒビイワ 28/8/11/3）と
@@ -653,7 +661,7 @@
       immunities: [],
       // 主なので即死に強い。獣なので目は効く
       statusResist: { poison: 0, paralysis: 10, sleep: 0, seal: 9,
-                      blind: 9, curse: 0, instantDeath: 9 },
+                      blind: 9, curse: 0, instantDeath: 6 },
       maxLevel: 70,
       // 攻めと速さが伸び、守りが置いていかれる。育てるほど「殴られる前に殴る」形になる
       // 成長率の段階（作者が決めたもの。2026-10-28 上限70に合わせて Lv25 から先を作り直した。早見表/成長率の段階.txt）。
@@ -663,7 +671,7 @@
         attack:  [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.09 }, { from: 31, rate: 0.19 }, { from: 41, rate: 0.35 }, { from: 51, rate: 0.50 }, { from: 61, rate: 0.56 }],
         defense: [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.23 }, { from: 31, rate: 0.37 }, { from: 41, rate: 0.23 }, { from: 51, rate: 0.48 }, { from: 61, rate: 0.26 }],
         speed:   [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.65 }, { from: 31, rate: 0.58 }, { from: 41, rate: 0.65 }, { from: 51, rate: 0.65 }, { from: 61, rate: 0.60 }],
-        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.13 }, { from: 31, rate: 0.15 }, { from: 41, rate: 0.45 }, { from: 51, rate: 0.58 }, { from: 61, rate: 0.58 }]
+        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.13 }, { from: 31, rate: 0.15 }, { from: 41, rate: 0.90 }, { from: 51, rate: 1.16 }, { from: 61, rate: 1.16 }]
       },
       description: "火属性。探索者の間では亀裂の主と呼ばれている。たてがみが燃えていて、通った跡はすべて焦げている。近づくだけで肌が焼ける。火の息には注意。水に弱い。",
       // 基礎値は「仲間にしたとき」の強さ。在来種より少し上、という程度に抑えてある。
@@ -741,7 +749,7 @@
         attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.20 }, { from: 30, rate: 0.35 }, { from: 51, rate: 0.53 }, { from: 55, rate: 0.83 }, { from: 61, rate: 0.48 }],
         defense: [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 50, rate: 0.63 }, { from: 65, rate: 0.40 }],
         speed:   [{ from: 1, rate: 0.07 }, { from: 25, rate: 0.15 }, { from: 50, rate: 0.30 }],
-        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.40 }, { from: 50, rate: 0.55 }, { from: 61, rate: 0.35 }]
+        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.80 }, { from: 50, rate: 1.10 }, { from: 61, rate: 0.70 }]
       },
       basePp: 7,
       description: "水属性。探索者の間では深層の主と呼ばれている。スライムたちの王で、頭に冠を載せている。体が大きく、体重を生かしたボディプレスは強力。闇に弱い。",
@@ -817,13 +825,17 @@
       maxLevel: 70,
       // 素早さだけ突出させる。そのぶん打たれ弱い
       // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      // v1.4.2（2026-11-13 作者の表）：個体値0・素直で Lv25 62/48/11/60/22・Lv30 89/67/15/83/32・Lv40 120/110/23/139/55・Lv50 179/150/36/194/106・Lv60 225/233/51/264/166・Lv70 304/356/59/349/191（HP/攻/防/速/PP）に
+      //   ちょうどなるよう、HP・攻撃・素早さ の成長率を逆算した。Lv25 で違う能力は Lv22 から変えた（第一章の Lv21 までは前のまま）
+      //   そのあと作者の指定（11-13）：攻撃は Lv61 からを下げて Lv70 330（Lv60 までは表のまま）。
+      //   素早さは Lv31〜40 の伸びを下げて Lv35〜50 を能力値の線の中へ（Lv50 183）、Lv51〜60 で取り戻して Lv60 264・Lv70 349 は表のまま
       growthRate: {
-        hp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.40 }, { from: 65, rate: 0.55 }],
+        hp:      [{ from: 1, rate: 0.12 }, { from: 22, rate: 0.27 }, { from: 26, rate: 0.38 }, { from: 31, rate: 0.22 }, { from: 41, rate: 0.424 }, { from: 51, rate: 0.33 }, { from: 61, rate: 0.56 }],
         // Lv51 から +0.49（2026-10-20 作者の判断。上限で攻撃300。前は 50:0.75 のままで231）
-        attack:  [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.45 }, { from: 40, rate: 0.55 }, { from: 50, rate: 0.75 }, { from: 51, rate: 1.24 }],
+        attack:  [{ from: 1, rate: 0.18 }, { from: 22, rate: 0.565 }, { from: 31, rate: 0.61 }, { from: 41, rate: 0.57 }, { from: 51, rate: 1.19 }, { from: 61, rate: 1.38 }],
         defense: [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.50 }, { from: 61, rate: 0.25 }],
-        speed:   [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.45 }, { from: 40, rate: 0.55 }, { from: 50, rate: 0.60 }, { from: 61, rate: 0.85 }],
-        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.41 }, { from: 40, rate: 0.50 }, { from: 50, rate: 0.60 }, { from: 61, rate: 0.25 }]
+        speed:   [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.45 }, { from: 31, rate: 0.45 }, { from: 41, rate: 0.55 }, { from: 51, rate: 0.81 }, { from: 61, rate: 0.85 }],
+        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.41 }, { from: 40, rate: 1.00 }, { from: 50, rate: 1.20 }, { from: 61, rate: 0.50 }]
       },
       description: "風属性。灰をまとって舞う鳥。亀裂の熱に乗って、上から来る。体は軽く脆い。水に弱い。",
       baseHp: 14,
@@ -899,7 +911,7 @@
         attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.29 }, { from: 31, rate: 0.27 }, { from: 41, rate: 0.38 }, { from: 51, rate: 0.62 }, { from: 61, rate: 0.63 }],
         defense: [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.24 }, { from: 31, rate: 0.33 }, { from: 41, rate: 0.635 }, { from: 51, rate: 0.72 }, { from: 61, rate: 0.53 }],
         speed:   [{ from: 1, rate: 0.08 }, { from: 25, rate: 0.17 }, { from: 31, rate: 0.20 }, { from: 41, rate: 0.40 }, { from: 51, rate: 0.16 }, { from: 61, rate: 0.20 }],
-        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.18 }, { from: 31, rate: 0.20 }, { from: 41, rate: 0.25 }, { from: 51, rate: 0.27 }, { from: 61, rate: 0.30 }]
+        pp:      [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.18 }, { from: 31, rate: 0.20 }, { from: 41, rate: 0.50 }, { from: 51, rate: 0.54 }, { from: 61, rate: 0.60 }]
       },
       description: "地属性。熱でひび割れた岩のモンスター。守りは固いが、同じ石をぶつけると割れる。地に弱い。",
       baseHp: 25,
@@ -965,7 +977,7 @@
         attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.41 }, { from: 31, rate: 0.41 }, { from: 41, rate: 0.40 }, { from: 51, rate: 0.46 }, { from: 61, rate: 1.08 }],
         defense: [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.31 }, { from: 41, rate: 0.52 }, { from: 51, rate: 0.83 }, { from: 61, rate: 0.87 }],
         speed:   [{ from: 1, rate: 0.10 }, { from: 25, rate: 0.14 }, { from: 31, rate: 0.17 }, { from: 41, rate: 0.25 }, { from: 51, rate: 0.38 }, { from: 61, rate: 0.75 }],
-        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.22 }, { from: 31, rate: 0.32 }, { from: 41, rate: 1.02 }, { from: 51, rate: 0.54 }, { from: 61, rate: 0.42 }]
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.22 }, { from: 31, rate: 0.32 }, { from: 41, rate: 2.04 }, { from: 51, rate: 1.08 }, { from: 61, rate: 0.84 }]
       },
       description: "火属性。マグマの中で暮らす中型のモンスター。殻を固めてじっと動かない。動かないからといって、背を向けないこと。水に弱い。",
       baseHp: 22,
@@ -1041,7 +1053,7 @@
         attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.47 }, { from: 31, rate: 0.49 }, { from: 41, rate: 0.68 }, { from: 51, rate: 1.32 }, { from: 61, rate: 1.54 }],
         defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.82 }, { from: 31, rate: 0.84 }, { from: 41, rate: 0.70 }, { from: 51, rate: 0.70 }, { from: 61, rate: 0.70 }],
         speed:   [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.68 }, { from: 31, rate: 0.67 }, { from: 41, rate: 0.56 }, { from: 51, rate: 0.42 }, { from: 61, rate: 0.42 }],
-        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.39 }, { from: 31, rate: 0.38 }, { from: 41, rate: 0.32 }, { from: 51, rate: 0.25 }, { from: 61, rate: 0.23 }]
+        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.39 }, { from: 31, rate: 0.38 }, { from: 41, rate: 0.64 }, { from: 51, rate: 0.50 }, { from: 61, rate: 0.46 }]
       },
       description: "火属性。燃えさしの炭が起き上がったもの。一体ずつは弱いが、群れで湧く。水に弱い。",
       baseHp: 15,
@@ -1105,7 +1117,7 @@
         attack:  [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.40 }, { from: 40, rate: 0.65 }, { from: 50, rate: 1.10 }, { from: 61, rate: 0.70 }],
         defense: [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.50 }, { from: 50, rate: 0.67 }, { from: 95, rate: 1.30 }],
         speed:   [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.40 }, { from: 50, rate: 0.60 }, { from: 61, rate: 0.47 }],
-        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.65 }, { from: 40, rate: 0.50 }, { from: 50, rate: 0.70 }, { from: 85, rate: 0.60 }]
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.65 }, { from: 40, rate: 1.00 }, { from: 50, rate: 1.40 }, { from: 85, rate: 1.20 }]
       },
       description: "火属性。体に炎をまとう獣。気性が荒く近づくと牙をむく。水に弱い。",
       baseHp: 19,
@@ -1172,12 +1184,14 @@
                       blind: 0, curse: 4, instantDeath: 0 },
       maxLevel: 70,
       // 成長率の段階（作者が決めたもの。2026-10-28 上限70に合わせて Lv25 から先を作り直した。早見表/成長率の段階.txt）。Lv24 までは前と同じ
+      // v1.4.2（2026-11-13 作者の表）：個体値0・素直で Lv25 87/40/23/31/16・Lv30 123/62/40/55/29・Lv40 198/99/81/91/53・Lv50 294/149/114/122/93・Lv60 352/198/164/159/135・Lv70 464/266/200/208/199（HP/攻/防/速/PP）に
+      //   ちょうどなるよう、HP・攻撃・防御・素早さ・PP の成長率を逆算した。Lv25 で違う能力は Lv22 から変えた（第一章の Lv21 までは前のまま）
       growthRate: {
-        hp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.40 }, { from: 31, rate: 0.42 }, { from: 41, rate: 0.53 }, { from: 51, rate: 0.325 }, { from: 61, rate: 0.32 }],
-        attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.56 }, { from: 31, rate: 0.34 }, { from: 41, rate: 0.50 }, { from: 51, rate: 0.61 }, { from: 61, rate: 0.53 }],
-        defense: [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.68 }, { from: 31, rate: 0.68 }, { from: 41, rate: 0.56 }, { from: 51, rate: 0.42 }, { from: 61, rate: 0.44 }],
-        speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.56 }, { from: 31, rate: 0.57 }, { from: 41, rate: 0.30 }, { from: 51, rate: 0.67 }, { from: 61, rate: 0.42 }],
-        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.64 }, { from: 31, rate: 0.60 }, { from: 41, rate: 0.50 }, { from: 51, rate: 0.40 }, { from: 61, rate: 0.38 }]
+        hp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.40 }, { from: 31, rate: 0.42 }, { from: 41, rate: 0.53 }, { from: 51, rate: 0.325 }, { from: 61, rate: 0.62 }],
+        attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.56 }, { from: 31, rate: 0.46 }, { from: 41, rate: 0.622 }, { from: 61, rate: 0.85 }],
+        defense: [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.68 }, { from: 31, rate: 0.82 }, { from: 41, rate: 0.66 }, { from: 51, rate: 1.00 }, { from: 61, rate: 0.72 }],
+        speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.56 }, { from: 26, rate: 0.68 }, { from: 31, rate: 0.51 }, { from: 41, rate: 0.44 }, { from: 51, rate: 0.53 }, { from: 61, rate: 0.70 }],
+        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.64 }, { from: 31, rate: 0.60 }, { from: 41, rate: 1.00 }, { from: 51, rate: 1.05 }, { from: 61, rate: 1.60 }]
       },
       description: "闇属性。底に溜まった闇が形を持ったもの。一体では頼りないが、群れで湧く。光に弱い。",
       baseHp: 18,
@@ -1251,7 +1265,7 @@
         attack:  [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.19 }, { from: 31, rate: 0.20 }, { from: 41, rate: 0.36 }, { from: 51, rate: 0.60 }, { from: 61, rate: 0.58 }],
         defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.31 }, { from: 41, rate: 0.52 }, { from: 51, rate: 0.74 }, { from: 61, rate: 0.74 }],
         speed:   [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.27 }, { from: 31, rate: 0.27 }, { from: 41, rate: 0.45 }, { from: 51, rate: 0.63 }, { from: 61, rate: 0.60 }],
-        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.35 }, { from: 31, rate: 0.37 }, { from: 41, rate: 0.58 }, { from: 51, rate: 0.80 }, { from: 61, rate: 0.78 }]
+        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.35 }, { from: 31, rate: 0.37 }, { from: 41, rate: 1.16 }, { from: 51, rate: 1.60 }, { from: 61, rate: 1.56 }]
       },
       description: "闇属性。闇の底で根を張る蔦。絡みつかれると、少しずつ力を吸われる。足元に注意すること。火に弱い。",
       baseHp: 23,
@@ -1329,13 +1343,16 @@
       // 仲間にする価値を持たせたいので、上限は高めにしてある
       maxLevel: 70,
       // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      // v1.4.2（2026-11-13 作者の表）：個体値0・素直で Lv25 64/41/16/59/24・Lv30 84/52/21/81/43・Lv40 148/87/42/118/86・Lv50 240/128/87/170/178・Lv60 341/243/102/229/289・Lv70 399/330/134/319/354（HP/攻/防/速/PP）に
+      //   ちょうどなるよう、HP・攻撃・防御・素早さ の成長率を逆算した。Lv25 で違う能力は Lv22 から変えた（第一章の Lv21 までは前のまま）
+      //   そのあと作者の指定（11-13）：攻撃を Lv51 から少し下げて Lv60 236・Lv70 318（Lv50 までは表のまま）
       growthRate: {
-        hp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.25 }, { from: 35, rate: 0.50 }, { from: 45, rate: 0.63 }, { from: 61, rate: 0.25 }],
+        hp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.25 }, { from: 35, rate: 0.50 }, { from: 45, rate: 0.63 }, { from: 61, rate: 0.36 }],
         // Lv51 から +0.66（2026-10-20 作者の判断。上限で攻撃300。前は 45:0.65・61:0.30 で194）
-        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.30 }, { from: 45, rate: 0.65 }, { from: 51, rate: 1.31 }, { from: 61, rate: 0.96 }],
-        defense: [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.25 }, { from: 30, rate: 0.45 }, { from: 65, rate: 0.25 }],
-        speed:   [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.27 }, { from: 40, rate: 0.34 }, { from: 50, rate: 0.41 }, { from: 61, rate: 0.25 }],
-        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.75 }, { from: 40, rate: 0.90 }, { from: 50, rate: 1.11 }, { from: 61, rate: 0.65 }]
+        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.43 }, { from: 41, rate: 0.52 }, { from: 51, rate: 1.35 }, { from: 61, rate: 1.02 }],
+        defense: [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.25 }, { from: 30, rate: 0.45 }, { from: 31, rate: 0.52 }, { from: 41, rate: 1.12 }, { from: 51, rate: 0.38 }, { from: 61, rate: 0.80 }],
+        speed:   [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.27 }, { from: 26, rate: 0.37 }, { from: 31, rate: 0.31 }, { from: 41, rate: 0.43 }, { from: 51, rate: 0.49 }, { from: 61, rate: 0.75 }],
+        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.75 }, { from: 40, rate: 1.80 }, { from: 50, rate: 2.22 }, { from: 61, rate: 1.30 }]
       },
       description: "雷属性。小さな体に電気をためこんだ虫。触れると弾ける。素手で触らないこと。地に弱い。",
       baseHp: 16,
@@ -1404,15 +1421,17 @@
       //   「電気は通すが、しびれる神経が無い」と読めば通る。意図した組み合わせ
       statusResist: { poison: 3, paralysis: 10, sleep: 0, seal: 0,
                       blind: 0, curse: 0, instantDeath: 0 },
-      maxLevel: 70,
+      maxLevel: 80,   // v1.4.2：70 → 80（作者の指定）
       // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      // v1.4.2（2026-11-13 作者の表）：個体値0・素直で Lv25 87/59/22/17/17・Lv30 111/77/30/22/23・Lv40 162/113/46/31/36・Lv50 242/152/69/43/73・Lv60 322/245/94/59/117・Lv70 394/319/139/93/157・Lv80 474/359/199/167/199（HP/攻/防/速/PP）に
+      //   ちょうどなるよう、HP・攻撃・防御・素早さ・PP の成長率を逆算した。Lv25 で違う能力は Lv22 から変えた（第一章の Lv21 までは前のまま）
       growthRate: {
-        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.50 }, { from: 61, rate: 0.45 }],
+        hp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.50 }, { from: 61, rate: 0.45 }, { from: 71, rate: 0.50 }],
         // Lv51 から +0.22（2026-10-20 作者の判断。上限で攻撃319。前は 50:0.55・61:0.40 で266）
-        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.30 }, { from: 50, rate: 0.55 }, { from: 51, rate: 0.77 }, { from: 61, rate: 0.62 }],
-        defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.31 }, { from: 40, rate: 0.45 }, { from: 55, rate: 0.55 }, { from: 63, rate: 0.99 }],
-        speed:   [{ from: 1, rate: 0.08 }, { from: 25, rate: 0.15 }, { from: 40, rate: 0.20 }, { from: 55, rate: 0.30 }, { from: 61, rate: 0.45 }],
-        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.27 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.55 }, { from: 61, rate: 0.50 }]
+        attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.30 }, { from: 50, rate: 0.55 }, { from: 51, rate: 0.77 }, { from: 61, rate: 0.62 }, { from: 71, rate: 0.33 }],
+        defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.31 }, { from: 40, rate: 0.45 }, { from: 55, rate: 0.55 }, { from: 63, rate: 0.99 }, { from: 71, rate: 1.20 }],
+        speed:   [{ from: 1, rate: 0.08 }, { from: 25, rate: 0.15 }, { from: 40, rate: 0.20 }, { from: 55, rate: 0.30 }, { from: 61, rate: 0.57 }, { from: 71, rate: 1.23 }],
+        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.27 }, { from: 40, rate: 0.90 }, { from: 50, rate: 1.10 }, { from: 61, rate: 1.00 }, { from: 71, rate: 1.05 }]
       },
       description: "水属性。底の水が集まって形を取ったもの。重い水の塊で叩き潰してくる。水たまりに見えても踏まないこと。雷に弱い。",
       // 攻撃特化。壁役ではないので、HP・防御・PPは低く抑えてある。
@@ -1481,27 +1500,29 @@
       element: "dark",
       // 闇+10 は battle.js の immuneAt に達するので、闇の技は完全に効かない。
       // 光だけが2倍で通る、という一点突破の形にしてある
-      resistances: { dark: 10, earth: 5, fire: 3, water: 3, light: -5 },
+      resistances: { dark: 10, fire: 3, water: 3, light: -5 },   // v1.4.2：地 +5 → 0（作者の指定）
       immunities: [],
-      // 闇の頂点。麻痺と即死は完全に効かない。
+      // 闇の頂点。麻痺は完全に効かない。即死は 7（v1.4.2 で 10 → 7。作者の指定）。
       // 通るのは眠りと呪い ——「眠らせてから殴る」が搦め手になる。
       // ★ 出るときの倍率と行動手順は data/dungeons.js のエントリに書いてある
       //   （HP×2.25・攻×0.9・防×1.25／闇の息→噛みつく→通常攻撃）。
       //   ここの値は「仲間にしたとき」の素の強さ
       statusResist: { poison: 5, paralysis: 10, sleep: 0, seal: 5,
-                      blind: 3, curse: 0, instantDeath: 10 },
-      // 上限まで育てると全種で最も強くなる（攻撃・防御・PPが1位）。
+                      blind: 3, curse: 0, instantDeath: 7 },
       // 上限99の3種より低いのは、そちらが「長く付き合う枠」で格とは別軸だから
       maxLevel: 75,
       // 基礎値は在来種の目安内に収め、格は成長率の配分と耐性で出している
-      // 成長率の段階（α-10・作者が決めたもの。早見表/成長率の段階.txt）。Lv24 までは α-9 と同じ
+      // 成長率（v1.4.2・2026-11-13 作者の表で下方修正。個体値0・素直で
+      //   Lv25 128/61/58/39/28・Lv30 150/76/64/44/35・Lv40 231/102/89/70/56・Lv50 330/153/137/101/79・
+      //   Lv60 453/218/189/136/103・Lv75 571/309/244/164/134（HP/攻/防/速/PP）にちょうどなるよう逆算した。
+      //   HP・攻撃・防御・素早さは Lv25 まで前のまま。PP は Lv25 で 28 にするため Lv1 から下げた。
+      //   PP は作者の表のまま（全種の「Lv40 から PP の伸び2倍」は入れない。作者の指定）
       growthRate: {
-        hp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.25 }, { from: 35, rate: 0.35 }, { from: 50, rate: 0.50 }, { from: 61, rate: 0.30 }],
-        // Lv51 から +0.14（2026-10-20 作者の判断。上限で攻撃319。前は 61:0.35・74:1.30 で277）
-        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.35 }, { from: 51, rate: 0.49 }, { from: 61, rate: 0.49 }, { from: 74, rate: 1.44 }],
-        defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.50 }, { from: 45, rate: 0.35 }, { from: 61, rate: 0.20 }, { from: 74, rate: 1.00 }],
-        speed:   [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.30 }, { from: 50, rate: 0.35 }, { from: 61, rate: 0.19 }],
-        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.30 }, { from: 50, rate: 0.45 }, { from: 61, rate: 0.30 }]
+        hp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.25 }, { from: 26, rate: 0.17 }, { from: 31, rate: 0.312 }, { from: 41, rate: 0.38 }, { from: 51, rate: 0.474 }, { from: 61, rate: 0.303 }],
+        attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 26, rate: 0.24 }, { from: 31, rate: 0.22 }, { from: 41, rate: 0.42 }, { from: 51, rate: 0.545 }, { from: 61, rate: 0.505 }],
+        defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.20 }, { from: 26, rate: 0.10 }, { from: 31, rate: 0.21 }, { from: 41, rate: 0.40 }, { from: 51, rate: 0.43 }, { from: 61, rate: 0.306 }],
+        speed:   [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.20 }, { from: 26, rate: 0.10 }, { from: 31, rate: 0.26 }, { from: 41, rate: 0.31 }, { from: 51, rate: 0.35 }, { from: 61, rate: 0.186 }],
+        pp:      [{ from: 1, rate: 0.107 }, { from: 26, rate: 0.17 }, { from: 31, rate: 0.26 }, { from: 41, rate: 0.29 }, { from: 51, rate: 0.30 }, { from: 61, rate: 0.26 }]
       },
       description: "闇属性。揺籃の穴にいるはずのない竜。鱗は光を通さず吐く息は闇そのもの。勝てる相手とは思えない。見かけたら逃げること。光に弱い。",
       baseHp: 26,
@@ -1615,7 +1636,7 @@
         attack:  [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.57 }, { from: 31, rate: 0.59 }, { from: 41, rate: 0.32 }, { from: 51, rate: 0.92 }, { from: 61, rate: 0.65 }],
         defense: [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.40 }, { from: 31, rate: 0.38 }, { from: 41, rate: 0.54 }, { from: 51, rate: 0.72 }, { from: 61, rate: 0.38 }],
         speed:   [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.15 }, { from: 31, rate: 0.29 }, { from: 41, rate: 0.50 }, { from: 51, rate: 0.67 }, { from: 61, rate: 0.85 }],
-        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.42 }, { from: 31, rate: 0.40 }, { from: 41, rate: 0.50 }, { from: 51, rate: 0.54 }, { from: 61, rate: 0.34 }]
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.42 }, { from: 31, rate: 0.40 }, { from: 41, rate: 1.00 }, { from: 51, rate: 1.08 }, { from: 61, rate: 0.68 }]
       },
       description: "闇属性。毒沼の上を群れで飛ぶ蜂。刺された傷より、あとに残る毒のほうが長く効く。解毒草を持って入ること。光に弱い。",
       baseHp: 17,
@@ -1684,7 +1705,7 @@
         attack:  [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.24 }, { from: 31, rate: 0.27 }, { from: 41, rate: 0.35 }, { from: 51, rate: 0.35 }, { from: 61, rate: 0.35 }],
         defense: [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.29 }, { from: 31, rate: 0.40 }, { from: 41, rate: 0.67 }, { from: 51, rate: 0.63 }, { from: 61, rate: 0.51 }],
         speed:   [{ from: 1, rate: 0.08 }, { from: 25, rate: 0.22 }, { from: 31, rate: 0.20 }, { from: 41, rate: 0.20 }, { from: 51, rate: 0.23 }, { from: 61, rate: 0.14 }],
-        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.26 }, { from: 31, rate: 0.28 }, { from: 41, rate: 0.52 }, { from: 51, rate: 0.30 }, { from: 61, rate: 0.26 }]
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.26 }, { from: 31, rate: 0.28 }, { from: 41, rate: 1.04 }, { from: 51, rate: 0.60 }, { from: 61, rate: 0.52 }]
       },
       description: "地属性。沼底の泥をかぶった亀。甲羅に溜めた泥から、たえず毒の息を漏らしている。風下に立たないこと。雷に弱い。",
       baseHp: 25,
@@ -1749,7 +1770,7 @@
         attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.20 }, { from: 51, rate: 0.57 }, { from: 54, rate: 1.25 }, { from: 61, rate: 0.72 }],
         defense: [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.33 }, { from: 44, rate: 0.44 }, { from: 50, rate: 0.50 }],
         speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.15 }, { from: 40, rate: 0.30 }, { from: 50, rate: 0.40 }, { from: 61, rate: 0.35 }],
-        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.50 }, { from: 50, rate: 0.75 }, { from: 61, rate: 0.60 }]
+        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.30 }, { from: 40, rate: 1.00 }, { from: 50, rate: 1.50 }, { from: 61, rate: 1.20 }]
       },
       description: "闇属性。沼に沈んだ骨が、泥に浮いたまま動いている。眼窩の奥だけが青く光る。長く見ていたいものではない。光に弱い。",
       baseHp: 20,
@@ -1826,7 +1847,7 @@
         attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 35, rate: 0.40 }, { from: 45, rate: 0.55 }, { from: 51, rate: 0.70 }, { from: 55, rate: 0.45 }],
         defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.30 }, { from: 40, rate: 0.25 }, { from: 50, rate: 0.45 }, { from: 61, rate: 0.35 }],
         speed:   [{ from: 1, rate: 0.08 }, { from: 25, rate: 0.25 }, { from: 50, rate: 0.40 }, { from: 61, rate: 0.20 }],
-        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.30 }, { from: 50, rate: 0.45 }, { from: 61, rate: 0.25 }, { from: 75, rate: 0.75 }]
+        pp:      [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.20 }, { from: 40, rate: 0.60 }, { from: 50, rate: 0.90 }, { from: 61, rate: 0.50 }, { from: 75, rate: 1.50 }]
       },
       description: "水属性。探索者の間では沼の主と呼ばれている。動かずに口だけを開けて待ち、近づいたものを丸ごと呑む。間合いを測ってから近づくこと。雷に弱い。",
       baseHp: 30,
@@ -1899,7 +1920,7 @@
         attack:  [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.45 }, { from: 31, rate: 0.47 }, { from: 41, rate: 0.78 }, { from: 51, rate: 0.75 }, { from: 61, rate: 0.52 }],
         defense: [{ from: 1, rate: 0.22 }, { from: 25, rate: 0.56 }, { from: 31, rate: 0.50 }, { from: 41, rate: 0.67 }, { from: 51, rate: 1.15 }, { from: 61, rate: 1.20 }],
         speed:   [{ from: 1, rate: 0.08 }, { from: 25, rate: 0.44 }, { from: 31, rate: 0.44 }, { from: 41, rate: 0.56 }, { from: 51, rate: 0.70 }, { from: 61, rate: 0.37 }],
-        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.43 }, { from: 31, rate: 0.75 }, { from: 41, rate: 0.40 }, { from: 51, rate: 0.78 }, { from: 61, rate: 0.77 }]
+        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.43 }, { from: 31, rate: 0.75 }, { from: 41, rate: 0.80 }, { from: 51, rate: 1.56 }, { from: 61, rate: 1.54 }]
       },
       // 図鑑の説明・記録・絆の報酬は、私の案を作者が直して決めたもの（2026-10-13。若葉の洞_図鑑と絆.md）
       description: "地属性。頭に双葉を生やした芋虫。古い皮を脱ぎ捨てるたびに、毒やしびれも一緒に落としてしまう。体は見た目より硬い。火に弱い。",
@@ -1968,7 +1989,7 @@
         attack:  [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.36 }, { from: 31, rate: 0.58 }, { from: 41, rate: 0.66 }, { from: 51, rate: 1.12 }, { from: 61, rate: 1.10 }],
         defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.42 }, { from: 41, rate: 0.48 }, { from: 51, rate: 0.60 }, { from: 61, rate: 0.62 }],
         speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.49 }, { from: 31, rate: 0.72 }, { from: 41, rate: 0.48 }, { from: 51, rate: 0.52 }, { from: 61, rate: 0.50 }],
-        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.68 }, { from: 31, rate: 0.56 }, { from: 41, rate: 0.60 }, { from: 51, rate: 1.12 }, { from: 61, rate: 1.12 }]
+        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.68 }, { from: 31, rate: 0.56 }, { from: 41, rate: 1.20 }, { from: 51, rate: 2.24 }, { from: 61, rate: 2.24 }]
       },
       // 図鑑の説明・記録・絆の報酬は、私の案を作者が直して決めたもの（2026-10-13。若葉の洞_図鑑と絆.md）
       description: "光属性。ゆらゆらと揺れるつぼみのモンスター。その揺れを眺めていると、まぶたが重くなってくる。傷ついた仲間を治すので、放っておくと戦いが長引く。闇に弱い。",
@@ -2045,7 +2066,7 @@
         attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.37 }, { from: 31, rate: 0.54 }, { from: 41, rate: 0.64 }, { from: 51, rate: 1.12 }, { from: 61, rate: 0.99 }],
         defense: [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.14 }, { from: 31, rate: 0.15 }, { from: 41, rate: 0.18 }, { from: 51, rate: 0.24 }, { from: 61, rate: 0.11 }],
         speed:   [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.37 }, { from: 31, rate: 0.59 }, { from: 41, rate: 0.70 }, { from: 51, rate: 0.65 }, { from: 61, rate: 0.58 }],
-        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.34 }, { from: 31, rate: 0.38 }, { from: 41, rate: 0.48 }, { from: 51, rate: 0.54 }, { from: 61, rate: 0.34 }]
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.34 }, { from: 31, rate: 0.38 }, { from: 41, rate: 0.96 }, { from: 51, rate: 1.08 }, { from: 61, rate: 0.68 }]
       },
       // 図鑑の説明・記録・絆の報酬は、私の案を作者が直して決めたもの（2026-10-13。若葉の洞_図鑑と絆.md）
       description: "風属性。若葉色の羽を持つ小鳥。追い風に乗って飛び、気づいたときには先に嘴を当てられている。起こした風は群れごとなぎ払う。体は軽く脆い。地に弱い。",
@@ -2116,7 +2137,7 @@
         attack:  [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.44 }, { from: 31, rate: 0.41 }, { from: 41, rate: 0.35 }, { from: 51, rate: 0.40 }, { from: 61, rate: 0.39 }],
         defense: [{ from: 1, rate: 0.19 }, { from: 25, rate: 0.25 }, { from: 31, rate: 0.72 }, { from: 41, rate: 0.54 }, { from: 51, rate: 0.55 }, { from: 61, rate: 0.56 }],
         speed:   [{ from: 1, rate: 0.08 }, { from: 25, rate: 0.21 }, { from: 31, rate: 0.20 }, { from: 41, rate: 0.16 }, { from: 51, rate: 0.12 }, { from: 61, rate: 0.12 }],
-        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.64 }, { from: 31, rate: 0.60 }, { from: 41, rate: 0.53 }, { from: 51, rate: 0.65 }, { from: 61, rate: 0.62 }]
+        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.64 }, { from: 31, rate: 0.60 }, { from: 41, rate: 1.06 }, { from: 51, rate: 1.30 }, { from: 61, rate: 1.24 }]
       },
       // 図鑑の説明・記録・絆の報酬は、私の案を作者が直して決めたもの（2026-10-13。若葉の洞_図鑑と絆.md）
       description: "水属性。苔と若草を背負った亀。甲羅はとても硬く、生半可な攻撃は通らない。毒を受けた仲間を治すこともある。闇に弱い。",
@@ -2184,7 +2205,7 @@
       resistances: { fire: -1, wind: -1, light: 9, dark: 2, thunder: -3 },
       immunities: [],
       statusResist: { poison: 0, paralysis: 0, sleep: 3, seal: 0,
-                      blind: 5, curse: 0, instantDeath: 5 },
+                      blind: 5, curse: 0, instantDeath: 3 },
       maxLevel: 80,
       growthRate: {
         hp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.27 }, { from: 31, rate: 0.27 }, { from: 41, rate: 0.45 }, { from: 51, rate: 0.86 }, { from: 61, rate: 0.39 }],
@@ -2192,7 +2213,7 @@
         attack:  [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.36 }, { from: 31, rate: 0.38 }, { from: 41, rate: 0.62 }, { from: 51, rate: 1.49 }, { from: 61, rate: 0.94 }],
         defense: [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.31 }, { from: 31, rate: 0.32 }, { from: 41, rate: 0.52 }, { from: 51, rate: 0.66 }, { from: 61, rate: 0.64 }],
         speed:   [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.30 }, { from: 41, rate: 0.49 }, { from: 51, rate: 0.68 }, { from: 61, rate: 0.43 }],
-        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.93 }, { from: 31, rate: 0.92 }, { from: 41, rate: 1.08 }, { from: 51, rate: 0.49 }, { from: 61, rate: 0.49 }]
+        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.93 }, { from: 31, rate: 0.92 }, { from: 41, rate: 2.16 }, { from: 51, rate: 0.98 }, { from: 61, rate: 0.98 }]
       },
       // 図鑑の説明・記録・絆の報酬は、私の案を作者が直して決めたもの（2026-10-13。若葉の洞_図鑑と絆.md）
       description: "光属性。芽吹いたばかりの森に宿るという精。めったに姿を見せない。そばの仲間に守りを分け、強い光で目をくらませてくる。雷に弱い。",
@@ -2269,7 +2290,7 @@
         attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.30 }, { from: 27, rate: 0.18 }, { from: 31, rate: 0.32 }, { from: 41, rate: 0.38 }, { from: 51, rate: 0.69 }, { from: 61, rate: 0.46 }],
         defense: [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.26 }, { from: 27, rate: 0.33 }, { from: 31, rate: 0.24 }, { from: 41, rate: 0.39 }, { from: 51, rate: 0.49 }, { from: 61, rate: 0.21 }],
         speed:   [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.27 }, { from: 27, rate: 0.30 }, { from: 31, rate: 0.28 }, { from: 41, rate: 0.27 }, { from: 51, rate: 0.68 }, { from: 61, rate: 0.24 }],
-        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.21 }, { from: 27, rate: 0.36 }, { from: 31, rate: 0.35 }, { from: 41, rate: 0.18 }, { from: 51, rate: 0.47 }, { from: 61, rate: 0.43 }]
+        pp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.21 }, { from: 27, rate: 0.36 }, { from: 31, rate: 0.35 }, { from: 41, rate: 0.36 }, { from: 51, rate: 0.94 }, { from: 61, rate: 0.86 }]
       },
       // 図鑑の説明・記録・絆の報酬は、私の案を作者が直して決めたもの（2026-10-13。若葉の洞_図鑑と絆.md）
       description: "地属性。探索者の間では若葉の洞の主と呼ばれている。切り株の若芽が、根を手足にして歩き出したもの。傷の無い相手ほど強く打ちすえる。火に弱い。",
@@ -2340,8 +2361,8 @@
      * ★ 名前「カラクリモリ」（からくり＋森／守り）は私の案を作者が確定した（2026-11-10）。
      * ★ 仲間にしたときの値は作者が決めた（2026-11-03）：
      *   能力値の目標（個体値0・素直）Lv30 170/62/71/27/35・Lv50 354/132/140/53/76・
-     *   Lv70 544/263/246/76/121・Lv80 622/311/290/99/152（HP/攻/防/速/PP）。成長率はこの値にちょうどなるよう逆算した。
-     *   耐性 雷6・風3・地−4・火−2／状態異常 毒10・麻痺8・呪い8・即死5／特性 放電／覚える技／勧誘率 0.12／
+     *   Lv70 544/263/246/76/121・Lv80 622/311/290/99/152（HP/攻/防/速/PP）。成長率はこの値にちょうどなるよう逆算した（PP は v1.4.2 で Lv40 から伸び2倍にしたので、Lv50 から上はこれより高い）。
+     *   耐性 雷6・風3・地−4・火−2／状態異常 毒10・麻痺8・呪い8・即死3（v1.4.1 で 5 → 3）／特性 放電／覚える技／勧誘率 0.12／
      *   絆の報酬 地+2・火+2・防御×1.1・攻撃×1.05。
      *   図鑑の説明と記録は作者が確定（2026-11-11。信頼の記録は作者の文）。経験値・ゴールドは私の案を作者がそのまま確定（2026-11-11）
      */
@@ -2355,7 +2376,7 @@
       immunities: [],
       // 機械なので毒と麻痺に強い（毒10は効かない。主のあいだは data/bosses.js の immuneToStatus で麻痺も効かない）
       statusResist: { poison: 10, paralysis: 8, sleep: 0, seal: 0,
-                      blind: 0, curse: 8, instantDeath: 5 },
+                      blind: 0, curse: 8, instantDeath: 3 },
       maxLevel: 80,
       // 区切りは Lv30・50・70 の目標値のところ（遅くて硬い。防御は Lv50 から大きく伸びる）
       growthRate: {
@@ -2363,7 +2384,7 @@
         attack:  [{ from: 1, rate: 0.161 }, { from: 31, rate: 0.319 }, { from: 51, rate: 0.595 }, { from: 71, rate: 0.437 }],
         defense: [{ from: 1, rate: 0.239 }, { from: 31, rate: 0.384 }, { from: 51, rate: 0.589 }, { from: 71, rate: 0.489 }],
         speed:   [{ from: 1, rate: 0.124 }, { from: 31, rate: 0.216 }, { from: 51, rate: 0.192 }, { from: 71, rate: 0.383 }],
-        pp:      [{ from: 1, rate: 0.14 },  { from: 31, rate: 0.293 }, { from: 51, rate: 0.322 }, { from: 71, rate: 0.443 }]
+        pp:      [{ from: 1, rate: 0.14 }, { from: 31, rate: 0.293 }, { from: 40, rate: 0.586 }, { from: 51, rate: 0.644 }, { from: 71, rate: 0.886 }]
       },
       description: "雷属性。千年樹の根底の主と呼ばれている。千年樹を守るために置かれた古いからくりで、胸の琥珀の光で動き続けている。地に弱い。",
       records: {
@@ -2456,7 +2477,7 @@
       resistances: { dark: 4, earth: 2, fire: -2 },
       immunities: [],
       statusResist: { poison: 0, paralysis: 0, sleep: 0, seal: 3,
-                      blind: 0, curse: 3, instantDeath: 3 },
+                      blind: 0, curse: 3, instantDeath: 0 },
       maxLevel: 70,
       // キノコンと同じ成長率（亜種なので伸び方をそろえた。作者が了承）。上限 Lv70 で攻撃はおよそ210。
       // 防御だけ Lv51 から +0.19（作者の指定 2026-10-21。Lv70 で 192 → 223。Lv50 までは変えていないので回廊の敵は同じ）
@@ -2465,7 +2486,7 @@
         attack:  [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.40 }, { from: 50, rate: 0.60 }, { from: 51, rate: 0.83 }],
         defense: [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.25 }, { from: 40, rate: 0.45 }, { from: 50, rate: 0.65 }, { from: 51, rate: 0.84 }, { from: 61, rate: 0.64 }],
         speed:   [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.21 }, { from: 40, rate: 0.35 }, { from: 50, rate: 0.51 }, { from: 61, rate: 0.41 }],
-        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.41 }, { from: 40, rate: 0.68 }, { from: 50, rate: 0.99 }, { from: 61, rate: 0.79 }]
+        pp:      [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.41 }, { from: 40, rate: 1.36 }, { from: 50, rate: 1.98 }, { from: 61, rate: 1.58 }]
       },
       // 説明は私の案を作者が確定（2026-10-28）。
       // 図鑑の決まり：属性 → 見た目・生態 → 注意書き → 弱い属性（1つ）
@@ -2512,7 +2533,7 @@
      * ▼ どのレベル帯でも同じ能力：上限 Lv1・出現も Lv1 固定（data/dungeons.js の minLevel/maxLevel）。
      *   Lv1 の能力は基礎値そのものなので、HP66・攻33・防33・速66・PP666 になる（成長しない）。
      *   敵のレベルは画面に出ない（BattleScene は味方だけ Lv を出す）。経験値266・ゴールド166 は Lv1 の値そのまま
-     * ▼ 耐性：仲間のときは全属性 +5・全状態異常 +5。敵のときは出現の表の effects で +4・+5 を足して、+9・+10 になる
+     * ▼ 耐性：仲間のときは全属性 +5・状態異常は即死だけ 10（仲間のときも効かない。v1.4.1）でほかは +5。敵のときは出現の表の effects で +4・+5 を足して、+9・+10 になる
      * ▼ 敵のとき：死神の鎌 80%・死の踊り 15%・通常攻撃 5%。PP は減らない（出現の表）
      * ▼ スカウト：ストーリーを全部クリアしたあとだけ（scoutableWhen）。いまは最後の物語が無いので誘えない
      * ▼ 図鑑：倒すだけで開く（dexOnDefeat）
@@ -2526,7 +2547,7 @@
       resistances: { fire: 5, water: 5, wind: 5, earth: 5, thunder: 5, light: 5, dark: 5 },
       immunities: [],
       statusResist: { poison: 5, paralysis: 5, sleep: 5, seal: 5,
-                      blind: 5, curse: 5, instantDeath: 5 },
+                      blind: 5, curse: 5, instantDeath: 10 },
       maxLevel: 1,
       // 上限 Lv1 なので成長しない（書いておくだけ）
       growthRate: 0,
@@ -2599,12 +2620,14 @@
       // Lv25〜50 は私の案。Lv70 の値は作者の指定（2026-10-22。376/257/178/343/203、素早さは俊足込み）に、
       // Lv51 から先の成長率で合わせた（Lv50 までは変えていない）。
       // 個体値0・素直で Lv26 84/33/30/50/36、Lv50 203/115/70/180/122、Lv60 301/180/136/272/170、Lv70 376/257/178/343/203
+      // v1.4.2（2026-11-13 作者の表）：個体値0・素直で Lv25 99/31/29/38/33・Lv30 121/52/36/54/47・Lv40 178/88/59/98/80・Lv50 233/127/99/150/164・Lv60 311/190/146/226/260・Lv70 426/277/218/296/326（HP/攻/防/速/PP）に
+      //   ちょうどなるよう、HP・攻撃・防御・素早さ の成長率を逆算した。Lv25 で違う能力は Lv22 から変えた（第一章の Lv21 までは前のまま）
       growthRate: {
-        hp:      [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.25 }, { from: 31, rate: 0.28 }, { from: 41, rate: 0.32 }, { from: 51, rate: 0.58 }, { from: 61, rate: 0.44 }],
-        attack:  [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.30 }, { from: 31, rate: 0.45 }, { from: 41, rate: 0.60 }, { from: 51, rate: 0.93 }, { from: 61, rate: 1.09 }],
-        defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.22 }, { from: 31, rate: 0.25 }, { from: 41, rate: 0.32 }, { from: 51, rate: 1.11 }, { from: 61, rate: 0.69 }],
-        speed:   [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.40 }, { from: 31, rate: 0.55 }, { from: 41, rate: 0.65 }, { from: 51, rate: 0.95 }, { from: 61, rate: 0.74 }],
-        pp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.45 }, { from: 31, rate: 0.55 }, { from: 41, rate: 0.70 }, { from: 51, rate: 0.80 }, { from: 61, rate: 0.55 }]
+        hp:      [{ from: 1, rate: 0.15 }, { from: 22, rate: 0.46 }, { from: 26, rate: 0.26 }, { from: 31, rate: 0.336 }, { from: 41, rate: 0.324 }, { from: 51, rate: 0.46 }, { from: 61, rate: 0.675 }],
+        attack:  [{ from: 1, rate: 0.14 }, { from: 25, rate: 0.30 }, { from: 26, rate: 0.60 }, { from: 31, rate: 0.51 }, { from: 41, rate: 0.56 }, { from: 51, rate: 0.90 }, { from: 61, rate: 1.24 }],
+        defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.22 }, { from: 31, rate: 0.39 }, { from: 41, rate: 0.67 }, { from: 51, rate: 0.78 }, { from: 61, rate: 1.20 }],
+        speed:   [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.40 }, { from: 31, rate: 0.55 }, { from: 41, rate: 0.65 }, { from: 51, rate: 0.95 }, { from: 61, rate: 0.87 }],
+        pp:      [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.45 }, { from: 31, rate: 0.55 }, { from: 41, rate: 1.40 }, { from: 51, rate: 1.60 }, { from: 61, rate: 1.10 }]
       },
       // 図鑑の説明・記録・絆の報酬は作者が確定（2026-10-28。私の案を作者が直した）。
       // 弱い属性は火（-2）を書く（雷 -1 は書かない。図鑑の弱点は1つ）
@@ -2682,7 +2705,7 @@
         attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.40 },  { from: 31, rate: 0.46 }, { from: 41, rate: 0.41 }, { from: 51, rate: 0.61 },  { from: 61, rate: 0.81 }],
         defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.23 },  { from: 31, rate: 0.33 }, { from: 41, rate: 0.41 }, { from: 51, rate: 0.51 },  { from: 61, rate: 0.45 }],
         speed:   [{ from: 1, rate: 0.15 }, { from: 25, rate: 0.29 },  { from: 31, rate: 0.21 }, { from: 41, rate: 0.35 }, { from: 51, rate: 0.30 },  { from: 61, rate: 0.59 }],
-        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.49 },  { from: 31, rate: 0.26 }, { from: 41, rate: 0.34 }, { from: 51, rate: 0.46 },  { from: 61, rate: 0.52 }]
+        pp:      [{ from: 1, rate: 0.12 }, { from: 25, rate: 0.49 }, { from: 31, rate: 0.26 }, { from: 41, rate: 0.68 }, { from: 51, rate: 0.92 }, { from: 61, rate: 1.04 }]
       },
       // 図鑑の説明・記録・絆の報酬は作者が確定（2026-10-28。私の案を作者が直した）。
       // 弱い属性は闇・光が同じ -2 なので、闇を書く（図鑑の弱点は1つ）
@@ -2775,7 +2798,7 @@
       resistances: { fire: 6, earth: 2, thunder: 1, water: -3 },
       immunities: [],
       statusResist: { poison: 10, paralysis: 5, sleep: 0, seal: 0,
-                      blind: 0, curse: 0, instantDeath: 3 },
+                      blind: 0, curse: 0, instantDeath: 0 },
       maxLevel: 80,
       // 成長率は、作者の表（Lv30・40・50・60・70・80 の値）にぴったり合うように逆算したもの（2026-11-05）
       growthRate: {
@@ -2783,7 +2806,7 @@
         attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.35 }, { from: 31, rate: 0.32 }, { from: 41, rate: 0.37 }, { from: 51, rate: 0.80 }, { from: 61, rate: 0.50 }, { from: 71, rate: 0.43 }],
         defense: [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.19 }, { from: 31, rate: 0.25 }, { from: 41, rate: 0.43 }, { from: 51, rate: 0.67 }, { from: 61, rate: 0.65 }, { from: 71, rate: 0.40 }],
         speed:   [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.44 }, { from: 41, rate: 0.42 }, { from: 51, rate: 0.57 }, { from: 61, rate: 0.80 }, { from: 71, rate: 1.35 }],
-        pp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.20 }, { from: 31, rate: 0.15 }, { from: 41, rate: 0.50 }, { from: 51, rate: 0.69 }, { from: 61, rate: 0.61 }, { from: 71, rate: 0.42 }]
+        pp:      [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.20 }, { from: 31, rate: 0.15 }, { from: 41, rate: 1.00 }, { from: 51, rate: 1.38 }, { from: 61, rate: 1.22 }, { from: 71, rate: 0.84 }]
       },
       description: "火属性。何かを守るために造られた機械。不完全な箇所は多いが、両刃に属性をまとわせて攻撃する。水に弱い。",
       records: {
@@ -2846,7 +2869,7 @@
         attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 31, rate: 0.70 }, { from: 41, rate: 0.46 }, { from: 51, rate: 0.84 }, { from: 61, rate: 0.58 }],
         defense: [{ from: 1, rate: 0.50 }, { from: 25, rate: 0.70 }, { from: 31, rate: 1.125 }, { from: 41, rate: 1.235 }, { from: 51, rate: 1.225 }, { from: 61, rate: 1.68 }],
         speed:   [{ from: 1, rate: 0.13 }, { from: 25, rate: 0.24 }, { from: 31, rate: 0.335 }, { from: 41, rate: 0.42 }, { from: 51, rate: 0.455 }, { from: 61, rate: 0.79 }],
-        pp:      [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.25 }, { from: 31, rate: 0.48 }, { from: 41, rate: 0.56 }, { from: 51, rate: 0.66 }, { from: 61, rate: 0.84 }]
+        pp:      [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.25 }, { from: 31, rate: 0.48 }, { from: 41, rate: 1.12 }, { from: 51, rate: 1.32 }, { from: 61, rate: 1.68 }]
       },
       description: "無属性。宝石の体に悪魔が棲みついたもの、と言われるモンスター。とても硬く、攻撃はほとんど通らない。人を見るとすぐに逃げる。倒せれば多くの経験を得られる。",
       records: {
@@ -2908,7 +2931,7 @@
         attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.36 }, { from: 31, rate: 0.615 }, { from: 51, rate: 0.81 }, { from: 61, rate: 1.39 }],
         defense: [{ from: 1, rate: 0.16 }, { from: 25, rate: 0.27 }, { from: 31, rate: 0.33 }, { from: 41, rate: 0.65 }, { from: 51, rate: 0.70 }, { from: 61, rate: 0.73 }],
         speed:   [{ from: 1, rate: 0.18 }, { from: 25, rate: 0.22 }, { from: 31, rate: 0.26 }, { from: 41, rate: 0.50 }, { from: 51, rate: 0.37 }, { from: 61, rate: 0.565 }],
-        pp:      [{ from: 1, rate: 0.30 }, { from: 25, rate: 0.45 }, { from: 31, rate: 0.46 }, { from: 41, rate: 0.60 }, { from: 51, rate: 0.90 }, { from: 61, rate: 1.10 }]
+        pp:      [{ from: 1, rate: 0.30 }, { from: 25, rate: 0.45 }, { from: 31, rate: 0.46 }, { from: 41, rate: 1.20 }, { from: 51, rate: 1.80 }, { from: 61, rate: 2.20 }]
       },
       description: "地属性。千年のあいだ琥珀の中で眠っていた甲虫。背の琥珀がそのまま硬い殻になっている。正面からは刃が通りにくい。火に弱い。",
       records: {
@@ -2972,14 +2995,14 @@
       resistances: { water: 5, earth: 2, thunder: -2 },
       immunities: [],
       statusResist: { poison: 0, paralysis: 0, sleep: 0, seal: 0,
-                      blind: 8, curse: 0, instantDeath: 3 },
+                      blind: 8, curse: 0, instantDeath: 0 },
       maxLevel: 70,
       growthRate: {
         hp:      [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.28 }, { from: 31, rate: 0.25 }, { from: 41, rate: 0.38 }, { from: 51, rate: 0.362 }, { from: 61, rate: 0.495 }],
         attack:  [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.30 }, { from: 31, rate: 0.37 }, { from: 41, rate: 0.47 }, { from: 51, rate: 0.58 }, { from: 61, rate: 0.78 }],
         defense: [{ from: 1, rate: 0.17 }, { from: 25, rate: 0.25 }, { from: 31, rate: 0.54 }, { from: 41, rate: 0.67 }, { from: 51, rate: 0.81 }, { from: 61, rate: 0.845 }],
         speed:   [{ from: 1, rate: 0.20 }, { from: 25, rate: 0.40 }, { from: 31, rate: 0.41 }, { from: 41, rate: 0.56 }, { from: 51, rate: 0.60 }, { from: 61, rate: 0.64 }],
-        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.30 }, { from: 31, rate: 0.46 }, { from: 41, rate: 0.44 }, { from: 51, rate: 0.485 }, { from: 61, rate: 0.565 }]
+        pp:      [{ from: 1, rate: 0.11 }, { from: 25, rate: 0.30 }, { from: 31, rate: 0.46 }, { from: 41, rate: 0.88 }, { from: 51, rate: 0.97 }, { from: 61, rate: 1.13 }]
       },
       description: "水属性。千年樹の傷から流れた樹液が固まって動き出したもの。仲間の傷を塞ぎ、ねばる体で足を止める。雷に弱い。",
       records: {

@@ -100,7 +100,10 @@
    */
   GameData.prototype.formatSkillPower = function (skill) {
     var power = (skill && skill.power) || 0;
-    if (skill && skill.kind === "slash" && power === Math.floor(power) && power > 0) return power.toFixed(1);
+    // 倍率の技（斬撃・1体の体技。v1.4.1）は「1.0」のように小数で出す
+    var rate = skill && (skill.kind === "slash" ||
+      (NS.BattleSystem && NS.BattleSystem.bodyModeOf && NS.BattleSystem.bodyModeOf(skill) === "rate"));
+    if (rate && power === Math.floor(power) && power > 0) return power.toFixed(1);
     return String(power);
   };
 
