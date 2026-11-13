@@ -198,6 +198,12 @@
         run: checkAffectionCap
       },
       {
+        title: "シニガミはいつも 1% で、図鑑は仲間にしたら開く",
+        since: "v1.4.3",
+        why: "1.4.3 でシニガミを誘えるようにした。HP を削っても・誘いの香を使っても・何体持っていても 1% のまま。倒しただけでは図鑑が開かず、古いセーブで倒して開いていたシニガミだけの技は伏せ直す。ほかの種族の確率は今までどおり動く。",
+        run: checkShinigamiScout
+      },
+      {
         title: "版の名前がそろっている",
         since: "v1.3.1",
         why: "data/config.js の version・パッチノートの先頭・README の「現在のバージョン」が同じ。「開発中」の日付は先頭の版だけ。",
@@ -1850,6 +1856,52 @@
       saved.affection = 999;
       var back = NS.MonsterInstance.fromSaveData(saved, gd);
       expect(back.affection === 180 && back.hasReachedBondReward(), "上限を超えた古いセーブ（999）は読み込みで 180 になり、絆の報酬は残る：" + back.affection);
+      return { ok: ok, lines: lines };
+    }
+
+    // --- シニガミのスカウトと図鑑（v1.4.3） ---
+    function checkShinigamiScout(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var scout = new NS.ScoutSystem(gd, { next: function () { return 0.5; } });
+      var sp = gd.monsters.shinigami;
+      var s = new NS.MonsterInstance("shinigami", 1, gd, {});
+      var rates = [];
+      [1, 0.5, 0.01].forEach(function (hp) {
+        s.currentHp = Math.max(1, Math.floor(s.getMaxHp() * hp));
+        [null, { scoutMultiplier: 3 }].forEach(function (item) {
+          [0, 1, 5].forEach(function (owned) { rates.push(scout.calcRate(s, item, owned)); });
+        });
+      });
+      var allOne = rates.every(function (r) { return r === 0.01; });
+      expect(allOne, "シニガミは HP 満タン〜瀕死・誘いの香あり／なし・0〜5体持っていても 1%（" + rates.length + " 通り）");
+      expect(!sp.scoutableWhen && !sp.dexOnDefeat, "誘える時期の決まり（scoutableWhen）と倒すだけで開く図鑑（dexOnDefeat）を外した");
+
+      var slime = new NS.MonsterInstance("slime", 10, gd, {});
+      var full = scout.calcRate(slime, null, 0);
+      slime.currentHp = 1;
+      var low = scout.calcRate(slime, null, 0);
+      expect(low > full, "ほかの種族（スライム）は HP を削ると上がる：" + Math.round(full * 1000) / 10 + "% → " + Math.round(low * 1000) / 10 + "%");
+
+      var d = new NS.Discovery();
+      d.markMonsterDefeated("shinigami");
+      expect(!d.isMonsterDexOpen("shinigami", sp), "倒しただけでは図鑑が開かない");
+      d.markMonsterCaught("shinigami");
+      expect(d.isMonsterDexOpen("shinigami", sp), "仲間にしたら開く");
+
+      // 古いセーブ：倒して開いた技を伏せ直す（デスはツリガネも覚えるので残す）
+      var fake = { discovery: new NS.Discovery(), data: gd };
+      ["deathScythe", "deathDance", "death", "deathra"].forEach(function (id) { fake.discovery.markSkillLearned(id); });
+      NS.Game.prototype._forgetDefeatOnlySkills.call(fake);
+      var L = fake.discovery;
+      expect(!L.isSkillLearned("deathScythe") && !L.isSkillLearned("deathDance") && !L.isSkillLearned("deathra") && L.isSkillLearned("death"),
+        "古いセーブ：仲間にしていなければ 死神の鎌・死の踊り・デスラ を伏せ直し、デスは残す");
+      var kept = { discovery: new NS.Discovery(), data: gd };
+      kept.discovery.markMonsterCaught("shinigami");
+      kept.discovery.markSkillLearned("deathScythe");
+      NS.Game.prototype._forgetDefeatOnlySkills.call(kept);
+      expect(kept.discovery.isSkillLearned("deathScythe"), "仲間にしたことがあれば消さない");
       return { ok: ok, lines: lines };
     }
 

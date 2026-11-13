@@ -2539,9 +2539,9 @@
      *   敵のレベルは画面に出ない（BattleScene は味方だけ Lv を出す）。経験値266・ゴールド166 は Lv1 の値そのまま
      * ▼ 耐性：仲間のときは全属性 +5・状態異常は即死だけ 10（仲間のときも効かない。v1.4.1）でほかは +5。敵のときは出現の表の effects で +4・+5 を足して、+9・+10 になる
      * ▼ 敵のとき：死神の鎌 80%・死の踊り 15%・通常攻撃 5%。PP は減らない（出現の表）
-     * ▼ スカウト：ストーリーを全部クリアしたあとだけ（scoutableWhen）。いまは最後の物語が無いので誘えない
-     * ▼ 図鑑：倒すだけで開く（dexOnDefeat）
-     * ★ 愛情度の記録・絆の報酬はまだ無い
+     * ▼ スカウト：いつでも誘える。成功率は**いつも 1%**（scoutRateFixed。v1.4.3・作者の指定）。
+     *   HP を削っても、誘いの香を使っても、同じ種族を持っていても変わらない（ScoutSystem.calcRate）
+     * ▼ 図鑑：ほかの種族と同じく、仲間にしたら詳しいところが開く（v1.4.3。前の「倒すだけで開く」は外した）
      */
     shinigami: {
       id: "shinigami",
@@ -2566,16 +2566,14 @@
         bond:  "いつも寄り添ってくる。だが鎌だけは触らせてもらえない。"
       },
       bondReward: { effects: [ { type: "undying" } ] },
-      // 倒すだけで図鑑の詳しいところ（と覚える技）が開く（作者の指定。仲間にできるのはストーリーを全部クリアしたあとなので）
-      dexOnDefeat: true,
       baseHp: 66,
       baseAttack: 33,
       baseDefense: 33,
       baseSpeed: 66,
       basePp: 666,
-      scoutRate: 0.02,
-      // ストーリーを全部クリアしたあとだけ誘える（BattleScene._scoutLocked）
-      scoutableWhen: { storyComplete: true },
+      // v1.4.3（作者の指定）：いつでも誘えるが、成功率はいつも 1%。HP・道具・持っている数では変わらない
+      scoutRate: 0.01,
+      scoutRateFixed: true,
       spawnRate: 0.1,
       evasion: 0,
       learnset: [

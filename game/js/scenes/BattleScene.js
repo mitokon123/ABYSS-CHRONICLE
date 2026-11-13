@@ -872,7 +872,7 @@
         this._applyStyle("faint", event.target, null);
         // 即死で倒れたときは、直前の即死の音が倒れる音を兼ねる（音を持つ状態異常が原因なら鳴らさない）
         if (!this._statusSeOf(event.statusId)) this.game.audio.playSe("faint");
-        // 倒した敵を図鑑に記録する（倒すだけで図鑑が開く種族がある。シニガミ。Discovery.isMonsterDexOpen）
+        // 倒した敵を図鑑に記録する（倒すだけで図鑑が開く種族＝dexOnDefeat のため。v1.4.3 からは書いた種族がいない）
         if (event.target && this.enemies.indexOf(event.target) >= 0 && this.game.discovery &&
             this.game.discovery.markMonsterDefeated) {
           this.game.discovery.markMonsterDefeated(event.target.speciesId);
@@ -2884,7 +2884,7 @@
   };
 
   /**
-   * まだ誘えない相手か（種族の scoutableWhen。v1.0.0 シニガミ）。
+   * まだ誘えない相手か（種族の scoutableWhen。v1.0.0。v1.4.3 からはシニガミも外したので、書いた種族はいない）。
    *   { storyComplete: true } … ストーリーを全部クリアしたあと（Game.isStoryComplete）
    */
   BattleScene.prototype._scoutLocked = function (target) {
@@ -2907,7 +2907,7 @@
     events.push({ type: "custom", text: fill(texts.attempt,
       { actor: step.actor.getName(), name: target.getName() }) });
 
-    // 誘える時期が決まっている種族（シニガミ：ストーリーを全部クリアしたあと）は、それまで必ず断られる
+    // 誘える時期が決まっている種族（scoutableWhen）は、それまで必ず断られる
     if (this._scoutLocked(target)) {
       events.push({ type: "custom", text: fill(texts.locked || texts.refused || "",
         { name: target.getName() }) });

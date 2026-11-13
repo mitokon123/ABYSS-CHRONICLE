@@ -39,6 +39,9 @@
     if (!species) return 0;
 
     var baseRate = species.scoutRate || 0;
+    // 成功率が決まっている種族（scoutRateFixed。v1.4.3 シニガミの 1%）は、HP・道具・持っている数・
+    // 最低保証と上限のどれも掛けず、scoutRate そのままにする
+    if (species.scoutRateFixed) return baseRate;
     var maxHp = target.getMaxHp();
     var hpRatio = maxHp > 0 ? Math.max(0, Math.min(1, target.currentHp / maxHp)) : 0;
 

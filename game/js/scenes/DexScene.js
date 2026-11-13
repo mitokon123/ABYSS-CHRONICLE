@@ -169,7 +169,7 @@
 
   /**
    * そのモンスターの詳しいところを図鑑で見せてよいか。ふつうは仲間にしたら。
-   * 倒すだけで開く種族もある（dexOnDefeat。シニガミ。Discovery.isMonsterDexOpen）
+   * 倒すだけで開く種族も作れる（dexOnDefeat。Discovery.isMonsterDexOpen。いまは書いた種族がいない）
    */
   DexScene.prototype._dexOpen = function (id) {
     var discovery = this.game.discovery;

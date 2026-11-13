@@ -1216,6 +1216,29 @@
     for (i = 0; i < slots.length; i++) {
       this.discovery.markItemObtained(slots[i].itemId);
     }
+    this._forgetDefeatOnlySkills();
+  };
+
+  /**
+   * v1.4.3 の移し替え：1.4.2 まではシニガミを倒すだけで、シニガミの覚える技が図鑑に開いていた（dexOnDefeat）。
+   * 1.4.3 からはほかの種族と同じく、実際に覚えたら開く。シニガミを仲間にしたことが無いなら、
+   * シニガミしか覚えない技（死神の鎌・死の踊り・デスラ）の「覚えた」の記録を消して伏せ直す。
+   * ほかの種族も覚える技（デス＝ツリガネ）は、倒して開いたのか覚えて開いたのか分からないので残す
+   */
+  Game.prototype._forgetDefeatOnlySkills = function () {
+    var d = this.discovery, monsters = (this.data && this.data.monsters) || {};
+    if (!d || !d.skillsLearned || !monsters.shinigami || d.isMonsterCaught("shinigami")) return;
+    var others = {};
+    Object.keys(monsters).forEach(function (id) {
+      if (id === "shinigami") return;
+      var sp = monsters[id];
+      (sp.learnset || []).forEach(function (e) { others[e.skill] = true; });
+      var reward = sp.bondReward || (sp.bondSkill ? { skill: sp.bondSkill } : null);
+      if (reward && reward.skill) others[reward.skill] = true;
+    });
+    (monsters.shinigami.learnset || []).forEach(function (e) {
+      if (!others[e.skill]) delete d.skillsLearned[e.skill];
+    });
   };
 
   /**
@@ -1236,9 +1259,10 @@
   };
 
   /**
-   * ストーリーを全部クリアしたか（v1.0.0。シニガミを誘える条件。種族の scoutableWhen.storyComplete）。
+   * ストーリーを全部クリアしたか（v1.0.0。種族の scoutableWhen.storyComplete で使う。
+   * v1.4.3 でシニガミはいつでも誘えるようにしたので、いまこの条件を書いた種族はいない）。
    * 最後の物語の場面（data/story.js の id "ending"）を見たら true。
-   * ★ いまは最後の物語が無いので、いつも false（シニガミはまだ誘えない）。
+   * ★ いまは最後の物語が無いので、いつも false。
    *   最後の物語を足すときは、その場面の id を "ending" にする（違う id にするなら、ここも直す）
    */
   Game.prototype.isStoryComplete = function () {
