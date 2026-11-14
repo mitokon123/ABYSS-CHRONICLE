@@ -202,7 +202,7 @@
     if (affordable <= 0) return 0;
 
     // その品をあと何個持てるか
-    var maxStack = (item.maxStack === undefined) ? 99 : item.maxStack;
+    var maxStack = (item.maxStack === undefined) ? 999 : item.maxStack;
     var owned = game.inventory.getCount(item.id);
 
     return Math.max(0, Math.min(affordable, maxStack - owned));
@@ -242,7 +242,11 @@
    */
   ShopSystem.prototype.getMaxSellCount = function (game, item) {
     if (!item || !this.canSell(item)) return 0;
-    return game.inventory.getCount(item.id);
+    var owned = game.inventory.getCount(item.id);
+    // 所持金の上限（v1.4.4）を超えるほどは売れない
+    var price = this.getSellPrice(item);
+    if (price > 0 && game.getGoldRoom) owned = Math.min(owned, Math.floor(game.getGoldRoom() / price));
+    return owned;
   };
 
   /**
@@ -250,7 +254,7 @@
    *
    * @param {number} [count] 売る個数（省略で1個）
    * @returns {{success:boolean, reason:string, count:number, gold:number}}
-   *   reason: "sold" | "cannotSell" | "notOwned" | "unknown"
+   *   reason: "sold" | "cannotSell" | "notOwned" | "goldFull"（所持金が上限） | "unknown"
    */
   ShopSystem.prototype.sell = function (game, itemId, count) {
     var item = this.data.getItem(itemId);
@@ -258,6 +262,13 @@
     if (!this.canSell(item)) return fail("cannotSell");
 
     count = (count === undefined) ? 1 : Math.max(1, count);
+    // 所持金の上限（v1.4.4）を超えるぶんは売らない（品物だけ減ってお金が入らない、を防ぐ）
+    var price = this.getSellPrice(item);
+    if (price > 0 && game.getGoldRoom) {
+      var room = Math.floor(game.getGoldRoom() / price);
+      if (room <= 0) return fail("goldFull");
+      count = Math.min(count, room);
+    }
     var removed = game.inventory.remove(itemId, count);
     if (removed <= 0) return fail("notOwned");
 

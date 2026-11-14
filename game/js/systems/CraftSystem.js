@@ -65,6 +65,29 @@
   };
 
   /**
+   * 一度に作れる回数の上限（v1.4.4）。素材・所持金・持てる数（maxStack）のいちばん厳しいもの。
+   * 1回も作れなければ 0
+   */
+  CraftSystem.prototype.maxCraftable = function (game, recipe) {
+    if (!recipe || !recipe.result) return 0;
+    var resultItem = this.data.getItem(recipe.result.item);
+    if (!resultItem) return 0;
+    var max = Infinity;
+    var materials = recipe.materials || [];
+    for (var i = 0; i < materials.length; i++) {
+      var need = materials[i].count || 1;
+      max = Math.min(max, Math.floor(game.inventory.getCount(materials[i].item) / need));
+    }
+    var gold = recipe.gold || 0;
+    if (gold > 0) max = Math.min(max, Math.floor((game.gold || 0) / gold));
+    var per = recipe.result.count || 1;
+    var maxStack = (resultItem.maxStack === undefined) ? 999 : resultItem.maxStack;
+    max = Math.min(max, Math.floor((maxStack - game.inventory.getCount(resultItem.id)) / per));
+    if (max === Infinity) max = Math.floor(maxStack / per);
+    return Math.max(0, max);
+  };
+
+  /**
    * 作れるか。
    * @returns {{ok:boolean, reason:string}}
    *   reason: "ok" | "notEnoughMaterial" | "notEnoughGold" | "stackFull" | "unknown"
@@ -96,27 +119,30 @@
     if (!resultItem) return false;
 
     var owned = game.inventory.getCount(resultItem.id);
-    var maxStack = (resultItem.maxStack === undefined) ? 99 : resultItem.maxStack;
+    var maxStack = (resultItem.maxStack === undefined) ? 999 : resultItem.maxStack;
 
     return owned + (recipe.result.count || 1) <= maxStack;
   };
 
   /**
    * 作る。素材とゴールドを消費して、できたものを持ち物へ入れる。
+   * @param {number} [times] 何回ぶん作るか（v1.4.4。省略で1回。作れる上限を超えたら作らない）
    * @returns {{success:boolean, reason:string, count:number}}
    */
-  CraftSystem.prototype.craft = function (game, recipe) {
+  CraftSystem.prototype.craft = function (game, recipe, times) {
     var check = this.canCraft(game, recipe);
     if (!check.ok) return { success: false, reason: check.reason, count: 0 };
+    var n = Math.max(1, Math.floor(times || 1));
+    if (n > this.maxCraftable(game, recipe)) return { success: false, reason: "notEnoughMaterial", count: 0 };
 
     // 素材とゴールドを先に消費する（ここまでで足りることは確認済み）
     var materials = recipe.materials || [];
     for (var i = 0; i < materials.length; i++) {
-      game.inventory.remove(materials[i].item, materials[i].count);
+      game.inventory.remove(materials[i].item, materials[i].count * n);
     }
-    game.spendGold(recipe.gold || 0);
+    game.spendGold((recipe.gold || 0) * n);
 
-    var count = recipe.result.count || 1;
+    var count = (recipe.result.count || 1) * n;
     var added = game.giveItem(recipe.result.item, count);
 
     return { success: true, reason: "crafted", count: added };

@@ -81,6 +81,8 @@
     this.styles = animation.styles || {};
     this.animator = new NS.BattleAnimator(animation);
     this.floatingText = new NS.FloatingText(animation.popup);
+    // 絆に届いた仲間から出るハート（v1.4.4）
+    this.hearts = new NS.HeartBurst(((game.data.ui || {}).theme || {}).hearts);
     this.screenEffects = new NS.ScreenEffects(animation);
     // 踏み込み・のけぞりのような「1回だけ流れる動き」を覚えておく
     this.actionMotions = new NS.MotionPlayer(game.data);
@@ -914,6 +916,8 @@
         if (event.actor && this.game.discovery.markAffectionStage) {
           this.game.discovery.markAffectionStage(event.actor.speciesId, event.stageIndex);
         }
+        // 絆に届いた瞬間は、その仲間からハートをいくつか出す（v1.4.4・作者の指定）
+        if (event.bond) this._bondHearts(event.actor);
         break;
       // 初めてレベルが上がったときの説明。
       // ここで出すと、レベルアップの演出が出ている画面のまま読める。
@@ -2658,7 +2662,9 @@
     if (total <= 0) return;
 
     var gained = this.game.giveGold(total);
-    events.push({ type: "custom", text: fill(texts.goldGained, { amount: gained }) });
+    if (gained > 0) events.push({ type: "custom", text: fill(texts.goldGained, { amount: gained }) });
+    // 上限（v1.4.4）に届いて入らなかったぶんがあれば、そう知らせる
+    if (gained < total) events.push({ type: "custom", text: texts.goldFull || "" });
   };
 
   /**
@@ -3071,6 +3077,8 @@
 
     // 浮かぶ数字は一番手前に描く
     this.floatingText.render(ctx);
+    // 絆のハート（v1.4.4）
+    if (this.hearts) this.hearts.render(ctx, this.game.clock);
 
     // 発動した強化・弱体・特性・加護の札（画面上部）
     this._renderEffectPopups(ctx, w);
@@ -3191,6 +3199,13 @@
    * 指定モンスターの画面上の位置（スプライトの中央あたり）。
    * ダメージ表示を出す場所に使う。
    */
+  /** 絆に届いた仲間の頭のあたりから、ハートを出す（控えに下がっていて場にいなければ出さない） */
+  BattleScene.prototype._bondHearts = function (monster) {
+    var center = this._monsterCenter(monster);
+    if (!center || !this.hearts) return;
+    this.hearts.add(center.x, center.y - 18, this.game.clock, (this.layout.bondHearts || 5));
+  };
+
   BattleScene.prototype._monsterScreenPos = function (monster) {
     if (!monster) return null;
     var w = this.game.canvas.width;
@@ -3699,6 +3714,8 @@
         { font: t.smallFont, color: t.subTextColor });
       y += lh;
     }
+    // 性格（v1.4.4・作者の指定。敵も見られる）。「性格 勇敢  攻撃↑ 防御↓」の形で、上がる能力は緑・下がる能力は赤
+    this._renderInspectNature(monster, x, y);
 
     // 右：状態異常とバフ／デバフ
     var cx = origin.x + (L.columnX || 300);
@@ -3727,6 +3744,48 @@
 
     this.panel.drawText(texts.hintInspect || "", origin.x, rect.y + rect.h - 14,
       { font: t.smallFont, color: t.hintColor });
+  };
+
+  /**
+   * 状態を見る：性格の行（v1.4.4）。名前は薄い色、上がる能力は緑・下がる能力は赤。
+   * 右の欄（状態異常）にかかりそうなら小さい字のまま詰める
+   */
+  BattleScene.prototype._renderInspectNature = function (monster, x, y, right) {
+    var nature = monster && monster.getNature ? monster.getNature() : null;
+    if (!nature) return;
+    var t = this.theme;
+    var texts = this.texts;
+    var dex = (this.game.data.messages || {}).dex || {};
+    var ctx = this.panel.ctx;
+    var font = t.smallFont || "12px monospace";
+    var up = t.hpBarHigh || "#5fd18c", down = t.hpBarLow || "#e8542a";
+
+    var label = fill(texts.inspectNature || "性格 {name}", { name: nature.name });
+    var chips = [];
+    var stats = [
+      { key: "hp", label: "HP" },
+      { key: "attack", label: texts.statAttack || "攻撃" },
+      { key: "defense", label: texts.statDefense || "防御" },
+      { key: "speed", label: texts.statSpeed || "素早さ" }
+    ];
+    for (var i = 0; i < stats.length; i++) {
+      var value = (nature[stats[i].key] === undefined) ? 1 : nature[stats[i].key];
+      if (value > 1) chips.push({ text: fill(dex.natureUp || "{stat}↑", { stat: stats[i].label }), color: up });
+      if (value < 1) chips.push({ text: fill(dex.natureDown || "{stat}↓", { stat: stats[i].label }), color: down });
+    }
+    if (chips.length === 0) chips.push({ text: dex.natureFlat || "補正なし", color: t.hintColor });
+
+    ctx.save();
+    ctx.font = font;
+    var gap = ctx.measureText(" ").width;
+    ctx.restore();
+    this.panel.drawText(label, x, y, { font: font, color: t.subTextColor });
+    ctx.save(); ctx.font = font; var tx = x + ctx.measureText(label).width + gap * 2; ctx.restore();
+    for (var c = 0; c < chips.length; c++) {
+      this.panel.drawText(chips[c].text, tx, y, { font: font, color: chips[c].color });
+      ctx.save(); ctx.font = font; tx += ctx.measureText(chips[c].text).width + gap; ctx.restore();
+    }
+    this._inspectNatureRight = tx;   // 確かめ（check.html）で右の欄にかからないかを見る
   };
 
   /**

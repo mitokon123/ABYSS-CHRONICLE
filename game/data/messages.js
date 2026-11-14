@@ -121,6 +121,7 @@
       wardSkill:        "{target} は 状態異常を1回 防げるようになった",  // target
       expGained:    "{amount} の経験値を獲得!",             // amount
       goldGained:   "{amount}G を手に入れた!",              // amount
+      goldFull:     "ゴールドがいっぱいで、これ以上持てない!",  // 上限（v1.4.4）に届いて捨てたぶんがあるとき
       levelUp:      "{actor} はレベル {level} に上がった!", // actor, level
       skillLearned: "{actor} は {skill} を覚えた!",          // actor, skill
       // 愛情度の段階が上がった（data/affection.js）。stage は段階の名前（慣れ・信頼・絆）
@@ -214,6 +215,8 @@
       cannotFlee:  "主からは逃げられない!",
       // 状態を見る
       inspectNone: "状態異常なし",
+      // v1.4.4：性格の行（「性格 勇敢  攻撃↑ 防御↓」。↑↓の文は図鑑と同じ messages.dex の natureUp/natureDown）
+      inspectNature: "性格 {name}",                         // name
       turnsLeft:   "あと{n}ターン",                        // n
       turnsLasting:"治すまで続く",
       hintInspect: "←→: 別の相手を見る    決定/Esc: 戻る",
@@ -299,7 +302,12 @@
       subtitle:  "これまでの更新",
       empty:     "このバージョンはまだ開発中です。",
       hintList:  "↑↓: バージョン    →/決定: 内容を読む    Esc: 戻る",
-      hintNotes: "↑↓: 読み進める    ←: バージョン一覧へ    Esc: 戻る"
+      hintNotes: "↑↓: 読み進める    決定: 見出しを開く／閉じる    C: まとめて    ←: 一覧へ    Esc: 戻る",
+      // 見出しの開け閉め（v1.4.4・作者の指定）。頭の印と、閉じているときに右へ出す件数
+      sectionOpen:   "▼ ",
+      sectionClosed: "▶ ",
+      closedCount:   "{count}件",                 // count
+      spoiler:       "ネタバレ注意"                // spoiler: true の見出し（閉じた状態から始まる）
     },
 
     save: {
@@ -639,6 +647,7 @@
       // ★ 持ち物の種類数に上限は無い（枠が埋まって買えないことは起きない）。
       //   出るのは「その品を持てる数（items.js の maxStack）」に達したときだけ
       stackFull:    "これ以上は持てない",
+      goldFull:     "ゴールドがいっぱいで、これ以上売れない",   // 所持金が上限（v1.4.4）
       cannotSell:   "これは売れない",
       notOwned:     "持っていない",
       noStock:      "並んでいる品物がない",
@@ -701,7 +710,16 @@
       hint:         "↑↓: 選択   ←→/F: 絞り込み{extra}   決定: 作る   Esc: 戻る",
       hintSources:  "   C: 手に入る場所",
       hintScroll:   "   Q/E: 送る",
-      hintConfirm:  "↑↓: 選択    決定: 決定    Esc: やめる"
+      hintConfirm:  "↑↓: 選択    決定: 決定    Esc: やめる",
+      // まとめて作る（v1.4.4）。決定のあと、右の欄に作る数の窓が出る（お店の個数と同じ操作）
+      countLabel:   "作る回数",
+      maxCount:     "最大 {max}回まで",                     // max
+      materialTotal:"使う素材（いま → 作ったあと）",
+      costTotal:    "費用の合計",
+      afterGold:    "作ったあとの所持金 {amount}G",          // amount
+      afterOwned:   "所持 {from} → {to}",                    // from, to
+      confirmCraft: "{name}を {count}個 作りますか?",        // name, count
+      hintQuantity: "←→: 1回ずつ    ↑↓: 10回ずつ    決定: 確認へ    Esc: やめる"
     },
 
     /** 加護を選ぶ画面（拠点） */

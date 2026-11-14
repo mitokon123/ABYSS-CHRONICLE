@@ -2950,7 +2950,7 @@
    *   斬撃     基礎 = max(0, 通常攻撃の基礎) × 技の power（倍率。噛みつく＝1.15。2026-10-22）
    *   ダメージ = floor( max(0, 基礎) × 属性倍率 × クリティカル倍率 × 防御 × 特性装備 × 乱数 )
    *   クリティカルのときは 基礎 から防御力を引かず、倍率は data/battle.js の critical
-   *   （共鳴だけ byKind で以前のまま：防御は引く・2.0）
+   *   （共鳴だけ byKind で 2.0）。共鳴・ブレスは v1.4.4 から defenseFactor 0 で、もともと防御を引かない
    *
    * 「通常攻撃」は normalAttackSkill の技だけ。体当たりなどの無属性技は技の式。
    *
@@ -3364,7 +3364,9 @@
       var stage = ally.getAffectionStage();
       events.push({
         type: "affectionUp", actorName: ally.getName(), actor: ally,
-        stageIndex: result.to, stageName: stage ? stage.name : ""
+        stageIndex: result.to, stageName: stage ? stage.name : "",
+        // 絆（報酬の段階）に届いた瞬間。画面がハートを出す（v1.4.4）
+        bond: !!(stage && stage.bondReward)
       });
       for (var k = 0; k < result.learned.length; k++) {
         var skill = this.data.getSkill(result.learned[k]);

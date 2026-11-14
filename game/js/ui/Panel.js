@@ -88,6 +88,9 @@
   // 見た目はバーも含めて一覧（ScrollList）とそろえてある（theme.scrollbar）。
 
   var HEAD_HEIGHT = 72;
+  // 札が1行に入りきらないときは折り返し、1行ふえるごとに上の欄をこれだけ高くする（v1.4.4。預かり所の狭い欄で性格の札がはみ出したため）
+  var CHIP_ROW = 24;
+  var CHIP_GAP = 6;
 
   /**
    * @param {MyGame.Panel} panel
@@ -128,7 +131,7 @@
     var lh = this.lineHeight();
     var origin = this.panel.innerOrigin(rect);
     var hasHead = !!(this.content && this.content.head);
-    var top = origin.y + (hasHead ? HEAD_HEIGHT : 0) + 18;
+    var top = origin.y + (hasHead ? this._headHeight(this.content.head) : 0) + 18;
     var bottom = rect.y + rect.h - (t.padding || 8);
     return {
       top: top,
@@ -291,23 +294,71 @@
     }
 
     this.panel.drawText(head.name || "", x, y + 22, { font: "18px monospace", color: head.nameColor || t.textColor });
-    var chipX = x;
-    var chips = head.chips || [];
-    for (var i = 0; i < chips.length; i++) {
-      chipX += this._chip(chips[i].label, chipX, y + 30, chips[i].color, chips[i].icon) + 6;
+    // 札。右の端を越えるなら次の行へ折り返す（2行目も名前の下＝絵の右から並べる。絵と影に重ねない）
+    var rows = this._chipRows(head);
+    for (var r = 0; r < rows.length; r++) {
+      for (var i = 0; i < rows[r].length; i++) {
+        var c = rows[r][i];
+        this._chip(c.chip.label, c.x, y + 30 + r * CHIP_ROW, c.chip.color, c.chip.icon);
+      }
     }
+    var extra = Math.max(0, rows.length - 1) * CHIP_ROW;
     if (head.sub) {
-      this.panel.drawText(head.sub, x, y + 66, { font: t.smallFont, color: head.subColor || t.subTextColor });
+      this.panel.drawText(head.sub, x, y + 66 + extra, { font: t.smallFont, color: head.subColor || t.subTextColor });
     }
 
     ctx.save();
     ctx.strokeStyle = t.panelBorder || "#3a4266";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(origin.x, y + HEAD_HEIGHT + 0.5);
-    ctx.lineTo(rect.x + rect.w - (t.padding || 8), y + HEAD_HEIGHT + 0.5);
+    ctx.moveTo(origin.x, y + HEAD_HEIGHT + extra + 0.5);
+    ctx.lineTo(rect.x + rect.w - (t.padding || 8), y + HEAD_HEIGHT + extra + 0.5);
     ctx.stroke();
     ctx.restore();
+  };
+
+  /** 上の欄の名前・札・下の小さい字の左端（絵があれば絵の右） */
+  DetailPane.prototype._headTextX = function (head) {
+    var x = this.panel.innerOrigin(this.rect).x;
+    return (head.icon || head.sprite || head.mark || head.drawPicture) ? x + 72 : x;
+  };
+
+  /**
+   * 札の並べ方。[[{ chip, x, w }…], …]（1行目・2行目…）。
+   * 名前の下（絵の右）から並べ、入りきらなければ次の行へ（どの行も絵の右から）
+   */
+  DetailPane.prototype._chipRows = function (head) {
+    var chips = head.chips || [];
+    var right = this.rect.x + this.rect.w - (this.theme.padding || 8) - 4;
+    var startX = this._headTextX(head);
+    var rows = [[]];
+    var cx = startX;
+    for (var i = 0; i < chips.length; i++) {
+      var w = this._chipWidth(chips[i].label, chips[i].icon);
+      if (rows[rows.length - 1].length > 0 && cx + w > right) {
+        rows.push([]);
+        cx = startX;
+      }
+      rows[rows.length - 1].push({ chip: chips[i], x: cx, w: w });
+      cx += w + CHIP_GAP;
+    }
+    return rows;
+  };
+
+  /** 上の欄の高さ（札が折り返したぶん高くなる） */
+  DetailPane.prototype._headHeight = function (head) {
+    if (!head) return 0;
+    return HEAD_HEIGHT + Math.max(0, this._chipRows(head).length - 1) * CHIP_ROW;
+  };
+
+  /** 札の幅（_chip と同じ計算） */
+  DetailPane.prototype._chipWidth = function (label, iconId) {
+    var ctx = this.panel.ctx;
+    ctx.save();
+    ctx.font = this.theme.smallFont || "12px monospace";
+    var w = Math.ceil(ctx.measureText(label || "").width) + (iconId ? 22 : 7) + (iconId ? 8 : 7);
+    ctx.restore();
+    return w;
   };
 
   /** 札（枠つきの小さな文字。絵を添えられる） */
@@ -436,6 +487,75 @@
   }
 
   NS.DetailPane = DetailPane;
+
+  /**
+   * ハートが昇って消える演出（v1.4.4・作者の指定）。
+   *   愛情度が「絆」に届いた瞬間（戦闘）と、拠点で絆の仲間に触れたとき（ときどき）に出す。
+   *   ★ 新しい js ファイルは読まれないことがあるので、共通の部品としてここに置いた
+   * 使い方：var hearts = new NS.HeartBurst(設定); hearts.add(x, y, clock, 個数); 毎フレーム hearts.render(ctx, clock)
+   * @param {object} [config] { life, rise, size, spread, stagger, color, edge }（data/ui.js の hearts）
+   */
+  function HeartBurst(config) {
+    this.config = config || {};
+    this.items = [];
+  }
+
+  /** (x, y) から count 個のハートを出す。少しずつ時間と横の位置をずらす */
+  HeartBurst.prototype.add = function (x, y, clock, count) {
+    var C = this.config;
+    var spread = C.spread || 22, stagger = C.stagger || 140;
+    var n = Math.max(1, count || 1);
+    for (var i = 0; i < n; i++) {
+      // 横は左右に散らす（真ん中から外へ）。1つだけなら真上
+      var side = (n === 1) ? 0 : (i / (n - 1)) * 2 - 1;
+      this.items.push({
+        x: x + side * spread * 0.6, y: y, sway: side * spread * 0.5 + ((i % 2) ? 4 : -4),
+        start: clock + i * stagger, size: (C.size || 10) * (i % 3 === 1 ? 1.25 : 1)
+      });
+    }
+  };
+
+  HeartBurst.prototype.isActive = function () { return this.items.length > 0; };
+
+  HeartBurst.prototype.render = function (ctx, clock) {
+    var C = this.config;
+    var life = C.life || 1300, rise = C.rise || 42;
+    var keep = [];
+    for (var i = 0; i < this.items.length; i++) {
+      var h = this.items[i];
+      var t = (clock - h.start) / life;
+      if (t >= 1) continue;
+      keep.push(h);
+      if (t < 0) continue;
+      // ふくらんで出て（最初の15%）、昇りながら揺れ、最後の4割で消える
+      var grow = Math.min(1, t / 0.15);
+      var alpha = t < 0.6 ? 1 : Math.max(0, 1 - (t - 0.6) / 0.4);
+      var x = h.x + h.sway * t + Math.sin(t * Math.PI * 2) * 3;
+      var y = h.y - rise * (1 - Math.pow(1 - t, 2));
+      drawHeart(ctx, x, y, h.size * (0.6 + 0.4 * grow), C.color || "#ff6f9c", C.edge || "#ffd0de", alpha);
+    }
+    this.items = keep;
+  };
+
+  /** ハート1つ（cx, cy が真ん中。size は横幅） */
+  function drawHeart(ctx, cx, cy, size, color, edge, alpha) {
+    var s = size / 2;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + s * 0.9);
+    ctx.bezierCurveTo(cx - s * 1.4, cy - s * 0.1, cx - s * 0.7, cy - s * 1.2, cx, cy - s * 0.45);
+    ctx.bezierCurveTo(cx + s * 0.7, cy - s * 1.2, cx + s * 1.4, cy - s * 0.1, cx, cy + s * 0.9);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = edge;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  NS.HeartBurst = HeartBurst;
 
   NS.Panel = Panel;
 })(window.MyGame);

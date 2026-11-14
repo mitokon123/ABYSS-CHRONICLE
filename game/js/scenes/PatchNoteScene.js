@@ -12,6 +12,9 @@
  * ▼ 操作
  *   ↑↓        … 左でバージョンを選ぶ
  *   ←→ / 決定 … 内容側へ移り、↑↓で読み進める
+ *   右の内容     … 話題の見出し（「▼ 仲間」）ごとに開け閉めできる（v1.4.4・作者の指定）。
+ *                  ↑↓ で見出しを選び、決定か見出しを押して開け閉め。C でその版の見出しをまとめて開け閉め。
+ *                  { section, spoiler: true } の見出しは、ネタバレ対策で閉じた状態から始まる
  *   ホイール    … カーソルの位置にある側をスクロール
  *   右端のバー  … どちらの枠も、持ち物などの一覧と同じバーでつまんで送れる（js/ui/ScrollList.js）
  *   Esc / 戻る … タイトルへ
@@ -42,6 +45,8 @@
 
     this.index = 0;       // 選んでいるバージョン
     this.focus = "list";  // "list"（バージョンを選ぶ）/ "notes"（内容を読む）
+    this.cursor = -1;     // 右で選んでいる見出しの行（notes の行の番号。見出しが無ければ -1）
+    this._open = {};      // 開け閉めした見出し。"版の番号:entries の番号" → true / false（無ければ spoiler でないものが開いている）
 
     var self = this;
     var L = this.layout.list;
@@ -94,11 +99,80 @@
     return Math.max(1, Math.floor((L.h - 10) / L.rowHeight));
   };
 
-  /** 選んでいるバージョンの内容を、右の枠に入れ直す（先頭から読む） */
-  PatchNoteScene.prototype._loadNotes = function () {
+  /**
+   * 選んでいるバージョンの内容を、右の枠に入れ直す。
+   * @param {number} [keepEntry] 開け閉めしたときに、選んでいた見出し（entries の番号）。
+   *   渡したときはスクロールの位置を残し、その見出しを選び直す。渡さなければ先頭から読む
+   */
+  PatchNoteScene.prototype._loadNotes = function (keepEntry) {
     var lines = this._buildLines();
     for (var i = 0; i < lines.length; i++) lines[i].type = "line";
-    this.notes.setRows(lines);
+    if (keepEntry === undefined) {
+      this.notes.setRows(lines);
+      this.cursor = this._nextHeading(-1, 1);
+      return;
+    }
+    // 開け閉めでは、読んでいた位置をそのまま残す
+    this.notes.rows = lines;
+    this.notes.scrollTarget = this.notes._clampScroll(this.notes.scrollTarget);
+    this.notes.scroll = this.notes._clampScroll(this.notes.scroll);
+    this.cursor = -1;
+    for (var k = 0; k < lines.length; k++) {
+      if (lines[k].heading && lines[k].entryIndex === keepEntry) { this.cursor = k; break; }
+    }
+  };
+
+  /** 見出しが開いているか（まだ触っていなければ、ネタバレの見出しだけ閉じている） */
+  PatchNoteScene.prototype._isOpen = function (entryIndex) {
+    var key = this.index + ":" + entryIndex;
+    if (this._open[key] !== undefined) return this._open[key];
+    var entry = ((this.getSelected() || {}).entries || [])[entryIndex] || {};
+    return !entry.spoiler;
+  };
+
+  /** 見出しの行（notes の行の番号）を開け閉めする */
+  PatchNoteScene.prototype._toggle = function (row) {
+    var line = this.notes.rows[row];
+    if (!line || !line.heading) return;
+    this._open[this.index + ":" + line.entryIndex] = !line.open;
+    this._loadNotes(line.entryIndex);
+    this._showCursor();
+    if (this.game.audio) this.game.audio.playSe("cursor");
+  };
+
+  /** この版の見出しをまとめて開け閉めする（1つでも閉じていれば全部開く。全部開いていれば全部閉じる） */
+  PatchNoteScene.prototype._toggleAll = function () {
+    var rows = this.notes.rows, anyClosed = false, i;
+    for (i = 0; i < rows.length; i++) if (rows[i].heading && !rows[i].open) anyClosed = true;
+    var keep = (this.cursor >= 0 && rows[this.cursor]) ? rows[this.cursor].entryIndex : undefined;
+    for (i = 0; i < rows.length; i++) if (rows[i].heading) this._open[this.index + ":" + rows[i].entryIndex] = anyClosed;
+    this._loadNotes(keep === undefined ? -1 : keep);
+    if (keep === undefined) this.cursor = this._nextHeading(-1, 1);
+    this._showCursor();
+    if (this.game.audio) this.game.audio.playSe("cursor");
+  };
+
+  /** from の次（dir = 1）か前（dir = -1）の見出しの行。無ければ -1 */
+  PatchNoteScene.prototype._nextHeading = function (from, dir) {
+    var rows = this.notes.rows;
+    for (var i = from + dir; i >= 0 && i < rows.length; i += dir) if (rows[i].heading) return i;
+    return -1;
+  };
+
+  /** いま見えている行の範囲 [start, end)（1行まるごと見えている行だけ） */
+  PatchNoteScene.prototype._shownRows = function () {
+    var lh = this.notes._rowHeight();
+    var start = Math.ceil(this.notes.scrollTarget / lh);
+    var end = Math.floor((this.notes.scrollTarget + this.notes._viewHeight()) / lh);
+    return { start: start, end: end };
+  };
+
+  /** 選んでいる見出しが見えるところまで送る */
+  PatchNoteScene.prototype._showCursor = function () {
+    if (this.cursor < 0) return;
+    var shown = this._shownRows();
+    if (this.cursor < shown.start) this.notes.scrollByRows(this.cursor - shown.start);
+    else if (this.cursor >= shown.end) this.notes.scrollByRows(this.cursor - shown.end + 1);
   };
 
   PatchNoteScene.prototype.getSelected = function () {
@@ -162,11 +236,52 @@
    */
   PatchNoteScene.prototype._updateNotes = function (input, active) {
     this.notes.handleInput(input);
+
+    // マウス：見出しに重ねると選び、押すと開け閉め
+    var pointed = this._pointedHeading(input);
+    if (pointed >= 0) {
+      this.cursor = pointed;
+      if (input.getPointer().clicked && !this.notes.isDragging()) { this._toggle(pointed); return; }
+    }
     if (!active) return;
 
-    if (input.isPressed("up")) this.notes.scrollByRows(-1);
-    if (input.isPressed("down")) this.notes.scrollByRows(1);
+    // ↑↓：次の見出しが見えていればそこへ。見えていなければ1行ずつ読み進める（長い話題も読み飛ばさない）
+    if (input.isPressed("down")) this._step(1);
+    if (input.isPressed("up")) this._step(-1);
+    if (input.isPressed("confirm") && this.cursor >= 0) { this._toggle(this.cursor); return; }
+    if (input.isPressed("menu")) { this._toggleAll(); return; }
     if (input.isPressed("left")) this.focus = "list";
+  };
+
+  /** ↑↓ 1回ぶん。dir = 1 で下、-1 で上 */
+  PatchNoteScene.prototype._step = function (dir) {
+    var shown = this._shownRows();
+    var next = this._nextHeading(this.cursor, dir);
+    var cursorShown = this.cursor >= shown.start && this.cursor < shown.end;
+    if (next >= 0 && next >= shown.start && next < shown.end && (cursorShown || dir > 0 || this.cursor < 0)) {
+      this.cursor = next;
+      return;
+    }
+    if (dir < 0 && this.cursor >= 0 && !cursorShown && this.cursor < shown.start && shown.start - this.cursor <= 1) {
+      this.notes.scrollByRows(-1);
+      return;
+    }
+    if (dir < 0 && next >= 0 && cursorShown) { this.cursor = next; this._showCursor(); return; }
+    this.notes.scrollByRows(dir);
+  };
+
+  /** マウスが重なっている見出しの行（無ければ -1） */
+  PatchNoteScene.prototype._pointedHeading = function (input) {
+    if (!input.getPointer) return -1;
+    var pointer = input.getPointer();
+    if (!pointer.inside || (!pointer.moved && !pointer.clicked)) return -1;
+    var view = this.notes._viewRect();
+    if (!NS.Panel.containsPoint(view, pointer)) return -1;
+    var rows = this.notes.rows;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].heading && NS.Panel.containsPoint(this.notes._rowRect(i), pointer)) return i;
+    }
+    return -1;
   };
 
   // --- 内容の組み立て ---
@@ -185,12 +300,21 @@
     var entries = version.entries || [];
     var lines = [];
 
+    var open = true;
     for (var i = 0; i < entries.length; i++) {
-      // 話題の見出し（{ section: "戦い" }）。札は付けず、色を変えて1行で出す
+      // 話題の見出し（{ section: "戦い" }）。札は付けず、色を変えて1行で出す。開け閉めできる（閉じていれば中身を出さない）
       if (entries[i].section) {
-        lines.push({ text: (this.texts.sectionMark || "■ ") + entries[i].section, tag: null, heading: true });
+        open = this._isOpen(i);
+        var count = 0;
+        for (var n = i + 1; n < entries.length && !entries[n].section; n++) count++;
+        lines.push({
+          text: entries[i].section, tag: null, heading: true, entryIndex: i, open: open,
+          count: count, spoiler: !!entries[i].spoiler
+        });
+        if (!open) lines.push({ text: "", tag: null });   // 閉じた見出しのあいだも1行あける
         continue;
       }
+      if (!open) continue;
 
       var type = this.types[entries[i].type] || null;
       var wrapped = wrapText(entries[i].text || "", chars);
@@ -330,9 +454,23 @@
 
     if (line.tag) this._drawTag(line.tag, x, y);
     if (line.heading) {
-      // 見出しは札の位置から書き始め、目立つ色にする
-      this.panel.drawText(line.text, x, y,
+      // 見出しは札の位置から書き始め、目立つ色にする。頭に開いているか（▼）閉じているか（▶）。
+      // 選んでいる見出しは帯を敷く。閉じていれば右に件数（ネタバレの見出しは「ネタバレ注意」も）
+      var lh = t.lineHeight || 18;
+      var right = this.layout.notes.x + this.layout.notes.w - (t.padding || 8) - this.notes.barSpace() - 4;
+      if (this.focus === "notes" && this.notes.rows[this.cursor] === line) {
+        this.panel.ctx.fillStyle = this.layout.selectedBg || "rgba(74,107,168,0.3)";
+        this.panel.ctx.fillRect(x - 4, y - lh + 4, right - x + 8, lh);
+      }
+      var mark = line.open ? (this.texts.sectionOpen || "▼ ") : (this.texts.sectionClosed || "▶ ");
+      this.panel.drawText(mark + line.text, x, y,
         { font: t.font, color: this.layout.sectionColor || t.cursorColor });
+      if (!line.open) {
+        var note = fill(this.texts.closedCount || "{count}件", { count: line.count });
+        if (line.spoiler) note = (this.texts.spoiler || "ネタバレ注意") + "　" + note;
+        this.panel.drawText(note, right, y,
+          { align: "right", font: t.smallFont, color: line.spoiler ? (this.layout.spoilerColor || "#e8a23a") : t.hintColor });
+      }
     } else if (line.text) {
       this.panel.drawText(line.text, textX, y, { font: t.smallFont, color: t.textColor });
     }
@@ -368,6 +506,11 @@
     }
     ctx.restore();
     return cut + "…";
+  }
+
+  /** 「{count}件」の差し込み */
+  function fill(text, values) {
+    return String(text).replace(/\{(\w+)\}/g, function (m, key) { return values[key] !== undefined ? values[key] : m; });
   }
 
   /** 文字数で折り返す（等幅フォント前提の簡易処理） */

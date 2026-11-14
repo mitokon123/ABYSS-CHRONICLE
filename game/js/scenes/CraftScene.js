@@ -47,7 +47,8 @@
     this.backButton = new NS.BackButton(this.panel, game.data);
     this.craftSystem = new NS.CraftSystem(game.data);
 
-    this.phase = "list";   // "list" | "confirm"
+    this.phase = "list";   // "list" | "quantity"（v1.4.4：作る数を決める）| "confirm"
+    this.order = null;     // 作ろうとしている内容 { recipe, count, max }（quantity・confirm のあいだ）
     this.notice = new NS.Notice(this.theme.notice);
     // 右の説明欄（共通の部品 NS.DetailPane。js/ui/Panel.js）
     this.pane = new NS.DetailPane(this.panel, this.sprites, this.layout.detail || { x: 0, y: 0, w: 0, h: 0 });
@@ -62,6 +63,7 @@
     this.game.audio.playBgm("craft");
 
     this.phase = "list";
+    this.order = null;
     this.notice.clear();
     this._rebuildList();
   };
@@ -205,13 +207,15 @@
 
     this.notice.update(dt);
 
-    // 「戻る」ボタン。確認の途中なら一覧へ戻す
+    // 「戻る」ボタン。確認の途中なら作る数へ、作る数なら一覧へ戻す
     if (this.backButton.handleInput(input)) {
-      if (this.phase === "confirm") this.phase = "list";
+      if (this.phase === "confirm") this.phase = "quantity";
+      else if (this.phase === "quantity") { this.phase = "list"; this.order = null; }
       else this.game.scenes.change(this.returnScene);
       return;
     }
 
+    if (this.phase === "quantity") { this._updateQuantity(input); return; }
     if (this.phase === "confirm") { this._updateConfirm(input); return; }
 
     // 絞り込み：F・←→・札を押す
@@ -255,11 +259,32 @@
       return;
     }
 
-    this.confirmMenu.setItems([
-      { label: this.texts.yes || "はい", value: "yes" },
-      { label: this.texts.no || "いいえ", value: "no" }
-    ]);
-    this.phase = "confirm";
+    // 作る数を決める（v1.4.4・作者の指定。お店の個数と同じ操作：←→ 1つずつ・↑↓ まとめて）
+    this.order = { recipe: recipe, count: 1, max: Math.max(1, this.craftSystem.maxCraftable(this.game, recipe)) };
+    this.phase = "quantity";
+  };
+
+  /** 作る数を決める。←→ で1つずつ、↑↓ で quantityStep ずつ。決定で確認へ */
+  CraftScene.prototype._updateQuantity = function (input) {
+    var step = this.layout.quantityStep || 10;
+    if (input.isPressed("right")) this._changeCount(1);
+    if (input.isPressed("left")) this._changeCount(-1);
+    if (input.isPressed("up")) this._changeCount(step);
+    if (input.isPressed("down")) this._changeCount(-step);
+    if (input.isPressed("cancel")) { this.phase = "list"; this.order = null; return; }
+    if (input.isPressed("confirm")) {
+      this.confirmMenu.setItems([
+        { label: this.texts.yes || "はい", value: "yes" },
+        { label: this.texts.no || "いいえ", value: "no" }
+      ]);
+      this.phase = "confirm";
+    }
+  };
+
+  /** 作る数を増減する（1〜作れる上限に収める） */
+  CraftScene.prototype._changeCount = function (delta) {
+    if (!this.order) return;
+    this.order.count = Math.max(1, Math.min(this.order.max, this.order.count + delta));
   };
 
   CraftScene.prototype._updateConfirm = function (input) {
@@ -267,18 +292,18 @@
     if (!result) return;
 
     if (result.type === "cancel" || result.value === "no") {
-      this.phase = "list";
+      this.phase = "quantity";
       return;
     }
     if (result.value === "yes") this._craft();
   };
 
   CraftScene.prototype._craft = function () {
-    var recipe = this._selectedRecipe();
+    var recipe = this.order ? this.order.recipe : this._selectedRecipe();
     if (!recipe) return;
 
     var item = this.game.data.getItem(recipe.result.item);
-    var result = this.craftSystem.craft(this.game, recipe);
+    var result = this.craftSystem.craft(this.game, recipe, this.order ? this.order.count : 1);
 
     this._showNotice(result.success
       ? fill(this.texts.crafted, { name: item.name, count: result.count })
@@ -287,6 +312,7 @@
     else this.game.playError();
 
     this.phase = "list";
+    this.order = null;
 
     // 素材と所持金が変わるので一覧を作り直す（カーソル位置は保つ）。
     // 「作れるもの」で絞っていると行が減るので、見出しに当たったら先頭のまま
@@ -312,9 +338,8 @@
     this._renderGold();
     this._renderFilterLabel();
     this.list.render(this.game.clock);
-    this._renderDetail();
-
-    if (this.phase === "confirm") this.confirmMenu.render(this.game.clock);
+    if (this.order && (this.phase === "quantity" || this.phase === "confirm")) this._renderOrder();
+    else this._renderDetail();
 
     this._renderNotice();
     this._renderHint();
@@ -336,9 +361,11 @@
     if (!pos) return;
 
     var template = ((this.game.data.messages || {}).home || {}).gold || "{amount}G";
+    // 上限（v1.4.4）に届いていれば色を変える
+    var full = this.game.isGoldFull && this.game.isGoldFull();
     this.panel.drawText(template.replace("{amount}", this.game.gold || 0), pos.x, pos.y,
       { align: "right", font: pos.font || this.theme.font,
-        color: pos.color || this.theme.cursorColor });
+        color: full ? (this.theme.goldFullColor || "#ff9a3a") : (pos.color || this.theme.cursorColor) });
   };
 
   /** 一覧の右上の絞り込みの札（「絞り込み：すべて　F」）。右端を一覧の右端にそろえる。押すと次に変わる */
@@ -515,6 +542,102 @@
     return NS.EffectSystem.describeEffect(effect, this.game.data);
   };
 
+  /**
+   * 作ろうとしている内容（v1.4.4）。右の説明欄に重ねて出す（お店の個数の窓と同じ形）。
+   * 名前 → 作る数（◀ N ▶）→ 最大 → N回ぶんの素材 → 費用の合計と残り → できたあとの所持数 →（確認のとき）問いとはい／いいえ
+   */
+  CraftScene.prototype._renderOrder = function () {
+    var rect = this.layout.detail;
+    var order = this.order;
+    if (!rect || !order) return;
+    var t = this.theme, texts = this.texts, data = this.game.data;
+    var recipe = order.recipe;
+    var item = data.getItem(recipe.result.item) || {};
+    var per = recipe.result.count || 1;
+    var n = order.count;
+    var right = rect.x + rect.w - (t.padding || 8) - 6;
+    var red = t.hpBarLow || "#e8542a";
+
+    this.panel.drawBox(rect);
+    var origin = this.panel.innerOrigin(rect);
+    var lh = t.lineHeight || 18;
+    var x = origin.x + 4;
+    var y = origin.y + 22;
+    this._orderRows = [];   // 確かめ（check.html）用：描いた行の [左端, 右端, y]
+
+    this.panel.drawText((item.name || "") + (per > 1 ? " ×" + per : ""), x, y, { color: t.textColor });
+    y += lh + 16;
+
+    // 作る数。左右で1つずつ・上下でまとめて動くことが見て分かるよう、◀▶ と ▲▼ を添える
+    var step = this.layout.quantityStep || 10;
+    var confirming = (this.phase === "confirm");
+    this.panel.drawText(texts.countLabel || "", x, y, { font: t.smallFont, color: t.subTextColor });
+    if (!confirming) {
+      this.panel.drawText("▲" + step, right, y - lh + 4, { align: "right", font: t.smallFont, color: t.hintColor });
+      this.panel.drawText("▼" + step, right, y + lh - 4, { align: "right", font: t.smallFont, color: t.hintColor });
+    }
+    this.panel.drawText(confirming ? String(n) : ("◀ " + n + " ▶"), right, y, { align: "right", color: t.cursorColor });
+    y += lh + 6;
+    this.panel.drawText(fill(texts.maxCount || "", { max: order.max }), x, y, { font: t.smallFont, color: t.hintColor });
+    y += lh + 12;
+
+    // N回ぶんの素材（持っている数 → 作ったあと）
+    this.panel.drawText(texts.materialTotal || "", x, y, { font: t.smallFont, color: t.subTextColor });
+    this._orderRows.push([x, this._textRight(texts.materialTotal || "", x), y]);
+    y += lh;
+    var materials = recipe.materials || [];
+    for (var i = 0; i < materials.length; i++) {
+      var m = data.getItem(materials[i].item) || {};
+      var need = (materials[i].count || 1) * n, owned = this.game.inventory.getCount(m.id);
+      var amount = owned + " → " + (owned - need);
+      this.panel.drawText("・" + (m.name || ""), x, y, { font: t.smallFont });
+      this.panel.drawText(amount, right, y,
+        { align: "right", font: t.smallFont, color: owned >= need ? t.subTextColor : red });
+      this._orderRows.push([x, this._textRight("・" + (m.name || ""), x), y, right - this._textWidth(amount)]);
+      y += lh - 2;
+    }
+    y += 10;
+
+    // 費用（無料のレシピでは出さない）
+    var gold = (recipe.gold || 0) * n;
+    if (gold > 0) {
+      this.panel.drawText(texts.costTotal || "", x, y, { font: t.smallFont });
+      this.panel.drawText(gold + "G", right, y, { align: "right", color: t.cursorColor });
+      y += lh;
+      var rest = fill(texts.afterGold || "", { amount: (this.game.gold || 0) - gold });
+      this.panel.drawText(rest, x, y, { font: t.smallFont, color: t.subTextColor });
+      this._orderRows.push([x, this._textRight(rest, x), y]);
+      y += lh;
+    }
+    var have = this.game.inventory.getCount(item.id);
+    var after = fill(texts.afterOwned || "", { from: have, to: have + per * n });
+    this.panel.drawText(after, x, y, { font: t.smallFont, color: t.subTextColor });
+    this._orderRows.push([x, this._textRight(after, x), y]);
+    this._orderBottom = y;
+
+    if (!confirming) return;
+    // 問いは、はい／いいえ（confirmMenu）の左に折り返して出す
+    var q = NS.wrapText(fill(texts.confirmCraft || "", { name: item.name || "", count: per * n }),
+      (this.layout.orderQuestionChars || 12));
+    var M = this.layout.confirmMenu || { x: 560, y: 400 };
+    for (var k = 0; k < q.length; k++) {
+      this.panel.drawText(q[k], x, M.y + 22 + k * (lh - 2), { font: t.smallFont, color: t.textColor });
+      this._orderRows.push([x, this._textRight(q[k], x), M.y + 22 + k * (lh - 2), M.x]);
+    }
+    this.confirmMenu.render(this.game.clock);
+  };
+
+  /** 小さい字で書いたときの幅・右端（窓に収まるかの確かめにも使う） */
+  CraftScene.prototype._textWidth = function (text) {
+    var ctx = this.panel.ctx;
+    ctx.save();
+    ctx.font = this.theme.smallFont || "12px monospace";
+    var w = ctx.measureText(text || "").width;
+    ctx.restore();
+    return w;
+  };
+  CraftScene.prototype._textRight = function (text, x) { return x + this._textWidth(text); };
+
   CraftScene.prototype._renderNotice = function () {
     if (!this.notice.isActive()) return;
     var pos = this.layout.notice || { x: 400, y: 526 };
@@ -532,6 +655,7 @@
     var texts = this.texts;
     var hint;
     if (this.phase === "confirm") hint = texts.hintConfirm;
+    else if (this.phase === "quantity") hint = texts.hintQuantity;
     else {
       // 足りない素材があれば「C: 手に入る場所」、入りきらなければ「Q/E: 送る」を足す
       var extra = (this._hasMissing() ? (texts.hintSources || "") : "")

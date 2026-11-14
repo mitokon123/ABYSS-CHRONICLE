@@ -5,7 +5,8 @@
  * ▼ ダメージ計算式（すべてこのファイルの数値で調整可能）
  *
  *   技のとき   基礎 = 攻撃力 × skill.attackFactor  + 技威力 × skill.powerFactor - 防御力 × defenseFactor
- *              （係数は技の種類ごと。damage.byKind にある種類はそちらを使う）
+ *              （係数は技の種類ごと。damage.byKind にある種類はそちらを使う。
+ *               共鳴・ブレスは defenseFactor 0＝防御力を引かない。守りは属性の耐性。v1.4.4）
  *   通常攻撃   基礎 = 攻撃力 × normal.attackFactor + normal.power             - 防御力 × defenseFactor
  *   基礎 = max(0, 基礎)
  *   ダメージ = floor( 基礎 × 属性倍率 × クリティカル倍率 × 防御コマンド倍率
@@ -27,7 +28,7 @@
  * ▼ クリティカル
  *   確率 = critical.baseRate + 技の criticalBonus
  *   当たると 基礎 から防御力を引かず（critical.ignoreDefense）、critical.multiplier（1.66）を掛ける。
- *   共鳴だけは critical.byKind で以前のまま（防御は引く・2.0）。属性の耐性は無視しない。
+ *   共鳴だけは critical.byKind で 2.0 倍（共鳴とブレスは v1.4.4 からもともと防御を引かない）。属性の耐性は無視しない。
  *
  * ▼ 命中
  *   技に accuracy が書かれていればその値、無ければ defaultAccuracy。
@@ -89,11 +90,14 @@
        *     共鳴は ×1.50 になったので、足すときに見直す
        */
       //   defenseFactor … その種類だけ防御の引き方を変える（書かなければ下の共通 0.30）。
-      //     共鳴・ブレスは 0.15（半分）。2026-09-29 作者の判断：属性技が9割なので、
-      //     防御より「耐性」が守りの中心になるようにする。まず半分で試し、足りなければ 0（無視）へ
+      //     共鳴・ブレスは 0（防御力を引かない）。2026-09-29 に「属性技が9割なので、防御より耐性が守りの中心」として
+      //     半分（0.15）で試し、v1.4.4（2026-11-14 作者の指定）で 0 にした：
+      //     共鳴・ブレスは属性を持つので、軽くするのは耐性（属性倍率）の役目。防御力で引くと耐性の意味が薄れる
       byKind: {
-        resonance: { attackFactor: 0.25, powerFactor: 1.50, defenseFactor: 0.15 },  // 共鳴：攻撃力にあまり頼らず、威力が効く
-        breath:    { attackFactor: 0.30, powerFactor: 1.35, defenseFactor: 0.15 },  // ブレス：全体・状態異常のぶん控えめ
+        // v1.4.4（2026-11-14 作者の指定）：防御を引かないのに合わせて、攻撃力の係数を 共鳴 0.25 → 0.15・ブレス 0.30 → 0.10 に下げた。
+        //   共鳴・ブレスは技の威力で決まり、使う者の攻撃力にはあまり伸びない
+        resonance: { attackFactor: 0.15, powerFactor: 1.50, defenseFactor: 0 },  // 共鳴：攻撃力にあまり頼らず、威力が効く。防御は引かない
+        breath:    { attackFactor: 0.10, powerFactor: 1.35, defenseFactor: 0 },  // ブレス：全体・状態異常のぶん控えめ。防御は引かない
         // 体技：v1.4.1 から体技の技はこの係数を使わない（作者の指定。1体＝通常攻撃の基礎 × 倍率・全体＝威力そのまま。
         // BattleSystem.bodyModeOf）。残しているのは、計算だけ体技の技（damageKind）が出てきたときのため
         body:      { attackFactor: 0.55, powerFactor: 1.25 },
@@ -102,7 +106,7 @@
         slash:     { attackFactor: 0.65, powerFactor: 1.10 },
         dance:     { attackFactor: 0.40, powerFactor: 1.35 }   // 踊り：未定（いずれ技ごとの専用の式）。今は以前の値
       },
-      defenseFactor: 0.30,  // 防御力に掛ける係数（通常攻撃・体技・斬撃。共鳴とブレスは byKind で 0.15）
+      defenseFactor: 0.30,  // 防御力に掛ける係数（通常攻撃・1体の体技・斬撃・踊り。共鳴とブレスは byKind で 0＝引かない）
       randomMin: 0.9,
       randomMax: 1.1,
       // 計算が0になったとき（防御で削り切った・乱数で切り捨てた）の扱い（RC-1。作者の指定）。
@@ -126,7 +130,7 @@
      *                   属性の耐性・防御コマンド・特性や装備の軽減はそのまま効く
      *   multiplier    … 倍率。防御を無視するぶん、2.0 から 1.66 に下げた
      *   byKind        … 技の種類ごとの上書き（multiplier / ignoreDefense）。
-     *                   共鳴だけは以前のまま（防御は引く・2.0 倍。作者の指定）
+     *                   共鳴だけは 2.0 倍（作者の指定）。共鳴は v1.4.4 から防御を引かないので、ignoreDefense は効き目が無い
      */
     critical: {
       baseRate: 0.03,      // 全キャラ共通のクリティカル率

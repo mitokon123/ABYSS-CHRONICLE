@@ -204,6 +204,42 @@
         run: checkShinigamiScout
       },
       {
+        title: "持てる数 999・工房でまとめて作る・戦闘で性格を見る",
+        since: "v1.4.4",
+        why: "1.4.4 で、どの品も 999 個まで持てる・工房で作る回数を選べる・戦闘の「状態を見る」で相手の性格が見える、にした。上限で止まるか・作った数と減った素材が合うか・作れる上限を超えて作れないか・作る数の窓と性格の行が枠や右の欄にかからないか。",
+        run: checkSpec144
+      },
+      {
+        title: "仲間の詳しい欄で性格の札がはみ出さない",
+        since: "v1.4.4",
+        why: "預かり所の右の欄は狭く、性格の札が4つ（臆病の「HP↓ 攻撃↓ 防御↑ 素早さ↑」など）だと右の端からはみ出していた（1.4.0 から）。入りきらない札は次の行へ折り返し（絵の右から）、上の欄をそのぶん高くする。どの性格でも、札が欄の中に収まり、絵や下の「Lv」の行と重ならないか。",
+        run: checkNatureChipsFit
+      },
+      {
+        title: "パッチノートの見出しを開け閉めできる",
+        since: "v1.4.4",
+        why: "1.4.4 で、パッチノートの話題の見出しを開け閉めできるようにした。モンスターの名前が出る見出しはネタバレ対策で閉じた状態から始まる。どの版でも、ネタバレの見出しが閉じて始まる・決定と C で開け閉めできる・↓ を押し続ければ全部の行に届く・見出しと「ネタバレ注意 〇件」が重ならないか。",
+        run: checkPatchNoteFold
+      },
+      {
+        title: "ゴールドは 9,999,999G で止まる",
+        since: "v1.4.4",
+        why: "1.4.4 で、持てるゴールドに上限（9,999,999G）を付けた。戦闘で超えたぶんは入らず知らせが出る・お店では上限を超えるほどは売れない（品物だけ減らない）・古いセーブで超えていても上限にそろう・上限の所持金が画面に収まるか。",
+        run: checkGoldCap
+      },
+      {
+        title: "共鳴・ブレスは防御力で軽くならない",
+        since: "v1.4.4",
+        why: "1.4.4 で、共鳴とブレスは防御力を引かないようにした（属性を持つので、軽くするのは耐性）。相手の防御が 0 でも 999 でも同じダメージになり、耐性ではちゃんと軽くなるか。通常攻撃・斬撃は今までどおり防御で軽くなるか。",
+        run: checkNoDefenseForElemental
+      },
+      {
+        title: "絆のハート",
+        since: "v1.4.4",
+        why: "1.4.4 で、愛情度が絆に届いた瞬間（戦闘）にハートを出し、拠点で絆の仲間に触れるとときどきハートを出すようにした。絆に届いたときだけ出る・信頼に上がったときは出ない・絆でない仲間に触れても出ない・ハートは時間がたつと消えるか。",
+        run: checkBondHearts
+      },
+      {
         title: "版の名前がそろっている",
         since: "v1.3.1",
         why: "data/config.js の version・パッチノートの先頭・README の「現在のバージョン」が同じ。「開発中」の日付は先頭の版だけ。",
@@ -1902,6 +1938,384 @@
       kept.discovery.markSkillLearned("deathScythe");
       NS.Game.prototype._forgetDefeatOnlySkills.call(kept);
       expect(kept.discovery.isSkillLearned("deathScythe"), "仲間にしたことがあれば消さない");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 1.4.4 の仕様の変更 ---
+    function checkSpec144(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var lines = [], ok = true, wide = [];
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+
+      // 持てる数
+      var not999 = Object.keys(gd.items).filter(function (id) { return gd.items[id].maxStack !== 999; });
+      var inv = new NS.Inventory(gd);
+      var added = inv.add("potion", 1200);
+      expect(not999.length === 0 && added === 999 && inv.getCount("potion") === 999,
+        "どの品も 999 個まで（" + Object.keys(gd.items).length + " 品）。1200 個入れると 999 で止まる" + (not999.length ? "（違う：" + not999.slice(0, 4).join(" / ") + "）" : ""));
+
+      // 工房：まとめて作る
+      function makeGame(gold) {
+        var g = { data: gd, inventory: new NS.Inventory(gd), gold: gold };
+        g.canAfford = function (n) { return g.gold >= (n || 0); };
+        g.spendGold = function (n) { if (!g.canAfford(n)) return false; g.gold -= (n || 0); return true; };
+        g.giveItem = function (id, n) { return g.inventory.add(id, n); };
+        return g;
+      }
+      var cs = new NS.CraftSystem(gd);
+      var recipe = gd.recipes.potion;
+      var need = recipe.materials[0].count;
+      var game = makeGame(0);
+      game.inventory.add(recipe.materials[0].item, need * 7 + 1);
+      var max = cs.maxCraftable(game, recipe);
+      var r3 = cs.craft(game, recipe, 3);
+      var leftMat = game.inventory.getCount(recipe.materials[0].item);
+      expect(max === 7 && r3.success && r3.count === 3 && game.inventory.getCount("potion") === 3 && leftMat === need * 4 + 1,
+        "回復薬（素材 " + need + " 個で1つ）：素材 " + (need * 7 + 1) + " 個なら最大 " + max + " 回。3 回作ると 3 個できて素材は " + leftMat + " 個残る");
+      var over = cs.craft(game, recipe, 5);
+      expect(!over.success && game.inventory.getCount("potion") === 3, "作れる上限（いま 4 回）を超える 5 回は作らない・何も減らない");
+      var fake = { id: "fakeGold", result: { item: "potion", count: 2 }, materials: [ { item: recipe.materials[0].item, count: 1 } ], gold: 100 };
+      var g2 = makeGame(350);
+      g2.inventory.add(recipe.materials[0].item, 50);
+      g2.inventory.add("potion", 995);
+      var maxGold = cs.maxCraftable(g2, fake);
+      g2.inventory.remove("potion", 995);
+      var maxGold2 = cs.maxCraftable(g2, fake);
+      expect(maxGold === 2 && maxGold2 === 3, "持てる数（995 個持っていて1回2個 → 2回）と所持金（350G・1回100G → 3回）でも止まる：" + maxGold + " 回 ／ " + maxGold2 + " 回");
+
+      // 作る数の窓：全レシピを、たくさん作れる状態で描く。行が窓からはみ出さず、確認のときは はい／いいえ にかからない
+      var env = checkSceneEnv(NS, gd);
+      var sceneGame = env.game;
+      sceneGame.inventory = { getCount: function () { return 998; } };
+      sceneGame.gold = 9999999;
+      var scene = new NS.CraftScene(sceneGame, null);
+      var D = gd.ui.craft.detail, M = gd.ui.craft.confirmMenu;
+      var rightEdge = D.x + D.w - 6;
+      Object.keys(gd.recipes).forEach(function (id) {
+        ["quantity", "confirm"].forEach(function (phase) {
+          scene.order = { recipe: gd.recipes[id], count: 999, max: 999 };
+          scene.phase = phase;
+          scene._renderOrder();
+          (scene._orderRows || []).forEach(function (r) {
+            var limit = (r[3] !== undefined ? r[3] - 8 : rightEdge);
+            if (r[1] > limit && wide.length < 6) wide.push(id + "（" + phase + "）の行");
+          });
+          if (phase === "confirm" && scene._orderBottom > M.y - 4 && wide.length < 6) wide.push(id + " の行が はい／いいえ に届く");
+        });
+      });
+      expect(env.badTexts.length === 0, "文に undefined や NaN が出ない" + (env.badTexts.length ? "（出た：" + env.badTexts.join(" / ") + "）" : ""));
+      expect(wide.length === 0, "作る数の窓（" + Object.keys(gd.recipes).length + " のレシピ・999 回）が枠と はい／いいえ に収まる" + (wide.length ? "（" + wide.join(" / ") + "）" : ""));
+
+      // 戦闘の「状態を見る」：どの性格でも、性格の行が右の欄（状態異常）にかからない
+      var party = new NS.Party(6);
+      party.add(new NS.MonsterInstance("slime", 20, gd, {}));
+      env.game.party = party;
+      var foe = new NS.MonsterInstance("batty", 20, gd, {});
+      var battle = new NS.BattleScene(env.game, party, [foe], {}, function () {}, {});
+      var L = gd.ui.battle.inspect, msg = gd.ui.battle.message;
+      var origin = battle.panel.innerOrigin(msg);
+      var colX = origin.x + (L.columnX || 300);
+      var natureWide = [];
+      Object.keys(gd.natures).forEach(function (n) {
+        foe.natureId = n;
+        battle._inspectNatureRight = 0;
+        battle._renderInspectNature(foe, origin.x, origin.y + 80);
+        if (!(battle._inspectNatureRight > origin.x) || battle._inspectNatureRight > colX - 8) natureWide.push(gd.natures[n].name);
+      });
+      battle._inspectList = [foe]; battle._inspectIndex = 0; battle.phase = "inspect";
+      battle._renderInspect();
+      expect(natureWide.length === 0 && env.badTexts.length === 0,
+        "性格の行（" + Object.keys(gd.natures).length + " つ）が右の欄にかからない・敵でも描ける" + (natureWide.length ? "（かかる：" + natureWide.join(" / ") + "）" : ""));
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 仲間の詳しい欄：性格の札の折り返し（v1.4.4） ---
+    function checkNatureChipsFit(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var env = checkSceneEnv(NS, gd);
+      env.game.storage = new NS.MonsterStorage(300);
+      var scene = new NS.PartyScene(env.game, null, {});
+      var monster = new NS.MonsterInstance(Object.keys(gd.monsters)[0], 32, gd, {});
+      var panes = [
+        { name: "預かり所", pane: scene.boxPane, box: scene.layout.box.detail },
+        { name: "仲間の一覧", pane: scene.pane, box: scene.layout.detail }
+      ];
+      var natureIds = Object.keys(gd.natures);
+      panes.forEach(function (p) {
+        var bad = [], wrapped = [];
+        var rect = p.pane.rect;
+        var right = rect.x + rect.w - (scene.theme.padding || 8);
+        natureIds.forEach(function (n) {
+          monster.natureId = n;
+          scene._renderDetail(monster, p.box);
+          var head = p.pane.content.head;
+          var rows = p.pane._chipRows(head);
+          var origin = scene.panel.innerOrigin(rect);
+          var subY = origin.y + 66 + (rows.length - 1) * 24;
+          rows.forEach(function (row, r) {
+            row.forEach(function (c) {
+              var chipBottom = origin.y + 30 + r * 24 + 20;
+              if (c.x < p.pane._headTextX(head) || c.x + c.w > right || chipBottom > subY - 10) bad.push(gd.natures[n].name + "「" + c.chip.label + "」");
+            });
+          });
+          if (p.pane._headHeight(head) !== 72 + (rows.length - 1) * 24) bad.push(gd.natures[n].name + "（上の欄の高さ）");
+          if (rows.length > 1) wrapped.push(gd.natures[n].name);
+        });
+        expect(bad.length === 0, p.name + "（幅 " + rect.w + "）：" + natureIds.length + " つの性格の札が欄に収まり、Lv の行に重ならない" +
+          (wrapped.length ? "（折り返した：" + wrapped.join(" / ") + "）" : "") + (bad.length ? "（はみ出す：" + bad.slice(0, 5).join(" / ") + "）" : ""));
+      });
+      expect(env.badTexts.length === 0, "文に undefined や NaN が出ない" + (env.badTexts.length ? "（出た：" + env.badTexts.join(" / ") + "）" : ""));
+      return { ok: ok, lines: lines };
+    }
+
+    // --- パッチノートの見出しの開け閉め（v1.4.4） ---
+    function checkPatchNoteFold(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var env = checkSceneEnv(NS, gd);
+      var pointer = { x: -1, y: -1, inside: false, clicked: false, wheel: 0, moved: false, down: false };
+      env.game.input.getPointer = function () { return pointer; };
+      env.game.audio = { playBgm: function () {}, playSe: function () {} };
+      var scene = new NS.PatchNoteScene(env.game, null);
+      scene.enter();
+      function step(action) {
+        env.pressed = {};
+        if (action) env.pressed[action] = true;
+        scene.update(16);
+        env.pressed = {};
+        scene.notes.scroll = scene.notes.scrollTarget;
+        scene.render(env.g2);
+      }
+      function heads() { return scene.notes.rows.filter(function (r) { return r.heading; }); }
+      var versions = gd.patchnotes.versions;
+      var spoilerOpen = [], unreachable = [], overlap = [], toggleBad = [], spoilers = 0;
+      var g2 = env.g2;
+      for (var v = 0; v < versions.length; v++) {
+        if (v > 0) step("down");
+        if (scene.index !== v) { toggleBad.push(versions[v].version + "（選べない）"); continue; }
+        heads().forEach(function (h) {
+          if (h.spoiler) spoilers++;
+          if (h.spoiler && h.open) spoilerOpen.push(versions[v].version + " " + h.text);
+          if (!h.spoiler && !h.open) spoilerOpen.push(versions[v].version + " " + h.text + "（閉じている）");
+        });
+        // 全部閉じて、見出しと右の件数が重ならないか
+        step("right");
+        if (heads().length) {
+          if (heads().some(function (h) { return h.open; })) step("menu");
+          if (heads().some(function (h) { return h.open; })) step("menu");
+          var right = scene.layout.notes.x + scene.layout.notes.w - 8 - scene.notes.barSpace() - 4;
+          var x = scene.panel.innerOrigin(scene.layout.notes).x;
+          heads().forEach(function (h) {
+            g2.font = scene.theme.font || "14px monospace";
+            var hw = g2.measureText("▶ " + h.text).width;
+            g2.font = scene.theme.smallFont || "12px monospace";
+            var nw = g2.measureText((h.spoiler ? "ネタバレ注意　" : "") + h.count + "件").width;
+            if (x + hw + 8 > right - nw) overlap.push(versions[v].version + " " + h.text);
+          });
+          if (heads().some(function (h) { return h.open; })) toggleBad.push(versions[v].version + "（C で閉じない）");
+          step("menu");
+          if (heads().some(function (h) { return !h.open; })) toggleBad.push(versions[v].version + "（C で開かない）");
+          // 決定で1つ閉じて、もう一度で開く
+          var first = scene.cursor;
+          step("confirm");
+          var closed = scene.notes.rows[scene.cursor] && !scene.notes.rows[scene.cursor].open;
+          step("confirm");
+          var reopened = scene.notes.rows[scene.cursor] && scene.notes.rows[scene.cursor].open;
+          if (first < 0 || !closed || !reopened) toggleBad.push(versions[v].version + "（決定）");
+        }
+        // 全部開いた状態で、↓ を押し続けて全部の行が見えるか
+        var lh = scene.notes._rowHeight(), seen = {}, total = scene.notes.rows.length;
+        var rowsShown = Math.floor(scene.notes._viewHeight() / lh);
+        for (var k = 0; k < total + 40; k++) {
+          var st = Math.round(scene.notes.scrollTarget / lh);
+          for (var r = st; r < st + rowsShown && r < total; r++) seen[r] = true;
+          step("down");
+        }
+        if (Object.keys(seen).length < total) unreachable.push(versions[v].version + "（" + Object.keys(seen).length + "/" + total + "）");
+        for (k = 0; k < total + 40; k++) step("up");
+        if (scene.notes.scrollTarget !== 0) unreachable.push(versions[v].version + "（上へ戻れない）");
+        step("left");
+        // 次の版で確かめるために、開け閉めを元に戻す
+        scene._open = {};
+        scene._loadNotes();
+      }
+      expect(spoilerOpen.length === 0 && spoilers > 0, "ネタバレの見出し（" + spoilers + " か所）は閉じて、ほかは開いて始まる" + (spoilerOpen.length ? "（違う：" + spoilerOpen.slice(0, 4).join(" / ") + "）" : ""));
+      expect(toggleBad.length === 0, "決定と C で開け閉めできる（" + versions.length + " 版）" + (toggleBad.length ? "（できない：" + toggleBad.slice(0, 4).join(" / ") + "）" : ""));
+      expect(unreachable.length === 0, "↓ を押し続けると全部の行に届き、↑ で先頭へ戻る" + (unreachable.length ? "（届かない：" + unreachable.slice(0, 4).join(" / ") + "）" : ""));
+      expect(overlap.length === 0, "閉じた見出しと「ネタバレ注意 〇件」が重ならない" + (overlap.length ? "（重なる：" + overlap.slice(0, 4).join(" / ") + "）" : ""));
+      expect(env.badTexts.length === 0, "文に undefined や NaN が出ない" + (env.badTexts.length ? "（出た：" + env.badTexts.join(" / ") + "）" : ""));
+      return { ok: ok, lines: lines };
+    }
+
+    // --- ゴールドの上限（v1.4.4） ---
+    function checkGoldCap(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var max = gd.player.maxGold;
+      var game = Object.create(NS.Game.prototype);
+      game.data = gd; game.gold = max - 100; game.run = null;
+      game.inventory = new NS.Inventory(gd);
+      var a = game.giveGold(250), b = game.giveGold(5);
+      expect(max === 9999999 && a === 100 && b === 0 && game.gold === max && game.isGoldFull(),
+        "上限 " + max + "G。あと 100G のところへ 250G 渡すと 100G だけ入り、次は 0G（いま " + game.gold + "G）");
+
+      // 戦闘：入らなかったぶんの知らせ
+      var battleTexts = gd.messages.battle;
+      var fakeScene = { game: game, enemies: [ { getGoldReward: function () { return 300; } } ] };
+      var events = [];
+      game.gold = max - 120;
+      NS.BattleScene.prototype._awardGold.call(fakeScene, events);
+      var t1 = events.map(function (e) { return e.text; });
+      events = [];
+      NS.BattleScene.prototype._awardGold.call(fakeScene, events);
+      var t2 = events.map(function (e) { return e.text; });
+      expect(t1.length === 2 && t1[0].indexOf("120") >= 0 && t1[1] === battleTexts.goldFull && t2.length === 1 && t2[0] === battleTexts.goldFull,
+        "戦闘：一部だけ入れば「" + (t1[0] || "") + "」と「" + battleTexts.goldFull + "」、まったく入らなければ知らせだけ");
+
+      // お店：上限を超えるほどは売れない
+      var shop = new NS.ShopSystem(gd);
+      var sellable = Object.keys(gd.items).map(function (id) { return gd.items[id]; })
+        .filter(function (it) { return shop.canSell(it) && shop.getSellPrice(it) > 0; })
+        .sort(function (x, y) { return shop.getSellPrice(y) - shop.getSellPrice(x); })[0];
+      var price = shop.getSellPrice(sellable);
+      game.inventory.add(sellable.id, 999);
+      game.gold = max - price * 3 - 1;
+      var canSell = shop.getMaxSellCount(game, sellable);
+      var r = shop.sell(game, sellable.id, 10);
+      var left = game.inventory.getCount(sellable.id);
+      var r2 = shop.sell(game, sellable.id, 1);
+      expect(canSell === 3 && r.success && r.count === 3 && left === 996 && game.gold === max - 1 && !r2.success && r2.reason === "goldFull" && game.inventory.getCount(sellable.id) === 996,
+        sellable.name + "（売値 " + price + "G）：あと 3 個ぶんの余裕なら最大 " + canSell + " 個。10 個売ろうとしても 3 個だけ売れ、品物は " + left + " 個残る。そのあとは「" + gd.messages.shop.goldFull + "」");
+      // いちばん高い品を 999 個売っても上限に収まるか（案 B を選んだ理由）
+      expect(price * 999 <= max, "いちばん高く売れる品（" + sellable.name + "）を 999 個売っても " + (price * 999) + "G で、上限に収まる");
+
+      // 古いセーブ
+      var st = { party: null, storage: null, inventory: game.inventory, gold: max * 3, discovery: null };
+      try { game.applyLoadedState(st); } catch (e) { }
+      expect(game.gold === max, "上限より多いセーブを読むと " + max + "G にそろう（" + game.gold + "G）");
+
+      // 画面：上限の所持金を描いて、文に崩れがない
+      var env = checkSceneEnv(NS, gd);
+      env.game.gold = max;
+      env.game.getMaxGold = NS.Game.prototype.getMaxGold;
+      env.game.isGoldFull = NS.Game.prototype.isGoldFull;
+      env.game.getGoldRoom = NS.Game.prototype.getGoldRoom;
+      var drawn = [];
+      [["ShopScene", function () { return new NS.ShopScene(env.game, null); }],
+       ["CraftScene", function () { return new NS.CraftScene(env.game, null); }]].forEach(function (p) {
+        try { var sc = p[1](); if (sc.enter) sc.enter(); sc._renderGold(); drawn.push(p[0]); } catch (e) { drawn.push(p[0] + "（" + e.message + "）"); }
+      });
+      expect(env.badTexts.length === 0 && drawn.join("").indexOf("（") < 0, "お店・工房で上限の所持金を描ける" + (env.badTexts.length ? "（" + env.badTexts.join(" / ") + "）" : "") + "（" + drawn.join(" / ") + "）");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 共鳴・ブレスと防御（v1.4.4） ---
+    function checkNoDefenseForElemental(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var sys = new NS.BattleSystem(gd, new NS.Random(1));
+      var attacker = new NS.MonsterInstance("slime", 40, gd, {});
+      function foe(defense, resist) {
+        var m = new NS.MonsterInstance("slime", 40, gd, {});
+        m.getDefense = function () { return defense; };
+        if (resist) { var base = m.getResistance ? m.getResistance.bind(m) : null; m.getResistance = function (el) { return 5; }; }
+        return m;
+      }
+      var kinds = { resonance: [], breath: [] }, changed = [];
+      Object.keys(gd.skills).forEach(function (id) {
+        var s = gd.skills[id];
+        if (!kinds[s.kind] || !(s.power > 0) || s.damageKind) return;
+        kinds[s.kind].push(s);
+        var low = sys.calcDamage(attacker, foe(0), s, true).damage;
+        var high = sys.calcDamage(attacker, foe(999), s, true).damage;
+        if (low !== high && changed.length < 5) changed.push(s.name + "（" + low + " → " + high + "）");
+      });
+      expect(changed.length === 0 && kinds.resonance.length > 0 && kinds.breath.length > 0,
+        "共鳴 " + kinds.resonance.length + "・ブレス " + kinds.breath.length + " の技：相手の防御が 0 でも 999 でも同じダメージ" + (changed.length ? "（変わる：" + changed.join(" / ") + "）" : ""));
+      var fire = gd.skills.fireBreath || kinds.breath[0];
+      var plain = sys.calcDamage(attacker, foe(0), fire, true);
+      var resisted = foe(0);
+      resisted.getResistance = function () { return 5; };
+      var res = sys.calcDamage(attacker, resisted, fire, true);
+      var resNote = res.elementMultiplier < plain.elementMultiplier && res.damage < plain.damage;
+      expect(resNote, fire.name + "：耐性 +5 の相手には " + plain.damage + " → " + res.damage + "（属性の倍率 " + plain.elementMultiplier + " → " + res.elementMultiplier + "）");
+      var normal = gd.skills[sys.getNormalAttackId()];
+      var bite = Object.keys(gd.skills).map(function (k) { return gd.skills[k]; }).filter(function (s) { return s.kind === "slash" && s.power > 0 && !s.damageKind; })[0];
+      var n0 = sys.calcDamage(attacker, foe(0), normal, true).damage, n1 = sys.calcDamage(attacker, foe(30), normal, true).damage;
+      var b0 = sys.calcDamage(attacker, foe(0), bite, true).damage, b1 = sys.calcDamage(attacker, foe(30), bite, true).damage;
+      expect(n1 < n0 && b1 < b0, "通常攻撃（" + n0 + " → " + n1 + "）と" + bite.name + "（" + b0 + " → " + b1 + "）は、相手の防御 0 → 30 で今までどおり軽くなる");
+      return { ok: ok, lines: lines };
+    }
+
+    // --- 絆のハート（v1.4.4） ---
+    function checkBondHearts(ctx) {
+      var NS = ctx.NS, gd = ctx.gd;
+      var lines = [], ok = true;
+      function expect(cond, text) { if (!cond) ok = false; lines.push((cond ? "" : "✗ ") + text); }
+      var stages = gd.affection.stages;
+      var bondNeed = stages.filter(function (s) { return s.bondReward; })[0].need;
+      var trustNeed = stages[stages.length - 2].need;
+      var gain = gd.affection.gainPerWin || 1;
+
+      // 戦闘：勝って段階が上がったときの出来事
+      function award(start) {
+        var sys = new NS.BattleSystem(gd, new NS.Random(1));
+        var m = new NS.MonsterInstance("slime", 20, gd, {});
+        m.affection = start;
+        m._appeared = true;
+        sys.allies = [m];
+        var events = [];
+        sys._awardAffection(events);
+        return events.filter(function (e) { return e.type === "affectionUp"; })[0] || null;
+      }
+      var toBond = award(bondNeed - gain), toTrust = award(trustNeed - gain);
+      expect(toBond && toBond.bond === true && toTrust && toTrust.bond === false,
+        "絆に届いた勝利だけ bond の印（" + (toBond ? toBond.stageName : "-") + "：" + (toBond && toBond.bond) + "／" + (toTrust ? toTrust.stageName : "-") + "：" + (toTrust && toTrust.bond) + "）");
+
+      // 戦闘の画面：その出来事を見せるとハートが出る
+      var env = checkSceneEnv(NS, gd);
+      var party = new NS.Party(6);
+      var ally = new NS.MonsterInstance("slime", 20, gd, {});
+      party.add(ally);
+      env.game.party = party;
+      var battle = new NS.BattleScene(env.game, party, [new NS.MonsterInstance("batty", 5, gd, {})], {}, function () {}, {});
+      if (battle.enter) battle.enter();
+      battle._bondHearts(ally);
+      var count = battle.hearts.items.length;
+      battle.render(env.g2);
+      env.game.clock += 5000;
+      battle.render(env.g2);
+      expect(count === (gd.ui.battle.bondHearts || 5) && !battle.hearts.isActive(),
+        "戦闘：絆に届いた仲間から " + count + " 個出て、時間がたつと消える");
+
+      // 拠点：触れたとき（確率は 1 にして確かめる）
+      var camp = JSON.parse(JSON.stringify(gd.ui.home.camp));
+      camp.bondHeartChance = 1;
+      function touch(affection) {
+        var home = Object.create(NS.HomeScene.prototype);
+        var m = new NS.MonsterInstance("slime", 20, gd, {});
+        m.affection = affection;
+        var p = new NS.Party(6); p.add(m);
+        home.game = { party: p, clock: 1000, data: gd };
+        home.layout = { camp: camp };
+        home.random = new NS.Random(1);
+        home.hearts = new NS.HeartBurst(gd.ui.theme.hearts);
+        home.campMotions = { update: function () {}, play: function () {}, get: function () { return null; } };
+        home._campNext = {}; home._dozeUntil = {};
+        home._cheer = function () {};
+        var seat = home._seatRect(m, 0);
+        home._updateCamp({ getPointer: function () { return { x: seat.x + seat.w / 2, y: seat.y + seat.h / 2, inside: true, clicked: true }; } });
+        return home.hearts.items.length;
+      }
+      var bonded = touch(bondNeed), trusted = touch(trustNeed);
+      expect(bonded === camp.bondHearts && trusted === 0,
+        "拠点：絆の仲間に触れると " + bonded + " 個（確率 " + gd.ui.home.camp.bondHeartChance + "）、信頼の仲間は 0 個");
+      expect(env.badTexts.length === 0, "文に undefined や NaN が出ない" + (env.badTexts.length ? "（出た：" + env.badTexts.join(" / ") + "）" : ""));
       return { ok: ok, lines: lines };
     }
 

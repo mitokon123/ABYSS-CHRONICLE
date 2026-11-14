@@ -63,6 +63,11 @@
     },
 
     theme: {
+      // ハートの演出（NS.HeartBurst。v1.4.4）。life＝消えるまで(ms)・rise＝昇る高さ・size＝大きさ・
+      // spread＝横の散らばり・stagger＝1つずつずらす時間(ms)
+      hearts: { life: 1400, rise: 46, size: 15, spread: 40, stagger: 130, color: "#ff6f9c", edge: "#ffd0de" },
+      // 所持金が上限（data/player.js の maxGold）に届いたときの色（v1.4.4）
+      goldFullColor: "#ff9a3a",
       panelBg: "rgba(8,10,20,0.92)",
       panelBorder: "#3a4266",
       borderWidth: 2,
@@ -238,6 +243,8 @@
      * 描画側が人数から開始位置を計算する。
      */
     battle: {
+      // 愛情度が絆に届いた瞬間に出すハートの数（v1.4.4）
+      bondHearts: 5,
       background: "#0b0f1a",
 
       // 敵（上段）
@@ -472,7 +479,10 @@
         cheerEvery: [7000, 15000],
         dozeChance: 0.3,
         dozeFor: [6000, 11000],
-        zzzColor: "#9fb3ff"
+        zzzColor: "#9fb3ff",
+        // 絆（愛情度の報酬の段階）の仲間に触れたとき、ハートを出す確率と数（v1.4.4・作者の指定）
+        bondHeartChance: 0.5,
+        bondHearts: 3
       },
 
       title:    { x: 48, y: 62, font: "26px monospace", color: "#e6ecff" },
@@ -881,6 +891,8 @@
       tagTextColor: "#0a0f1c",
       // 話題の見出し（「■ 戦い」など。data/patchnotes.js の { section }）の色
       sectionColor: "#8fb8ff",
+      // 閉じた見出しの「ネタバレ注意」の色（v1.4.4）
+      spoilerColor: "#e8a23a",
 
       // visibleRows … 一度に出すバージョンの数。
       //   ★ バージョンは増え続けるので、入りきらない前提で送れるようにしてある。
@@ -966,6 +978,9 @@
       filter: { right: 372, y: 110 },
 
       confirmMenu: { x: 560, y: 400, w: 190, h: 80, lineHeight: 26 },
+      // まとめて作る（v1.4.4）。↑↓ で動く数・確認の問いの1行の文字数（はい／いいえの左に収める）
+      quantityStep: 10,
+      orderQuestionChars: 12,
       notice: { x: 400, y: 526 },
       hint:   { x: 48, y: 570 }
     },

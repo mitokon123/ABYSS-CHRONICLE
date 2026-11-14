@@ -503,7 +503,7 @@
     game.resetFileSettings();
     game.ensureProgress();
 
-    game.gold = opts.gold;
+    game.gold = Math.min(opts.gold, game.getMaxGold ? game.getMaxGold() : Infinity);   // 上限（v1.4.4）
     if (opts.dex) fillDex();
     if (opts.cleared) clearAllDungeons();
     if (opts.items) giveAllItems(99);
@@ -1070,7 +1070,7 @@
   };
 
   var CHG = {
-    gold: function (el) { game.gold = Math.max(0, Number(el.value) || 0); },
+    gold: function (el) { game.gold = Math.min(game.getMaxGold ? game.getMaxGold() : Infinity, Math.max(0, Number(el.value) || 0)); },
     openPreparing: function (el) { cheats.openPreparing = el.checked; saveCheats(); applyPreparing(); render(); },
     clearedOne: function (el) {
       if (el.checked) game.clearedDungeons[el.dataset.id] = true;

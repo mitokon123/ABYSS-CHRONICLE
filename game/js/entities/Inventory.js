@@ -83,7 +83,7 @@
     var definition = this.data.getItem(itemId);
     if (!definition) return 0;
 
-    var maxStack = definition.maxStack === undefined ? 99 : definition.maxStack;
+    var maxStack = definition.maxStack === undefined ? 999 : definition.maxStack;
     var slot = this._findSlot(itemId);
 
     if (!slot) {

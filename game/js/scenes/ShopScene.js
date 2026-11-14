@@ -478,7 +478,12 @@
 
   /** 1個もやりとりできない理由 */
   ShopScene.prototype._blockedReason = function (mode, choice) {
-    if (mode === "sell") return this.texts.notOwned;
+    if (mode === "sell") {
+      // 持っているのに売れないのは、所持金が上限（v1.4.4）のとき
+      var owned = this.game.inventory.getCount(choice.itemId);
+      return (owned > 0 && this.game.getGoldRoom && this.game.getGoldRoom() < this.shop.getSellPrice(this.game.data.getItem(choice.itemId)))
+        ? this.texts.goldFull : this.texts.notOwned;
+    }
     return this.game.canAfford(choice.price) ? this.texts.stackFull : this.texts.notEnoughGold;
   };
 
@@ -955,9 +960,11 @@
     if (!pos) return;
 
     var template = ((this.game.data.messages || {}).home || {}).gold || "{amount}G";
+    // 上限（v1.4.4）に届いていれば色を変える
+    var full = this.game.isGoldFull && this.game.isGoldFull();
     this.panel.drawText(template.replace("{amount}", this.game.gold || 0), pos.x, pos.y,
       { align: "right", font: pos.font || this.theme.font,
-        color: pos.color || this.theme.cursorColor });
+        color: full ? (this.theme.goldFullColor || "#ff9a3a") : (pos.color || this.theme.cursorColor) });
   };
 
   // --- 右の説明（v1.4.0） ---

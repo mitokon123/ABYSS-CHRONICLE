@@ -362,7 +362,8 @@
     this.party = state.party;
     this.storage = state.storage;
     this.inventory = state.inventory;
-    this.gold = state.gold || 0;
+    // 上限（v1.4.4）より前のセーブで超えていても、上限にそろえる
+    this.gold = Math.min(state.gold || 0, this.getMaxGold());
     this.discovery = state.discovery;
     // 名前と色。古いセーブには無いので、その場合は既定のまま
     this.playerName = state.playerName || null;
@@ -722,12 +723,34 @@
    * 全滅しても失わないので、挑戦（ラン）の記録には入れない。
    * @returns {number} 実際に増えた量
    */
+  /**
+   * ゴールドを渡す。上限（data/player.js の maxGold。v1.4.4）を超えたぶんは入らない。
+   * @returns {number} 実際に増えた量（上限に届いていれば 0）
+   */
   Game.prototype.giveGold = function (amount) {
     if (!amount || amount <= 0) return 0;
-    this.gold += amount;
+    var added = Math.min(amount, this.getGoldRoom());
+    if (added <= 0) return 0;
+    this.gold += added;
     // 結果画面で「いくら稼いだか」を出せるよう、挑戦中は記録しておく
-    if (this.run) this.run.recordGold(amount);
-    return amount;
+    if (this.run) this.run.recordGold(added);
+    return added;
+  };
+
+  /** 持てるゴールドの上限（v1.4.4） */
+  Game.prototype.getMaxGold = function () {
+    var max = ((this.data && this.data.player) || {}).maxGold;
+    return (typeof max === "number" && max > 0) ? max : Infinity;
+  };
+
+  /** あといくら持てるか */
+  Game.prototype.getGoldRoom = function () {
+    return Math.max(0, this.getMaxGold() - (this.gold || 0));
+  };
+
+  /** 所持金が上限に届いているか（所持金の色を変えるのに使う） */
+  Game.prototype.isGoldFull = function () {
+    return (this.gold || 0) >= this.getMaxGold();
   };
 
   /** 支払えるか */
@@ -978,7 +1001,7 @@
     var equipped = (monster.equipment || []).slice();
     for (var i = 0; i < equipped.length; i++) {
       var item = this.data.getItem(equipped[i]);
-      var maxStack = (item && item.maxStack !== undefined) ? item.maxStack : 99;
+      var maxStack = (item && item.maxStack !== undefined) ? item.maxStack : 999;
       if (this.inventory.getCount(equipped[i]) + 1 > maxStack) {
         return { success: false, reason: "stackFull", monster: monster };
       }

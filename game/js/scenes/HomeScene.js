@@ -65,6 +65,8 @@
     // たき火を囲む仲間（data/ui.js の home.camp）。
     // 1回だけの動き（喜ぶ）は MotionPlayer、次に何かする時刻とうたた寝の終わりは席ごとに持つ
     this.campMotions = new NS.MotionPlayer(game.data);
+    // 絆の仲間に触れたときのハート（v1.4.4）
+    this.hearts = new NS.HeartBurst(((game.data.ui || {}).theme || {}).hearts);
     this._campNext = [];
     this._dozeUntil = [];
 
@@ -322,6 +324,12 @@
       if (clicked) {
         this._dozeUntil[i] = 0;
         this._cheer(monster);
+        // 絆（愛情度の報酬の段階）の仲間は、ときどきハートを出す（v1.4.4・作者の指定）
+        if (monster.hasReachedBondReward && monster.hasReachedBondReward() &&
+            this.random.next() < (C.bondHeartChance === undefined ? 0.5 : C.bondHeartChance)) {
+          var seat = this._seatRect(monster, i);
+          this.hearts.add(seat.x + seat.w / 2, seat.y + 4, clock, C.bondHearts || 3);
+        }
         this._campNext[i] = clock + this._between(C.cheerEvery, [7000, 15000]);
         continue;
       }
@@ -393,6 +401,8 @@
 
       if (dozing) this._renderZzz(ctx, rect, clock, i);
     }
+    // 絆の仲間のハート（v1.4.4）。仲間より手前
+    if (this.hearts) this.hearts.render(ctx, clock);
   };
 
   /** 眠っている印。小さな z が2つ、ずれて昇って消える */
@@ -688,9 +698,12 @@
     var template = this.texts.gold || "{amount}G";
     var shown = (this._shownGold === null) ? (this.game.gold || 0) : this._shownGold;
 
+    // 上限（v1.4.4）に届いていれば色を変える
+    var full = this.game.isGoldFull && this.game.isGoldFull() && Math.round(shown) >= this.game.getMaxGold();
     this.panel.drawText(template.replace("{amount}", Math.round(shown)),
       pos.x, pos.y,
-      { align: "right", font: pos.font || this.theme.font, color: pos.color || this.theme.cursorColor });
+      { align: "right", font: pos.font || this.theme.font,
+        color: full ? (this.theme.goldFullColor || "#ff9a3a") : (pos.color || this.theme.cursorColor) });
   };
 
   /** 右側に手持ちの一覧を表示する */
